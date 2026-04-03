@@ -2,7 +2,14 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from streamlit_agraph import agraph, Config
+import plotly.graph_objects as go
 from utils import process_multiple_ris, criar_grafo_e_metricas, deduplicar_por_doi, deduplicar_por_similaridade
+from pyecharts import options as opts
+from pyecharts.charts import WordCloud as PyechartsWordCloud
+from streamlit_echarts import st_pyecharts
+from streamlit_echarts import st_echarts
+from pyecharts.commons.utils import JsCode
+import json
 
 st.set_page_config(page_title="Bibliometrix Python", page_icon="🧬", layout="wide")
 
@@ -50,9 +57,67 @@ if st.session_state['df_geral'] is not None:
     df = st.session_state['df_geral']
     
     tab_main, tab_grafos = st.tabs(["📊 Informações Principais", "🕸️ Redes e Grafos de Conhecimento"])
-
+    
     with tab_main:
         st.subheader("Resumo Estrutural da Amostra")
+
+        # Interface de Deduplicação
+        with st.expander("🛠️ Ferramenta de Limpeza: Remover Documentos Duplicados", expanded=True):
+            st.write("Escolha o método de deduplicação. A base será atualizada nos gráficos e tabelas.")
+            
+            # Controle de Threshold para a Similaridade
+            threshold = st.slider("Limiar de Similaridade do Título (Apenas para o Botão 2):", min_value=0.70, max_value=1.00, value=0.90, step=0.01)
+            
+            c_btn1, c_btn2, c_btn3 = st.columns(3)
+            
+            with c_btn1:
+                if st.button("1. Deduplicar por DOI Exato"):
+                    with st.spinner("Buscando DOIs..."):
+                        df_limpo, df_dupes = deduplicar_por_doi(st.session_state['df_geral'])
+                        st.session_state['df_geral'] = df_limpo
+                        # ANEXA os novos duplicados aos já existentes
+                        st.session_state['df_duplicados'] = pd.concat([st.session_state['df_duplicados'], df_dupes], ignore_index=True)
+                        st.rerun()
+
+            with c_btn2:
+                if st.button("2. Deduplicar por Similaridade"):
+                    with st.spinner("Calculando similaridade..."):
+                        df_limpo, df_dupes = deduplicar_por_similaridade(st.session_state['df_geral'], threshold)
+                        st.session_state['df_geral'] = df_limpo
+                        # ANEXA os novos duplicados aos já existentes
+                        st.session_state['df_duplicados'] = pd.concat([st.session_state['df_duplicados'], df_dupes], ignore_index=True)
+                        st.rerun()
+
+            with c_btn3:
+                if st.button("🔄 Reverter Base"):
+                    st.session_state['df_geral'] = st.session_state['df_original'].copy()
+                    st.session_state['df_duplicados'] = pd.DataFrame() # Limpa a lista de excluídos
+                    st.rerun()
+
+            # Avisos de Sucesso ou Erro
+            if st.session_state.get('df_duplicados') is not None:
+                qtd_removidos = len(st.session_state['df_duplicados'])
+                if qtd_removidos > 0:
+                    st.error(f"🗑️ Foram detectados e removidos **{qtd_removidos} documentos duplicados** nesta ação.")
+                else:
+                    st.success("🗃️ Deduplique por DOI ou por similaridade")
+
+            if st.session_state['df_duplicados'] is not None and not st.session_state['df_duplicados'].empty:
+                st.markdown("### 🚨 Relatório Permanente de Documentos Excluídos")
+            
+                dupes = st.session_state['df_duplicados']
+                # Definindo colunas para exibição
+                cols_exibicao = [c for c in ['TITLE', 'TI', 'DOCUMENTO DE REFERÊNCIA (MANTIDO)', 'BASE DE DADOS', 'DOI'] if c in dupes.columns]
+            
+                st.dataframe(dupes[cols_exibicao], use_container_width=True, hide_index=True)
+            
+                # Botão para baixar apenas os excluídos (útil para o anexo da metodologia PRISMA)
+                csv_dupes = dupes.to_csv(index=False).encode('utf-8')
+                st.download_button("Baixar Relatório de Excluídos (CSV)", data=csv_dupes, file_name='documentos_excluidos.csv')
+
+            st.write("")
+
+
         total_docs = len(df)
         
         timespan = f"{int(df['YEAR CLEAN'].min())}:{int(df['YEAR CLEAN'].max())}" if 'YEAR CLEAN' in df.columns and pd.notna(df['YEAR CLEAN'].min()) else "N/A"
@@ -151,7 +216,6 @@ if st.session_state['df_geral'] is not None:
                 st.info("ℹ️ Nenhuma informação de citação encontrada nos documentos para gerar este ranking.")
 
         # --- LINHA 3 DE GRÁFICOS: TOP PAÍSES ---
-        st.divider()
         st.markdown("##### 🌍 Top 20 Países Mais Produtivos/Citados")
         
         col_country_sel, col_country_graph = st.columns([1, 3])
@@ -199,67 +263,84 @@ if st.session_state['df_geral'] is not None:
                     st.plotly_chart(fig_c, use_container_width=True)
         st.divider()
 
+        # --- LINHA 4 DE GRÁFICOS: NUVEM DE PALAVRAS ---
+        st.divider()
+        st.markdown("##### ☁️ Nuvem de Palavras (Análise Semântica)")
+        
+        col_wc_sel, col_wc_img = st.columns([1, 3])
+        
+        with col_wc_sel:
+            st.write("")
+            fonte_nuvem = st.selectbox(
+                "Fonte de dados para a Nuvem:",
+                ["Títulos", "Palavras-chave", "Resumo (Abstract)"],
+                key="sel_wordcloud"
+            )
+
+            # NOVO SELETOR DE ESTILO:
+            estilo_fonte = st.selectbox(
+                "Estilo da Fonte:",
+                ["Arial", "Verdana", "Courier New", "Comic Sans MS", "Impact", "Poppins"],
+                index=0,
+                key="sel_font_style"
+            )
+
+            tema_cor = st.selectbox(
+                "Paleta de Cores:",
+                ["Oceano", "Fogo", "Floresta", "Cyberpunk", "Acadêmico"],
+                index=0,
+                key="sel_word_palette"
+            )
+
+            # Dicionário de Hex-Codes para as paletas
+            paletas = {
+                "Oceano": ["#0077b6", "#00b4d8", "#90e0ef", "#03045e", "#023e8a"],
+                "Fogo": ["#ff4d00", "#ff8c00", "#ff0000", "#fad02c", "#e85d04"],
+                "Floresta": ["#2d6a4f", "#40916c", "#1b4332", "#74c69d", "#95d5b2"],
+                "Cyberpunk": ["#f72585", "#7209b7", "#3a0ca3", "#4361ee", "#4cc9f0"],
+                "Acadêmico": ["#264653", "#2a9d8f", "#e9c46a", "#f4a261", "#e76f51"]
+            }
+            
+            paleta_escolhida = paletas[tema_cor]
+            
+            # Mapeamento para as colunas reais do DataFrame
+            mapa_colunas = {
+                "Títulos": next((c for c in ['TITLE', 'TI'] if c in df.columns), None),
+                "Palavras-chave": next((c for c in ['KEYWORDS', 'KW', 'DE'] if c in df.columns), None),
+                "Resumo (Abstract)": next((c for c in ['ABSTRACT', 'AB'] if c in df.columns), None)
+            }
+            
+            coluna_escolhida = mapa_colunas[fonte_nuvem]
+            st.info(f"As 'Stopwords' em inglês são removidas automaticamente para destacar termos conceituais.")
+
+        with col_wc_img:
+            if coluna_escolhida and coluna_escolhida in df.columns:
+                with st.spinner("Pintando palavras e ajustando tipografia..."):
+                    from utils import gerar_nuvem_echarts
+                    from streamlit_echarts import st_echarts # Usamos a função base nativa!
+                    
+                    wc_opcoes = gerar_nuvem_echarts(
+                        df, 
+                        coluna_escolhida, 
+                        fonte=estilo_fonte, 
+                        paleta=paleta_escolhida
+                    )
+                    
+                    if wc_opcoes:
+                        st_echarts(
+                            options=wc_opcoes, 
+                            height="550px", 
+                            key=f"wc_final_{estilo_fonte}_{fonte_nuvem}_{tema_cor}"
+                        )
+                    else:
+                        st.warning("Não há texto suficiente nesta coluna para gerar a nuvem.")
+            else:
+                st.warning(f"A coluna de {fonte_nuvem} não foi encontrada nos dados.")
+
         # =========================================================
         # MÓDULO DE DEDUPLICAÇÃO E TABELAS
         # =========================================================
         st.markdown("### 📋 Tabela Completa e Estatísticas de Citação")
-        
-        # Interface de Deduplicação
-        with st.expander("🛠️ Ferramenta de Limpeza: Remover Documentos Duplicados", expanded=True):
-            st.write("Escolha o método de deduplicação. A base será atualizada nos gráficos e tabelas.")
-            
-            # Controle de Threshold para a Similaridade
-            threshold = st.slider("Limiar de Similaridade do Título (Apenas para o Botão 2):", min_value=0.70, max_value=1.00, value=0.90, step=0.01)
-            
-            c_btn1, c_btn2, c_btn3 = st.columns(3)
-            
-            with c_btn1:
-                if st.button("1. Deduplicar por DOI Exato"):
-                    with st.spinner("Buscando DOIs..."):
-                        df_limpo, df_dupes = deduplicar_por_doi(st.session_state['df_geral'])
-                        st.session_state['df_geral'] = df_limpo
-                        # ANEXA os novos duplicados aos já existentes
-                        st.session_state['df_duplicados'] = pd.concat([st.session_state['df_duplicados'], df_dupes], ignore_index=True)
-                        st.rerun()
-
-            with c_btn2:
-                if st.button("2. Deduplicar por Similaridade"):
-                    with st.spinner("Calculando similaridade..."):
-                        df_limpo, df_dupes = deduplicar_por_similaridade(st.session_state['df_geral'], threshold)
-                        st.session_state['df_geral'] = df_limpo
-                        # ANEXA os novos duplicados aos já existentes
-                        st.session_state['df_duplicados'] = pd.concat([st.session_state['df_duplicados'], df_dupes], ignore_index=True)
-                        st.rerun()
-
-            with c_btn3:
-                if st.button("🔄 Reverter Base"):
-                    st.session_state['df_geral'] = st.session_state['df_original'].copy()
-                    st.session_state['df_duplicados'] = pd.DataFrame() # Limpa a lista de excluídos
-                    st.rerun()
-
-            # Avisos de Sucesso ou Erro
-            if st.session_state.get('df_duplicados') is not None:
-                qtd_removidos = len(st.session_state['df_duplicados'])
-                if qtd_removidos > 0:
-                    st.error(f"🗑️ Foram detectados e removidos **{qtd_removidos} documentos duplicados** nesta ação.")
-                else:
-                    st.success("✅ Nenhum documento duplicado encontrado nesta ação.")
-
-        if st.session_state['df_duplicados'] is not None and not st.session_state['df_duplicados'].empty:
-            st.markdown("---")
-            st.markdown("### 🚨 Relatório Permanente de Documentos Excluídos")
-            
-            dupes = st.session_state['df_duplicados']
-            # Definindo colunas para exibição
-            cols_exibicao = [c for c in ['TITLE', 'TI', 'DOCUMENTO DE REFERÊNCIA (MANTIDO)', 'BASE DE DADOS', 'DOI'] if c in dupes.columns]
-            
-            st.dataframe(dupes[cols_exibicao], use_container_width=True, hide_index=True)
-            
-            # Botão para baixar apenas os excluídos (útil para o anexo da metodologia PRISMA)
-            csv_dupes = dupes.to_csv(index=False).encode('utf-8')
-            st.download_button("Baixar Relatório de Excluídos (CSV)", data=csv_dupes, file_name='documentos_excluidos.csv')
-
-        st.write("")
         
         # Estatísticas e Tabela Bruta (Da base já limpa, caso tenha rodado a limpeza)
         if 'TOTAL CITATIONS' in df.columns:

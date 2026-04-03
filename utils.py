@@ -10,6 +10,66 @@ from itertools import combinations
 from streamlit_agraph import Node, Edge
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from wordcloud import WordCloud, STOPWORDS
+import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+from pyecharts import options as opts
+from pyecharts.charts import WordCloud as PyechartsWordCloud
+import json
+from pyecharts.commons.utils import JsCode
+import random
+
+def gerar_nuvem_echarts(df, coluna, fonte="Arial", paleta=None):
+    """Gera o dicionário nativo da nuvem de palavras, livre de erros de conversão JS."""
+    texto = " ".join(df[coluna].dropna().astype(str)).lower()
+    if not texto.strip():
+        return None
+
+    stopwords = set(STOPWORDS)
+    stopwords.update(["research", "study", "analysis", "results", "using", "paper", "article", "author", "will", "may", "can"])
+
+    palavras_limpas = re.findall(r'\b\w{3,}\b', texto)
+    palavras_filtradas = [w for w in palavras_limpas if w not in stopwords]
+    contagem = Counter(palavras_filtradas).most_common(150)
+
+    if not paleta:
+        paleta = ["#0077b6", "#00b4d8", "#90e0ef", "#03045e", "#023e8a"]
+
+    # Atribuímos a cor individualmente para cada palavra aqui mesmo no Python
+    dados_palavras = []
+    for palavra, freq in contagem:
+        dados_palavras.append({
+            "name": palavra,
+            "value": freq,
+            "textStyle": {
+                "color": random.choice(paleta)
+            }
+        })
+
+    # Dicionário puro e perfeito que o ECharts entende instantaneamente
+    opcoes_echarts = {
+        "tooltip": {"show": True},
+        "toolbox": {
+            "feature": {
+                "saveAsImage": {"show": True, "title": "Baixar Nuvem", "type": "png"}
+            }
+        },
+        "series": [{
+            "type": "wordCloud",
+            "shape": "circle",
+            "sizeRange": [15, 80],
+            "rotationRange": [-45, 90],
+            "rotationStep": 45,
+            "gridSize": 8,
+            "textStyle": {
+                "fontFamily": fonte,
+                "fontWeight": "bold"
+            },
+            "data": dados_palavras
+        }]
+    }
+
+    return opcoes_echarts
 
 def process_multiple_ris(uploaded_files, db_mapping):
     """Lê múltiplos arquivos RIS e retorna um DataFrame padronizado."""

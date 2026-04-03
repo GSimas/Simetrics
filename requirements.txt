@@ -1,0 +1,10 @@
+streamlit
+pandas
+rispy
+plotly
+networkx
+scipy
+scikit-learn
+streamlit-agraph
+wordcloud
+numpy
