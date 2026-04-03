@@ -8,3 +8,5 @@ scikit-learn
 streamlit-agraph
 wordcloud
 numpy
+pyecharts
+streamlit-echarts
