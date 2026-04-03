@@ -978,186 +978,183 @@ if st.session_state['df_geral'] is not None:
                 else:
                     st.warning("Métricas isoladas/não aplicáveis.")
 
-            st.markdown("---")
+            # =========================================================
+            # ABAS DO DOSSIÊ (HISTÓRICO, NUVEM E SIMILARES)
+            # =========================================================
+            tab_hist, tab_nuvem, tab_similares = st.tabs(["📈 Evolução Histórica", "☁️ Lexicometria", "🔗 Itens Semelhantes"])
 
-        # =========================================================
-        # ABAS DO DOSSIÊ (HISTÓRICO, NUVEM E SIMILARES)
-        # =========================================================
-        tab_hist, tab_nuvem, tab_similares = st.tabs(["📈 Evolução Histórica", "☁️ Lexicometria", "🔗 Itens Semelhantes"])
+            if not termo_ativo:
+                subset_df = pd.DataFrame(columns=df.columns)
+            elif tipo_ativo == "Documento": 
+                subset_df = df[df[col_titulos] == termo_ativo] if col_titulos else pd.DataFrame(columns=df.columns)
+            elif tipo_ativo == "Autor": 
+                subset_df = df[df[col_autores].fillna('').str.contains(str(termo_ativo), regex=False)] if col_autores else pd.DataFrame(columns=df.columns)
+            elif tipo_ativo == "País": 
+                subset_df = df[df[col_paises].fillna('').str.contains(str(termo_ativo), regex=False)] if col_paises else pd.DataFrame(columns=df.columns)
+            elif tipo_ativo == "Local de Publicação (Venue)": 
+                subset_df = df[df[col_venue] == termo_ativo] if col_venue else pd.DataFrame(columns=df.columns)
+            else:
+                subset_df = pd.DataFrame(columns=df.columns)
 
-        # CORREÇÃO: Garante que o DataFrame vazio mantenha a "casca" das colunas originais
-        if not termo_ativo:
-            subset_df = pd.DataFrame(columns=df.columns)
-        elif tipo_ativo == "Documento": 
-            subset_df = df[df[col_titulos] == termo_ativo] if col_titulos else pd.DataFrame(columns=df.columns)
-        elif tipo_ativo == "Autor": 
-            subset_df = df[df[col_autores].fillna('').str.contains(str(termo_ativo), regex=False)] if col_autores else pd.DataFrame(columns=df.columns)
-        elif tipo_ativo == "País": 
-            subset_df = df[df[col_paises].fillna('').str.contains(str(termo_ativo), regex=False)] if col_paises else pd.DataFrame(columns=df.columns)
-        elif tipo_ativo == "Local de Publicação (Venue)": 
-            subset_df = df[df[col_venue] == termo_ativo] if col_venue else pd.DataFrame(columns=df.columns)
-        else:
-            subset_df = pd.DataFrame(columns=df.columns)
-
-        # --- ABA 1: HISTÓRICO AVANÇADO ---
-        with tab_hist:
-            st.markdown(f"**Produção e Impacto ao Longo do Tempo**")
-            
-            nomes_comuns_tipo = [
-                'TYPE', 'DT', 'DOCUMENT TYPE', 'TY', 'TIPO', 
-                'TIPO DE DOCUMENTO', 'TYPE OF REFERENCE', 'REFERENCE TYPE'
-            ]
-            
-            col_tipo_doc = next((c for c in df.columns if str(c).strip().upper() in nomes_comuns_tipo), None)
-            
-            opcoes_visao = ["Visão Geral"]
-            if col_tipo_doc: 
-                opcoes_visao.append("Separado por Tipo de Documento")
-            
-            visao_hist = st.radio(
-                "Análise Histórica:", 
-                opcoes_visao, 
-                horizontal=True, 
-                key=f"rad_hist_{hash(termo_ativo)}"
-            )
-            
-            if col_ano and not subset_df.empty:
-                df_ano = subset_df.copy()
-                df_ano[col_ano] = pd.to_numeric(df_ano[col_ano], errors='coerce')
-                df_ano = df_ano.dropna(subset=[col_ano])
+            # --- ABA 1: HISTÓRICO AVANÇADO ---
+            with tab_hist:
+                st.markdown(f"**Produção e Impacto ao Longo do Tempo**")
                 
-                if not df_ano.empty:
-                    import plotly.graph_objects as go
-                    import plotly.express as px
+                nomes_comuns_tipo = [
+                    'TYPE', 'DT', 'DOCUMENT TYPE', 'TY', 'TIPO', 
+                    'TIPO DE DOCUMENTO', 'TYPE OF REFERENCE', 'REFERENCE TYPE'
+                ]
+                
+                col_tipo_doc = next((c for c in df.columns if str(c).strip().upper() in nomes_comuns_tipo), None)
+                
+                opcoes_visao = ["Visão Geral"]
+                if col_tipo_doc: 
+                    opcoes_visao.append("Separado por Tipo de Documento")
+                
+                visao_hist = st.radio(
+                    "Análise Histórica:", 
+                    opcoes_visao, 
+                    horizontal=True, 
+                    key=f"rad_hist_{hash(termo_ativo)}"
+                )
+                
+                if col_ano and not subset_df.empty:
+                    df_ano = subset_df.copy()
+                    df_ano[col_ano] = pd.to_numeric(df_ano[col_ano], errors='coerce')
+                    df_ano = df_ano.dropna(subset=[col_ano])
                     
-                    if visao_hist == "Visão Geral":
-                        if 'TOTAL CITATIONS' in df_ano.columns:
-                            hist_data = df_ano.groupby(col_ano).agg(Volume=(col_titulos, 'count'), Citacoes=('TOTAL CITATIONS', 'sum')).reset_index()
+                    if not df_ano.empty:
+                        import plotly.graph_objects as go
+                        import plotly.express as px
+                        
+                        if visao_hist == "Visão Geral":
+                            if 'TOTAL CITATIONS' in df_ano.columns:
+                                hist_data = df_ano.groupby(col_ano).agg(Volume=(col_titulos, 'count'), Citacoes=('TOTAL CITATIONS', 'sum')).reset_index()
+                            else:
+                                hist_data = df_ano.groupby(col_ano).size().reset_index(name='Volume')
+                                hist_data['Citacoes'] = 0
+                                
+                            # CORREÇÃO ARROW: Forçamos o tipo Inteiro para Volume para impedir o colapso do PyArrow
+                            hist_data['Volume'] = pd.to_numeric(hist_data['Volume'], errors='coerce').fillna(0).astype(int)
+                                
+                            fig_hist = go.Figure()
+                            fig_hist.add_trace(go.Bar(x=hist_data[col_ano], y=hist_data['Volume'], name="Documentos", marker_color="#2a9d8f"))
+                            fig_hist.add_trace(go.Scatter(x=hist_data[col_ano], y=hist_data['Citacoes'], name="Citações", mode='lines+markers', yaxis='y2', line=dict(color="#e76f51", width=3)))
+                            fig_hist.update_layout(
+                                title="Volume de Publicações vs Citações no Tempo",
+                                xaxis=dict(title="Ano", tickmode='linear', dtick=1),
+                                yaxis=dict(title=dict(text="Volume de Documentos", font=dict(color="#2a9d8f")), tickfont=dict(color="#2a9d8f")),
+                                yaxis2=dict(title=dict(text="Total de Citações", font=dict(color="#e76f51")), tickfont=dict(color="#e76f51"), overlaying='y', side='right'),
+                                template="plotly_white", margin=dict(l=0, r=0, t=40, b=0), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                            )
+                            st.plotly_chart(fig_hist, use_container_width=True)
                         else:
-                            hist_data = df_ano.groupby(col_ano).size().reset_index(name='Volume')
-                            hist_data['Citacoes'] = 0
+                            df_ano[col_tipo_doc] = df_ano[col_tipo_doc].fillna("Desconhecido")
+                            hist_data = df_ano.groupby([col_ano, col_tipo_doc]).size().reset_index(name='Volume')
                             
-                        # CORREÇÃO ARROW: Forçamos o tipo Inteiro para Volume para impedir o colapso do PyArrow
-                        hist_data['Volume'] = pd.to_numeric(hist_data['Volume'], errors='coerce').fillna(0).astype(int)
+                            # CORREÇÃO ARROW: Forçamos o tipo Inteiro para Volume 
+                            hist_data['Volume'] = pd.to_numeric(hist_data['Volume'], errors='coerce').fillna(0).astype(int)
                             
-                        fig_hist = go.Figure()
-                        fig_hist.add_trace(go.Bar(x=hist_data[col_ano], y=hist_data['Volume'], name="Documentos", marker_color="#2a9d8f"))
-                        fig_hist.add_trace(go.Scatter(x=hist_data[col_ano], y=hist_data['Citacoes'], name="Citações", mode='lines+markers', yaxis='y2', line=dict(color="#e76f51", width=3)))
-                        fig_hist.update_layout(
-                            title="Volume de Publicações vs Citações no Tempo",
-                            xaxis=dict(title="Ano", tickmode='linear', dtick=1),
-                            yaxis=dict(title=dict(text="Volume de Documentos", font=dict(color="#2a9d8f")), tickfont=dict(color="#2a9d8f")),
-                            yaxis2=dict(title=dict(text="Total de Citações", font=dict(color="#e76f51")), tickfont=dict(color="#e76f51"), overlaying='y', side='right'),
-                            template="plotly_white", margin=dict(l=0, r=0, t=40, b=0), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-                        )
-                        st.plotly_chart(fig_hist, use_container_width=True)
+                            fig_hist = px.bar(hist_data, x=col_ano, y='Volume', color=col_tipo_doc, title="Volume de Documentos por Tipo e Ano", template="plotly_white")
+                            fig_hist.update_layout(xaxis=dict(tickmode='linear', dtick=1))
+                            st.plotly_chart(fig_hist, use_container_width=True)
                     else:
-                        df_ano[col_tipo_doc] = df_ano[col_tipo_doc].fillna("Desconhecido")
-                        hist_data = df_ano.groupby([col_ano, col_tipo_doc]).size().reset_index(name='Volume')
-                        
-                        # CORREÇÃO ARROW: Forçamos o tipo Inteiro para Volume 
-                        hist_data['Volume'] = pd.to_numeric(hist_data['Volume'], errors='coerce').fillna(0).astype(int)
-                        
-                        fig_hist = px.bar(hist_data, x=col_ano, y='Volume', color=col_tipo_doc, title="Volume de Documentos por Tipo e Ano", template="plotly_white")
-                        fig_hist.update_layout(xaxis=dict(tickmode='linear', dtick=1))
-                        st.plotly_chart(fig_hist, use_container_width=True)
+                        st.info("Não há dados temporais válidos para gerar o histórico.")
                 else:
-                    st.info("Não há dados temporais válidos para gerar o histórico.")
-            else:
-                st.info("A coluna de Ano não está disponível para esta análise.")
+                    st.info("A coluna de Ano não está disponível para esta análise.")
 
-        # --- ABA 2: NUVEM DE PALAVRAS CUSTOMIZÁVEL ---
-        with tab_nuvem:
-            st.markdown(f"**Assinatura Semântica do Perfil**")
-            
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                fonte_txt = st.selectbox("Composição do Texto:", ["Tudo Combinado", "Apenas Títulos", "Apenas Palavras-chave", "Apenas Resumo"], key=f"src_wc_{hash(termo_ativo)}")
-            with c2:
-                estilo_txt = st.selectbox("Tipografia:", ["Arial", "Verdana", "Courier New", "Georgia", "Impact", "Trebuchet MS"], key=f"font_wc_{hash(termo_ativo)}")
-            with c3:
-                tema_cor = st.selectbox("Paleta:", ["Oceano", "Fogo", "Floresta", "Cyberpunk", "Acadêmico"], index=4, key=f"pal_wc_{hash(termo_ativo)}")
+            # --- ABA 2: NUVEM DE PALAVRAS CUSTOMIZÁVEL ---
+            with tab_nuvem:
+                st.markdown(f"**Assinatura Semântica do Perfil**")
                 
-            paletas_dict = {
-                "Oceano": ["#0077b6", "#00b4d8", "#90e0ef", "#03045e", "#023e8a"],
-                "Fogo": ["#ff4d00", "#ff8c00", "#ff0000", "#fad02c", "#e85d04"],
-                "Floresta": ["#2d6a4f", "#40916c", "#1b4332", "#74c69d", "#95d5b2"],
-                "Cyberpunk": ["#f72585", "#7209b7", "#3a0ca3", "#4361ee", "#4cc9f0"],
-                "Acadêmico": ["#264653", "#2a9d8f", "#e9c46a", "#f4a261", "#e76f51"]
-            }
-
-            textos_para_juntar = []
-            col_ab = next((c for c in ['ABSTRACT', 'AB'] if c in df.columns), None)
-            col_kw = next((c for c in ['KEYWORDS', 'KW', 'DE'] if c in df.columns), None)
-            
-            # CORREÇÃO 2: Verificamos se a coluna está em subset_df.columns antes de acessá-la
-            if ("Tudo" in fonte_txt or "Título" in fonte_txt) and col_titulos in subset_df.columns:
-                textos_para_juntar.append(" ".join(subset_df[col_titulos].dropna().astype(str)))
-            if ("Tudo" in fonte_txt or "Palavras-chave" in fonte_txt) and col_kw in subset_df.columns:
-                textos_para_juntar.append(" ".join(subset_df[col_kw].dropna().astype(str).str.replace(';', ' ')))
-            if ("Tudo" in fonte_txt or "Resumo" in fonte_txt) and col_ab in subset_df.columns:
-                textos_para_juntar.append(" ".join(subset_df[col_ab].dropna().astype(str)))
-
-            texto_final_vetorizado = " ".join(textos_para_juntar)
-            
-            subset_df_wc = pd.DataFrame({'TEXTO_COMBINADO': [texto_final_vetorizado]})
-
-            with st.spinner("Gerando nuvem de palavras específica..."):
-                from utils import gerar_nuvem_echarts
-                from streamlit_echarts import st_echarts
-                
-                wc_opcoes = gerar_nuvem_echarts(
-                    subset_df_wc, 
-                    coluna='TEXTO_COMBINADO', 
-                    fonte=estilo_txt, 
-                    paleta=paletas_dict[tema_cor]
-                )
-                
-                if wc_opcoes:
-                    st_echarts(options=wc_opcoes, height="450px", key=f"wc_{hash(termo_ativo)}_{fonte_txt}_{tema_cor}")
-                else:
-                    st.warning("Texto insuficiente nos documentos desta entidade para gerar a nuvem semântica.")
-
-        # --- ABA 3: CÁLCULO DE SIMILARIDADE ---
-        with tab_similares:
-            st.markdown(f"**Recomendação Topológica (Itens mais próximos de {termo_ativo})**")
-            st.caption("A proximidade é calculada pelo **Índice de Jaccard**, que mede a sobreposição estrutural de palavras-chave, coautorias e locais de publicação na sua base bibliométrica.")
-            
-            with st.spinner("Calculando similaridade vetorial na rede..."):
-                from utils import calcular_similares_biblio
-                similares = calcular_similares_biblio(termo_ativo, tipo_ativo, df)
-                
-            def render_tabela_similares(lista_dados, titulo_coluna_item, tipo_nav):
-                if not lista_dados:
-                    st.info(f"Nenhum item com forte correlação encontrado.")
-                    return
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    fonte_txt = st.selectbox("Composição do Texto:", ["Tudo Combinado", "Apenas Títulos", "Apenas Palavras-chave", "Apenas Resumo"], key=f"src_wc_{hash(termo_ativo)}")
+                with c2:
+                    estilo_txt = st.selectbox("Tipografia:", ["Arial", "Verdana", "Courier New", "Georgia", "Impact", "Trebuchet MS"], key=f"font_wc_{hash(termo_ativo)}")
+                with c3:
+                    tema_cor = st.selectbox("Paleta:", ["Oceano", "Fogo", "Floresta", "Cyberpunk", "Acadêmico"], index=4, key=f"pal_wc_{hash(termo_ativo)}")
                     
-                df_sim = pd.DataFrame(lista_dados)[['Item', 'Similaridade (%)', 'Traços em Comum']]
-                df_sim = df_sim.rename(columns={'Item': titulo_coluna_item})
-                
-                st.dataframe(
-                    df_sim, 
-                    hide_index=True, 
-                    use_container_width=True,
-                    column_config={
-                        "Similaridade (%)": st.column_config.ProgressColumn("Similaridade (%)", min_value=0, max_value=100, format="%.1f%%")
-                    }
-                )
-                
-                with st.expander(f"Navegar para os perfis ({titulo_coluna_item})"):
-                    for idx, row in df_sim.iterrows():
-                        item_nome = row[titulo_coluna_item]
-                        st.button(f"Ir para: {item_nome}", key=f"btn_sim_{tipo_nav}_{hash(item_nome)}_{idx}", on_click=navegar_busca, args=(tipo_nav, item_nome))
+                paletas_dict = {
+                    "Oceano": ["#0077b6", "#00b4d8", "#90e0ef", "#03045e", "#023e8a"],
+                    "Fogo": ["#ff4d00", "#ff8c00", "#ff0000", "#fad02c", "#e85d04"],
+                    "Floresta": ["#2d6a4f", "#40916c", "#1b4332", "#74c69d", "#95d5b2"],
+                    "Cyberpunk": ["#f72585", "#7209b7", "#3a0ca3", "#4361ee", "#4cc9f0"],
+                    "Acadêmico": ["#264653", "#2a9d8f", "#e9c46a", "#f4a261", "#e76f51"]
+                }
 
-            if not similares or all(len(v) == 0 for v in similares.values()):
-                st.warning("Este item possui conexões muito isoladas do resto do sistema para que vizinhos próximos sejam calculados com precisão.")
-            else:
-                if tipo_ativo == 'Documento':
-                    st.markdown("##### 📄 Documentos Semelhantes")
-                    render_tabela_similares(similares.get('Documentos', []), "Documento", "Documento")
-                elif tipo_ativo == 'Autor':
-                    st.markdown("##### ✍️ Autores com Perfil Semelhante")
-                    render_tabela_similares(similares.get('Autores', []), "Autor", "Autor")
-                elif tipo_ativo in ['País', 'Local de Publicação (Venue)']:
-                    st.markdown(f"##### 🔗 Entidades Semelhantes ({tipo_ativo})")
-                    render_tabela_similares(similares.get('Itens', []), tipo_ativo, tipo_ativo)
+                textos_para_juntar = []
+                col_ab = next((c for c in ['ABSTRACT', 'AB'] if c in df.columns), None)
+                col_kw = next((c for c in ['KEYWORDS', 'KW', 'DE'] if c in df.columns), None)
+                
+                # CORREÇÃO 2: Verificamos se a coluna está em subset_df.columns antes de acessá-la
+                if ("Tudo" in fonte_txt or "Título" in fonte_txt) and col_titulos in subset_df.columns:
+                    textos_para_juntar.append(" ".join(subset_df[col_titulos].dropna().astype(str)))
+                if ("Tudo" in fonte_txt or "Palavras-chave" in fonte_txt) and col_kw in subset_df.columns:
+                    textos_para_juntar.append(" ".join(subset_df[col_kw].dropna().astype(str).str.replace(';', ' ')))
+                if ("Tudo" in fonte_txt or "Resumo" in fonte_txt) and col_ab in subset_df.columns:
+                    textos_para_juntar.append(" ".join(subset_df[col_ab].dropna().astype(str)))
+
+                texto_final_vetorizado = " ".join(textos_para_juntar)
+                
+                subset_df_wc = pd.DataFrame({'TEXTO_COMBINADO': [texto_final_vetorizado]})
+
+                with st.spinner("Gerando nuvem de palavras específica..."):
+                    from utils import gerar_nuvem_echarts
+                    from streamlit_echarts import st_echarts
+                    
+                    wc_opcoes = gerar_nuvem_echarts(
+                        subset_df_wc, 
+                        coluna='TEXTO_COMBINADO', 
+                        fonte=estilo_txt, 
+                        paleta=paletas_dict[tema_cor]
+                    )
+                    
+                    if wc_opcoes:
+                        st_echarts(options=wc_opcoes, height="450px", key=f"wc_{hash(termo_ativo)}_{fonte_txt}_{tema_cor}")
+                    else:
+                        st.warning("Texto insuficiente nos documentos desta entidade para gerar a nuvem semântica.")
+
+            # --- ABA 3: CÁLCULO DE SIMILARIDADE ---
+            with tab_similares:
+                st.markdown(f"**Recomendação Topológica (Itens mais próximos de {termo_ativo})**")
+                st.caption("A proximidade é calculada pelo **Índice de Jaccard**, que mede a sobreposição estrutural de palavras-chave, coautorias e locais de publicação na sua base bibliométrica.")
+                
+                with st.spinner("Calculando similaridade vetorial na rede..."):
+                    from utils import calcular_similares_biblio
+                    similares = calcular_similares_biblio(termo_ativo, tipo_ativo, df)
+                    
+                def render_tabela_similares(lista_dados, titulo_coluna_item, tipo_nav):
+                    if not lista_dados:
+                        st.info(f"Nenhum item com forte correlação encontrado.")
+                        return
+                        
+                    df_sim = pd.DataFrame(lista_dados)[['Item', 'Similaridade (%)', 'Traços em Comum']]
+                    df_sim = df_sim.rename(columns={'Item': titulo_coluna_item})
+                    
+                    st.dataframe(
+                        df_sim, 
+                        hide_index=True, 
+                        use_container_width=True,
+                        column_config={
+                            "Similaridade (%)": st.column_config.ProgressColumn("Similaridade (%)", min_value=0, max_value=100, format="%.1f%%")
+                        }
+                    )
+                    
+                    with st.expander(f"Navegar para os perfis ({titulo_coluna_item})"):
+                        for idx, row in df_sim.iterrows():
+                            item_nome = row[titulo_coluna_item]
+                            st.button(f"Ir para: {item_nome}", key=f"btn_sim_{tipo_nav}_{hash(item_nome)}_{idx}", on_click=navegar_busca, args=(tipo_nav, item_nome))
+
+                if not similares or all(len(v) == 0 for v in similares.values()):
+                    st.warning("Este item possui conexões muito isoladas do resto do sistema para que vizinhos próximos sejam calculados com precisão.")
+                else:
+                    if tipo_ativo == 'Documento':
+                        st.markdown("##### 📄 Documentos Semelhantes")
+                        render_tabela_similares(similares.get('Documentos', []), "Documento", "Documento")
+                    elif tipo_ativo == 'Autor':
+                        st.markdown("##### ✍️ Autores com Perfil Semelhante")
+                        render_tabela_similares(similares.get('Autores', []), "Autor", "Autor")
+                    elif tipo_ativo in ['País', 'Local de Publicação (Venue)']:
+                        st.markdown(f"##### 🔗 Entidades Semelhantes ({tipo_ativo})")
+                        render_tabela_similares(similares.get('Itens', []), tipo_ativo, tipo_ativo)
