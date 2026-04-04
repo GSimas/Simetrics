@@ -1,24 +1,284 @@
-import pandas as pd
-import rispy
 import io
+import random
 import re
+from collections import Counter, defaultdict
+from datetime import date
+from itertools import combinations
+
 import networkx as nx
 import numpy as np
-import scipy.stats as stats
-from collections import Counter
-from itertools import combinations
-from streamlit_agraph import Node, Edge
+import pandas as pd
+import plotly.graph_objects as go
+import rispy
+import streamlit as st
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from wordcloud import WordCloud, STOPWORDS
-import matplotlib.pyplot as plt
-import plotly.graph_objects as go
-from pyecharts import options as opts
-from pyecharts.charts import WordCloud as PyechartsWordCloud
-import json
-from pyecharts.commons.utils import JsCode
-import random
-import streamlit as st
+from streamlit_agraph import Edge, Node
+from wordcloud import STOPWORDS
+
+
+CURRENT_YEAR = date.today().year
+
+
+def _pick_column(df, candidates):
+    return next((col for col in candidates if col in df.columns), None)
+
+
+def _split_semicolon_tokens(value, case=None):
+    if pd.isna(value):
+        return []
+
+    tokens = [token.strip() for token in str(value).split(';') if token and token.strip()]
+    if case == "lower":
+        return [token.lower() for token in tokens]
+    if case == "title":
+        return [token.title() for token in tokens]
+    return tokens
+
+
+def _join_sorted(values, sep=", "):
+    cleaned = [str(value).strip() for value in values if str(value).strip()]
+    return sep.join(sorted(set(cleaned)))
+
+
+@st.cache_data(show_spinner=False)
+def padronizar_base_bibliometrica(df):
+    if df is None:
+        return None
+
+    df_padrao = df.copy()
+
+    ref_candidates = ['REFERENCES_UNIFIED', 'REFERENCES', 'CITED REFERENCES', 'CR']
+    if any(col in df_padrao.columns for col in ref_candidates):
+        series_ref = None
+        for col in ref_candidates:
+            if col not in df_padrao.columns:
+                continue
+
+            current = df_padrao[col].fillna('').astype(str).str.strip()
+            if series_ref is None:
+                series_ref = current
+            else:
+                series_ref = series_ref.mask(series_ref.eq(''), current)
+
+        df_padrao['REFERENCES_UNIFIED'] = series_ref.fillna('')
+
+    if 'YEAR' in df_padrao.columns and 'YEAR CLEAN' not in df_padrao.columns:
+        df_padrao['YEAR CLEAN'] = pd.to_numeric(df_padrao['YEAR'], errors='coerce')
+    elif 'YEAR CLEAN' in df_padrao.columns:
+        df_padrao['YEAR CLEAN'] = pd.to_numeric(df_padrao['YEAR CLEAN'], errors='coerce')
+
+    if 'TOTAL CITATIONS' in df_padrao.columns:
+        df_padrao['TOTAL CITATIONS'] = pd.to_numeric(df_padrao['TOTAL CITATIONS'], errors='coerce').fillna(0)
+
+    object_cols = df_padrao.select_dtypes(include=['object']).columns
+    for col in object_cols:
+        df_padrao[col] = df_padrao[col].fillna('').astype(str)
+
+    return df_padrao
+
+
+@st.cache_data(show_spinner=False)
+def gerar_csv_bytes(df):
+    return df.to_csv(index=False).encode('utf-8')
+
+
+@st.cache_data(show_spinner=False)
+def analisar_completude_metadados(df):
+    campos_verificacao = [
+        ('AUTHORS', 'Author (AU)'),
+        ('DOCUMENT TYPE', 'Document Type (DT)'),
+        ('ABSTRACT', 'Abstract (AB)'),
+        ('COUNTRY', 'Affiliation/Country (C1)'),
+        ('DOI', 'DOI (DI)'),
+        ('TITLE', 'Title (TI)'),
+        ('SECONDARY TITLE', 'Journal/Source (SO)'),
+        ('YEAR CLEAN', 'Publication Year (PY)'),
+        ('TOTAL CITATIONS', 'Total Citation (TC)'),
+        ('KEYWORDS', 'Keywords (DE/ID)'),
+        ('REFERENCES_UNIFIED', 'Cited References (CR)')
+    ]
+
+    total_docs = len(df)
+    dados = []
+
+    for col_chave, descricao in campos_verificacao:
+        if col_chave in df.columns:
+            serie = df[col_chave]
+            faltantes = int(serie.isna().sum())
+            if pd.api.types.is_object_dtype(serie) or pd.api.types.is_string_dtype(serie):
+                faltantes += int(serie.astype(str).str.strip().eq('').sum())
+        else:
+            faltantes = total_docs
+
+        pct_faltante = (faltantes / total_docs) * 100 if total_docs else 0
+
+        if pct_faltante == 0:
+            status = "Excelente"
+        elif pct_faltante <= 10:
+            status = "Bom"
+        elif pct_faltante <= 20:
+            status = "Aceitável"
+        else:
+            status = "Ruim"
+
+        dados.append({
+            "Metadado": descricao,
+            "Faltantes": faltantes,
+            "Faltantes (%)": pct_faltante,
+            "Status": status
+        })
+
+    return pd.DataFrame(dados).sort_values(by="Faltantes (%)").reset_index(drop=True)
+
+
+@st.cache_data(show_spinner=False)
+def resumir_base_bibliometrica(df):
+    df_local = padronizar_base_bibliometrica(df)
+    b_metrics = calcular_metricas_bibliometrix(df_local)
+
+    years = pd.to_numeric(df_local.get('YEAR CLEAN'), errors='coerce') if 'YEAR CLEAN' in df_local.columns else pd.Series(dtype=float)
+    valid_years = years.dropna()
+    if valid_years.empty:
+        timespan = "N/S"
+        avg_age = "N/S"
+    else:
+        timespan = f"{int(valid_years.min())}:{int(valid_years.max())}"
+        avg_age = round(CURRENT_YEAR - valid_years.mean(), 2)
+
+    authors_count = 0
+    if 'AUTHORS' in df_local.columns:
+        authors = {
+            autor
+            for value in df_local['AUTHORS']
+            for autor in _split_semicolon_tokens(value)
+        }
+        authors_count = len(authors)
+
+    countries_count = 0
+    if 'COUNTRY' in df_local.columns:
+        countries = {
+            pais
+            for value in df_local['COUNTRY']
+            for pais in _split_semicolon_tokens(value)
+        }
+        countries_count = len(countries)
+
+    kw_count = 0
+    col_kw = _pick_column(df_local, ['KEYWORDS', 'KW', 'DE'])
+    if col_kw:
+        keywords = {
+            kw.lower()
+            for value in df_local[col_kw]
+            for kw in _split_semicolon_tokens(value)
+        }
+        kw_count = len(keywords)
+
+    venues_count = 0
+    col_venue = _pick_column(df_local, ['SECONDARY TITLE', 'SO', 'JO'])
+    if col_venue:
+        venues_count = int(df_local[col_venue].astype(str).str.strip().replace('', np.nan).dropna().nunique())
+
+    return {
+        "total_docs": int(len(df_local)),
+        "timespan": timespan,
+        "avg_age": avg_age,
+        "authors_count": authors_count,
+        "countries_count": countries_count,
+        "kw_count": kw_count,
+        "venues_count": venues_count,
+        "b_metrics": b_metrics
+    }
+
+
+@st.cache_data(show_spinner=False)
+def preparar_opcoes_busca(df):
+    col_titulos = _pick_column(df, ['TITLE', 'TI'])
+    col_autores = _pick_column(df, ['AUTHORS', 'AU'])
+    col_paises = _pick_column(df, ['COUNTRY'])
+    col_venue = _pick_column(df, ['SECONDARY TITLE', 'SO', 'JO'])
+    col_ano = _pick_column(df, ['YEAR', 'PY', 'YEAR CLEAN'])
+
+    opcoes_doc = sorted(df[col_titulos].dropna().astype(str).unique().tolist()) if col_titulos else []
+    opcoes_aut = sorted({
+        autor
+        for value in df[col_autores]
+        for autor in _split_semicolon_tokens(value)
+    }) if col_autores else []
+    opcoes_pais = sorted({
+        pais
+        for value in df[col_paises]
+        for pais in _split_semicolon_tokens(value)
+    }) if col_paises else []
+    opcoes_venue = sorted(df[col_venue].dropna().astype(str).str.strip().replace('', np.nan).dropna().unique().tolist()) if col_venue else []
+
+    return {
+        "col_titulos": col_titulos,
+        "col_autores": col_autores,
+        "col_paises": col_paises,
+        "col_venue": col_venue,
+        "col_ano": col_ano,
+        "opcoes_doc": opcoes_doc,
+        "opcoes_aut": opcoes_aut,
+        "opcoes_pais": opcoes_pais,
+        "opcoes_venue": opcoes_venue
+    }
+
+
+@st.cache_data(show_spinner=False)
+def filtrar_por_entidade(df, termo_ativo, tipo_ativo):
+    if not termo_ativo:
+        return pd.DataFrame(columns=df.columns)
+
+    info_busca = preparar_opcoes_busca(df)
+    col_titulos = info_busca["col_titulos"]
+    col_autores = info_busca["col_autores"]
+    col_paises = info_busca["col_paises"]
+    col_venue = info_busca["col_venue"]
+
+    if tipo_ativo == "Documento" and col_titulos:
+        return df[df[col_titulos] == termo_ativo].copy()
+    if tipo_ativo == "Autor" and col_autores:
+        return df[df[col_autores].fillna('').str.contains(str(termo_ativo), regex=False)].copy()
+    if tipo_ativo == "País" and col_paises:
+        return df[df[col_paises].fillna('').str.contains(str(termo_ativo), regex=False)].copy()
+    if tipo_ativo == "Local de Publicação (Venue)" and col_venue:
+        return df[df[col_venue] == termo_ativo].copy()
+
+    return pd.DataFrame(columns=df.columns)
+
+
+@st.cache_resource(show_spinner=False)
+def obter_grafo_global_busca(df, col_titulos, col_autores, col_paises, col_venue):
+    G = nx.Graph()
+    colunas_necessarias = [c for c in [col_titulos, col_autores, col_paises, col_venue] if c is not None]
+    if not col_titulos or not colunas_necessarias:
+        return G
+
+    for row in df[colunas_necessarias].to_dict('records'):
+        doc_node = str(row.get(col_titulos, '')).strip()
+        if not doc_node or doc_node.lower() == 'nan':
+            continue
+
+        G.add_node(doc_node, type='Documento')
+
+        if col_autores:
+            for autor in _split_semicolon_tokens(row.get(col_autores)):
+                G.add_node(autor, type='Autor')
+                G.add_edge(doc_node, autor)
+
+        if col_paises:
+            for pais in _split_semicolon_tokens(row.get(col_paises)):
+                G.add_node(pais, type='País')
+                G.add_edge(doc_node, pais)
+
+        if col_venue:
+            venue = str(row.get(col_venue, '')).strip()
+            if venue:
+                G.add_node(venue, type='Venue')
+                G.add_edge(doc_node, venue)
+
+    return G
 
 # --- FUNÇÕES AUXILIARES DE AGREGAÇÃO PARA TABELAS ---
 
@@ -26,16 +286,22 @@ import streamlit as st
 
 def _format_timeline(group):
     """Gera a string agrupada por ano garantindo unicidade de documentos no grupo."""
-    import pandas as pd
     anos = {}
-    # Removemos duplicatas do próprio grupo (caso o mesmo doc apareça 2x por erro de índice)
-    group_clean = group.drop_duplicates(subset=['TITLE', 'YEAR CLEAN'])
-    
-    for _, row in group_clean.iterrows():
-        ano = str(int(row['YEAR CLEAN'])) if pd.notna(row.get('YEAR CLEAN')) else "S/D"
-        tit = str(row.get('TITLE', 'Sem título')).strip()
-        cit = int(row.get('TOTAL CITATIONS', 0)) if pd.notna(row.get('TOTAL CITATIONS')) else 0
-        if ano not in anos: anos[ano] = []
+    title_col = _pick_column(group, ['TITLE', 'TI'])
+    subset_cols = ['YEAR CLEAN']
+    if title_col:
+        subset_cols.append(title_col)
+
+    group_clean = group.drop_duplicates(subset=subset_cols)
+
+    for row in group_clean.itertuples(index=False, name=None):
+        row_dict = dict(zip(group_clean.columns, row))
+        ano = str(int(row_dict['YEAR CLEAN'])) if pd.notna(row_dict.get('YEAR CLEAN')) else "S/D"
+        tit = str(row_dict.get(title_col, 'Sem título')).strip() if title_col else "Sem título"
+        cit_val = row_dict.get('TOTAL CITATIONS', 0)
+        cit = int(cit_val) if pd.notna(cit_val) else 0
+        if ano not in anos:
+            anos[ano] = []
         anos[ano].append(f"{tit} ({cit} citações)")
     
     out = []
@@ -45,24 +311,26 @@ def _format_timeline(group):
 
 def _get_top_doc(group):
     """Retorna o documento mais citado usando posição (iloc) para evitar erro de índice ambíguo."""
-    import pandas as pd
-    if group.empty: return ""
-    
-    # Em vez de idxmax (que retorna o nome do índice), usamos argmax (que retorna a posição)
+    if group.empty:
+        return ""
+
+    title_col = _pick_column(group, ['TITLE', 'TI'])
     posicao_max = group['TOTAL CITATIONS'].fillna(0).values.argmax()
-    # iloc[posicao] sempre retorna uma única Series, mesmo com índices duplicados
     row = group.iloc[posicao_max]
-    
-    tit = str(row.get('TITLE', 'Sem Título')).strip()
+
+    tit = str(row.get(title_col, 'Sem Título')).strip() if title_col else "Sem Título"
     val_cit = row.get('TOTAL CITATIONS', 0)
     cit = int(val_cit) if pd.notna(val_cit) else 0
-    
+
     return f"{tit} ({cit} citações)"
 
 # --- MOTORES DE GERAÇÃO DE TABELAS ---
 
+@st.cache_data(show_spinner=False)
 def gerar_tabela_autores(df):
-    import pandas as pd
+    if 'AUTHORS' not in df.columns:
+        return pd.DataFrame()
+
     df_exp = df.copy()
     df_exp['AUTHOR'] = df_exp['AUTHORS'].astype(str).str.split(';')
     df_exp = df_exp.explode('AUTHOR')
@@ -95,11 +363,12 @@ def gerar_tabela_autores(df):
             'Anos, Documentos e Citações': _format_timeline(group),
             'Coautores': ", ".join(coautores)
         })
-    return pd.DataFrame(res).sort_values(by='Qtd. de Citações', ascending=False)
+    return pd.DataFrame(res).sort_values(by='Qtd. de Citações', ascending=False).reset_index(drop=True)
 
+@st.cache_data(show_spinner=False)
 def gerar_tabela_paises(df):
-    import pandas as pd
-    if 'COUNTRY' not in df.columns: return pd.DataFrame()
+    if 'COUNTRY' not in df.columns:
+        return pd.DataFrame()
     
     df_exp = df.copy()
     df_exp['PAIS'] = df_exp['COUNTRY'].astype(str).str.split(';')
@@ -126,11 +395,11 @@ def gerar_tabela_paises(df):
             'Anos, Documentos e Citações': _format_timeline(group),
             'Documento com Mais Citações': _get_top_doc(group)
         })
-    return pd.DataFrame(res).sort_values(by='Qtd. de Citações', ascending=False)
+    return pd.DataFrame(res).sort_values(by='Qtd. de Citações', ascending=False).reset_index(drop=True)
 
+@st.cache_data(show_spinner=False)
 def gerar_tabela_venues(df):
-    import pandas as pd
-    col_venue = 'SECONDARY TITLE'
+    col_venue = _pick_column(df, ['SECONDARY TITLE', 'SO', 'JO'])
     if col_venue not in df.columns: return pd.DataFrame()
 
     df_ven = df.dropna(subset=[col_venue]).copy()
@@ -154,14 +423,16 @@ def gerar_tabela_venues(df):
             'Anos, Documentos e Citações': _format_timeline(group),
             'Documento com Mais Citações': _get_top_doc(group)
         })
-    return pd.DataFrame(res).sort_values(by='Qtd. de Citações', ascending=False)
+    return pd.DataFrame(res).sort_values(by='Qtd. de Citações', ascending=False).reset_index(drop=True)
 
+@st.cache_data(show_spinner=False)
 def gerar_tabela_keywords(df):
-    import pandas as pd
-    if 'KEYWORDS' not in df.columns: return pd.DataFrame()
+    col_kw = _pick_column(df, ['KEYWORDS', 'KW', 'DE'])
+    if not col_kw:
+        return pd.DataFrame()
     
     df_exp = df.copy()
-    df_exp['KW'] = df_exp['KEYWORDS'].astype(str).str.split(';')
+    df_exp['KW'] = df_exp[col_kw].astype(str).str.split(';')
     df_exp = df_exp.explode('KW')
     df_exp['KW'] = df_exp['KW'].str.strip().str.title()
     df_exp = df_exp[(df_exp['KW'] != '') & (df_exp['KW'] != 'Nan')]
@@ -184,7 +455,7 @@ def gerar_tabela_keywords(df):
             'Desvio Padrão de Citações': round(cits.std(), 2) if len(group) > 1 else 0.0,
             'Documento com Mais Citações': _get_top_doc(group)
         })
-    return pd.DataFrame(res).sort_values(by='Qtd. de Citações', ascending=False)
+    return pd.DataFrame(res).sort_values(by='Qtd. de Citações', ascending=False).reset_index(drop=True)
 
 def categorizar_temas_por_cluster(df, api_key, max_clusters=10):
     """Clusteriza documentos com TF-IDF + K-Means (otimizado por Silhouette) e nomeia via Gemini."""
@@ -290,6 +561,7 @@ def categorizar_temas_por_cluster(df, api_key, max_clusters=10):
     
     return df
 
+@st.cache_data(show_spinner=False)
 def gerar_mapas_conceituais(df, top_n_words=50, n_clusters=4):
     """Gera Mapas Conceituais 2D e 3D usando PCA e K-Means Clustering."""
     import pandas as pd
@@ -400,6 +672,7 @@ def gerar_mapas_conceituais(df, top_n_words=50, n_clusters=4):
 
     return fig_2d, fig_3d
 
+@st.cache_data(show_spinner=False)
 def get_country_collaboration_network(df, top_n=30):
     """Gera a rede matemática de colaboração entre países."""
     import networkx as nx
@@ -437,6 +710,7 @@ def get_country_collaboration_network(df, top_n=30):
     nx.set_node_attributes(G, {n: node_counts[n] for n in G.nodes()}, 'count')
     return G
 
+@st.cache_data(show_spinner=False)
 def plot_circular_collaboration(df, top_n=30):
     """Gera o grafo de rede circular com hover interativo detalhando parcerias."""
     import plotly.graph_objects as go
@@ -519,6 +793,7 @@ def plot_circular_collaboration(df, top_n=30):
     )
     return fig
 
+@st.cache_data(show_spinner=False)
 def plot_map_collaboration(df, top_n=30):
     """Gera o mapa-múndi de colaboração científica com preenchimento (Choropleth) e arestas dinâmicas."""
     import plotly.graph_objects as go
@@ -634,6 +909,7 @@ def plot_map_collaboration(df, top_n=30):
     
     return fig
 
+@st.cache_data(show_spinner=False)
 def plot_top_keywords_metric(df, metric_name, top_n=20):
     """Gera um gráfico de barras para as Top Keywords com legenda gradiente."""
     import pandas as pd
@@ -683,6 +959,7 @@ def plot_top_keywords_metric(df, metric_name, top_n=20):
     
     return fig
 
+@st.cache_data(show_spinner=False)
 def plot_author_production_over_time(df, top_n=10):
     """Gera o gráfico Top-Authors' Production over Time"""
     import pandas as pd
@@ -762,6 +1039,7 @@ def plot_author_production_over_time(df, top_n=10):
 
     return fig
 
+@st.cache_data(show_spinner=False)
 def plot_lotkas_law(df):
     """Gera a distribuição de Lotka (Frequência de Produtividade Científica)."""
     import pandas as pd
@@ -815,6 +1093,7 @@ def plot_lotkas_law(df):
 
     return fig
 
+@st.cache_data(show_spinner=False)
 def gerar_historiograph(df, top_n=30):
     """Gera um gráfico histórico de citações diretas com busca flexível de padrões."""
     import networkx as nx
@@ -1230,7 +1509,7 @@ def processar_excel_wos(file):
     if 'YEAR' in df.columns:
         df['YEAR CLEAN'] = pd.to_numeric(df['YEAR'], errors='coerce')
 
-    return df
+    return padronizar_base_bibliometrica(df)
 
 
 def processar_csv_scopus(file):
@@ -1304,56 +1583,53 @@ def processar_csv_scopus(file):
     if 'YEAR' in df.columns:
         df['YEAR CLEAN'] = pd.to_numeric(df['YEAR'], errors='coerce')
 
-    return df
+    return padronizar_base_bibliometrica(df)
 
 
 @st.cache_data
 def calcular_metricas_bibliometrix(df):
-
     """Calcula métricas avançadas baseadas no relatório Main Information do Bibliometrix."""
-    import pandas as pd
-    import numpy as np
+    df_local = padronizar_base_bibliometrica(df)
 
-    # 1. Taxa de Crescimento Anual (%)
-    anos = df['YEAR CLEAN'].dropna().unique()
-    if len(anos) > 1:
-        n_anos = anos.max() - anos.min()
-        doc_inicio = len(df[df['YEAR CLEAN'] == anos.min()])
-        doc_fim = len(df[df['YEAR CLEAN'] == anos.max()])
-        # Fórmula CAGR: [(Vfinal/Vinicial)^(1/t) - 1] * 100
-        growth_rate = ((doc_fim / doc_inicio)**(1/n_anos) - 1) * 100 if doc_inicio > 0 else 0
+    years = pd.to_numeric(df_local.get('YEAR CLEAN'), errors='coerce') if 'YEAR CLEAN' in df_local.columns else pd.Series(dtype=float)
+    valid_years = years.dropna()
+    if len(valid_years.unique()) > 1:
+        docs_by_year = valid_years.value_counts().sort_index()
+        ano_inicio = docs_by_year.index.min()
+        ano_fim = docs_by_year.index.max()
+        doc_inicio = docs_by_year.loc[ano_inicio]
+        doc_fim = docs_by_year.loc[ano_fim]
+        intervalo = ano_fim - ano_inicio
+        growth_rate = ((doc_fim / doc_inicio) ** (1 / intervalo) - 1) * 100 if doc_inicio > 0 and intervalo > 0 else 0
     else:
         growth_rate = 0
 
-    # 2. Citações Médias por Ano por Doc
-    # NTC: Normalized Total Citations (TC / Média de TC do ano)
-    if 'TOTAL CITATIONS' in df.columns and 'YEAR CLEAN' in df.columns:
-        df['TCperYear'] = df['TOTAL CITATIONS'] / (2026 - df['YEAR CLEAN'] + 1)
-        media_por_ano = df.groupby('YEAR CLEAN')['TOTAL CITATIONS'].transform('mean')
-        df['NTC'] = df['TOTAL CITATIONS'] / media_por_ano
-    
-    # 3. Colaboração (SCP vs MCP)
-    # SCP: Single Country Pubs | MCP: Multiple Country Pubs
+    avg_cit_year = 0
+    if 'TOTAL CITATIONS' in df_local.columns and 'YEAR CLEAN' in df_local.columns:
+        anos_doc = CURRENT_YEAR - years + 1
+        anos_doc = anos_doc.where(anos_doc > 0, 1)
+        tc_per_year = df_local['TOTAL CITATIONS'] / anos_doc
+        avg_cit_year = round(tc_per_year.replace([np.inf, -np.inf], np.nan).dropna().mean(), 2) if not tc_per_year.empty else 0
+
     mcp_count = 0
-    if 'COUNTRY' in df.columns:
-        mcp_count = df['COUNTRY'].dropna().apply(lambda x: len(set(str(x).split(';'))) > 1).sum()
-    
-    # 4. Índice de Coautoria
+    if 'COUNTRY' in df_local.columns:
+        mcp_count = int(df_local['COUNTRY'].apply(lambda value: len(set(_split_semicolon_tokens(value))) > 1).sum())
+
     autores_por_doc = 0
-    if 'AUTHORS' in df.columns:
-        counts = df['AUTHORS'].dropna().apply(lambda x: len(str(x).split(';')))
+    docs_unico_autor = 0
+    if 'AUTHORS' in df_local.columns:
+        counts = df_local['AUTHORS'].apply(lambda value: len(_split_semicolon_tokens(value)))
+        counts = counts[counts > 0]
         autores_por_doc = counts.mean()
         docs_unico_autor = (counts == 1).sum()
-    else:
-        docs_unico_autor = 0
 
     return {
         "growth_rate": round(growth_rate, 2),
         "mcp": mcp_count,
-        "scp": len(df) - mcp_count,
+        "scp": len(df_local) - mcp_count,
         "coauth_index": round(autores_por_doc, 2),
         "single_author_docs": docs_unico_autor,
-        "avg_cit_year": round(df['TCperYear'].mean(), 2) if 'TCperYear' in df.columns else 0
+        "avg_cit_year": avg_cit_year if not pd.isna(avg_cit_year) else 0
     }
 
 @st.cache_data
@@ -1499,93 +1775,85 @@ def calcular_similares_biblio(termo_ativo, tipo_busca, df):
     """Calcula a similaridade (Jaccard) do 'DNA acadêmico' entre entidades."""
     if not termo_ativo:
         return {}
-    
-    # Identifica colunas-chave do dataset
-    col_titulos = next((c for c in ['TITLE', 'TI'] if c in df.columns), None)
-    col_autores = next((c for c in ['AUTHORS', 'AU'] if c in df.columns), None)
-    col_kw = next((c for c in ['KEYWORDS', 'KW', 'DE'] if c in df.columns), None)
-    col_venue = next((c for c in ['SECONDARY TITLE', 'SO', 'JO'] if c in df.columns), None)
-    col_paises = next((c for c in ['COUNTRY'] if c in df.columns), None)
 
-    # Dentro da função calcular_similares_biblio, substitua a função extrair_features por:
-    
-    def extrair_features(df_subset):
-        """Extrai as impressões digitais de forma otimizada e sem iterrows."""
-        kws, aus, venues = set(), set(), set()
-        
-        if col_kw:
-            # Junta todos os textos, separa por ; e limpa em uma linha
-            kws.update([k.strip().lower() for k in ';'.join(df_subset[col_kw].dropna().astype(str)).split(';') if k.strip()])
-        if col_autores:
-            aus.update([a.strip() for a in ';'.join(df_subset[col_autores].dropna().astype(str)).split(';') if a.strip()])
-        if col_venue:
-            venues.update(df_subset[col_venue].dropna().astype(str).str.strip().unique())
-            
-        return kws, aus, venues
-        
-    # Isola a entidade buscada e captura seu "DNA"
-    if tipo_busca == "Documento": subset_alvo = df[df[col_titulos] == termo_ativo]
-    elif tipo_busca == "Autor": subset_alvo = df[df[col_autores].fillna('').str.contains(termo_ativo, regex=False)]
-    elif tipo_busca == "País": subset_alvo = df[df[col_paises].fillna('').str.contains(termo_ativo, regex=False)] if col_paises else pd.DataFrame()
-    elif tipo_busca == "Local de Publicação (Venue)": subset_alvo = df[df[col_venue] == termo_ativo]
-    else: return {}
+    col_titulos = _pick_column(df, ['TITLE', 'TI'])
+    col_autores = _pick_column(df, ['AUTHORS', 'AU'])
+    col_kw = _pick_column(df, ['KEYWORDS', 'KW', 'DE'])
+    col_venue = _pick_column(df, ['SECONDARY TITLE', 'SO', 'JO'])
+    col_paises = _pick_column(df, ['COUNTRY'])
 
-    kw_alvo, au_alvo, venue_alvo = extrair_features(subset_alvo)
-    
-    # Previne que a entidade combine consigo mesma no escore
-    if tipo_busca in ["Documento", "Autor"]: au_alvo.discard(termo_ativo)
-    
-    dna_alvo = kw_alvo.union(au_alvo).union(venue_alvo)
-    if not dna_alvo: return {}
+    doc_profiles = {}
+    author_profiles = defaultdict(set)
+    country_profiles = defaultdict(set)
+    venue_profiles = defaultdict(set)
+
+    colunas_base = [col for col in [col_titulos, col_autores, col_kw, col_venue, col_paises] if col]
+    for row in df[colunas_base].to_dict('records'):
+        title = str(row.get(col_titulos, '')).strip() if col_titulos else ''
+        authors = set(_split_semicolon_tokens(row.get(col_autores)))
+        keywords = set(_split_semicolon_tokens(row.get(col_kw), case="lower"))
+        countries = set(_split_semicolon_tokens(row.get(col_paises)))
+        venue = str(row.get(col_venue, '')).strip() if col_venue else ''
+        venue_set = {venue} if venue else set()
+
+        dna_doc = keywords | authors | venue_set
+        if title:
+            doc_profiles[title] = dna_doc
+
+        for author in authors:
+            author_profiles[author].update(keywords)
+            author_profiles[author].update(venue_set)
+            author_profiles[author].update(authors - {author})
+
+        for country in countries:
+            country_profiles[country].update(keywords)
+            country_profiles[country].update(authors)
+            country_profiles[country].update(venue_set)
+
+        if venue:
+            venue_profiles[venue].update(keywords)
+            venue_profiles[venue].update(authors)
+            venue_profiles[venue].update(countries)
+
+    if tipo_busca == "Documento":
+        perfil_alvo = doc_profiles.get(termo_ativo, set())
+        candidatos = {nome: perfil for nome, perfil in doc_profiles.items() if nome != termo_ativo}
+    elif tipo_busca == "Autor":
+        perfil_alvo = author_profiles.get(termo_ativo, set())
+        candidatos = {nome: perfil for nome, perfil in author_profiles.items() if nome != termo_ativo}
+    elif tipo_busca == "País":
+        perfil_alvo = country_profiles.get(termo_ativo, set())
+        candidatos = {nome: perfil for nome, perfil in country_profiles.items() if nome != termo_ativo}
+    elif tipo_busca == "Local de Publicação (Venue)":
+        perfil_alvo = venue_profiles.get(termo_ativo, set())
+        candidatos = {nome: perfil for nome, perfil in venue_profiles.items() if nome != termo_ativo}
+    else:
+        return {}
+
+    if not perfil_alvo:
+        return {}
 
     resultados = []
-    
-    # Compara o Alvo com todos os Candidatos
-    if tipo_busca == "Documento":
-        for _, r in df[df[col_titulos] != termo_ativo].iterrows():
-            cand_nome = r[col_titulos]
-            k, a, v = extrair_features(pd.DataFrame([r]))
-            dna_cand = k.union(a).union(v)
-            inter = dna_alvo.intersection(dna_cand)
-            if inter:
-                jaccard = len(inter) / len(dna_alvo.union(dna_cand))
-                resultados.append({'Item': cand_nome, 'Similaridade (%)': round(jaccard * 100, 1), 'Traços em Comum': " | ".join(list(inter)[:4])})
-                
-    elif tipo_busca == "Autor":
-        todos_autores = set()
-        for au_str in df[col_autores].dropna(): todos_autores.update([a.strip() for a in str(au_str).split(';') if a.strip()])
-        todos_autores.discard(termo_ativo)
-        
-        for cand in todos_autores:
-            sub_cand = df[df[col_autores].fillna('').str.contains(cand, regex=False)]
-            k, a, v = extrair_features(sub_cand)
-            a.discard(cand)
-            dna_cand = k.union(a).union(v)
-            inter = dna_alvo.intersection(dna_cand)
-            if inter:
-                jaccard = len(inter) / len(dna_alvo.union(dna_cand))
-                resultados.append({'Item': cand, 'Similaridade (%)': round(jaccard * 100, 1), 'Traços em Comum': " | ".join(list(inter)[:4])})
-                
-    elif tipo_busca in ["País", "Local de Publicação (Venue)"]:
-         col_busca = col_paises if tipo_busca == 'País' else col_venue
-         if col_busca:
-             todos_itens = set([x.strip() for s in df[col_busca].dropna() for x in str(s).split(';') if x.strip()])
-             todos_itens.discard(termo_ativo)
-             for cand in todos_itens:
-                 sub_cand = df[df[col_busca].fillna('').str.contains(cand, regex=False)]
-                 k, a, v = extrair_features(sub_cand)
-                 dna_cand = k.union(a).union(v)
-                 inter = dna_alvo.intersection(dna_cand)
-                 if inter:
-                     jaccard = len(inter) / len(dna_alvo.union(dna_cand))
-                     resultados.append({'Item': cand, 'Similaridade (%)': round(jaccard * 100, 1), 'Traços em Comum': " | ".join(list(inter)[:4])})
+    for candidato, perfil in candidatos.items():
+        intersecao = perfil_alvo.intersection(perfil)
+        if not intersecao:
+            continue
 
-    # Ordena, remove quem não tem nada a ver e corta nos top 15
-    resultados = sorted([r for r in resultados if r['Similaridade (%)'] > 0], key=lambda x: x['Similaridade (%)'], reverse=True)[:15]
-    
-    if tipo_busca == "Documento": return {'Documentos': resultados}
-    elif tipo_busca == "Autor": return {'Autores': resultados}
-    else: return {'Itens': resultados}
+        uniao = perfil_alvo.union(perfil)
+        similaridade = (len(intersecao) / len(uniao)) * 100 if uniao else 0
+        resultados.append({
+            'Item': candidato,
+            'Similaridade (%)': round(similaridade, 1),
+            'Traços em Comum': " | ".join(sorted(intersecao)[:4])
+        })
+
+    resultados = sorted(resultados, key=lambda item: item['Similaridade (%)'], reverse=True)[:15]
+
+    if tipo_busca == "Documento":
+        return {'Documentos': resultados}
+    if tipo_busca == "Autor":
+        return {'Autores': resultados}
+    return {'Itens': resultados}
 
 def limpar_termo_busca():
     """Limpa o termo de busca quando o usuário clica manualmente no botão de rádio."""
@@ -1596,6 +1864,7 @@ def navegar_busca(novo_tipo, novo_termo):
     st.session_state['busca_tipo_biblio'] = novo_tipo
     st.session_state['busca_termo_biblio'] = novo_termo
 
+@st.cache_data(show_spinner=False)
 def gerar_nuvem_echarts(df, coluna, fonte="Arial", paleta=None):
     """Gera o dicionário nativo da nuvem de palavras, livre de erros de conversão JS."""
     texto = " ".join(df[coluna].dropna().astype(str)).lower()
@@ -1683,28 +1952,25 @@ def process_multiple_ris(uploaded_files, db_mapping):
         
         if 'YEAR' in df.columns:
             df['YEAR CLEAN'] = pd.to_numeric(df['YEAR'], errors='coerce')
-            
-        # --- LÓGICA DE EXTRAÇÃO DE CITAÇÕES ---
-        def extract_citations(row):
-            for col in ['TC', 'Z9', 'TIMES CITED', 'CITED BY']:
-                if col in df.columns and pd.notna(row[col]):
-                    try: return float(row[col])
-                    except: pass
-            
-            if 'NOTES' in df.columns and pd.notna(row['NOTES']):
-                notes_str = str(row['NOTES'])
-                match_scopus = re.search(r'Cited\s+By:\s*(\d+)', notes_str, re.IGNORECASE)
-                if match_scopus: return float(match_scopus.group(1))
-                match_wos = re.search(r'Times\s+Cited(?:.*?):\s*(\d+)', notes_str, re.IGNORECASE)
-                if match_wos: return float(match_wos.group(1))
-            
-            return None 
-            
-        # 1º PASSO: Cria a coluna usando a regra acima
-        df['TOTAL CITATIONS'] = df.apply(extract_citations, axis=1)
-        
-        # 2º PASSO: Converte a coluna recém-criada para numérico (evita o erro do nlargest)
-        df['TOTAL CITATIONS'] = pd.to_numeric(df['TOTAL CITATIONS'], errors='coerce')
+
+        citation_cols = [col for col in ['TC', 'Z9', 'TIMES CITED', 'CITED BY'] if col in df.columns]
+        citations = pd.Series(np.nan, index=df.index, dtype='float64')
+        for col in citation_cols:
+            citations = citations.fillna(pd.to_numeric(df[col], errors='coerce'))
+
+        if 'NOTES' in df.columns:
+            notes_str = df['NOTES'].fillna('').astype(str)
+            cited_by_notes = pd.to_numeric(
+                notes_str.str.extract(r'Cited\s+By:\s*(\d+)', expand=False),
+                errors='coerce'
+            )
+            times_cited_notes = pd.to_numeric(
+                notes_str.str.extract(r'Times\s+Cited(?:.*?):\s*(\d+)', expand=False),
+                errors='coerce'
+            )
+            citations = citations.fillna(cited_by_notes).fillna(times_cited_notes)
+
+        df['TOTAL CITATIONS'] = citations.fillna(0)
         
         # --- LIMPEZA DO TIPO DE REFERÊNCIA ---
         if 'TYPE OF REFERENCE' in df.columns:
@@ -1778,11 +2044,10 @@ def process_multiple_ris(uploaded_files, db_mapping):
         else:
             df['COUNTRY'] = None
 
-        return df
+        return padronizar_base_bibliometrica(df)
     return None
 
 def deduplicar_por_doi(df):
-    # Criamos uma cópia e ordenamos: mais citações primeiro, NaNs por último
     df_clean = df.sort_values(by='TOTAL CITATIONS', ascending=False, na_position='last').copy()
     
     doi_col = next((c for c in ['DOI', 'DO'] if c in df_clean.columns), None)
@@ -1791,26 +2056,33 @@ def deduplicar_por_doi(df):
     if not doi_col: 
         return df_clean, pd.DataFrame()
 
-    valid_doi = df_clean[df_clean[doi_col].notna() & (df_clean[doi_col] != '')]
-    
-    # Ao usar keep='first' em um DF ordenado, ele mantém o registro com mais citações
-    first_occurrence = valid_doi.groupby(doi_col).apply(lambda x: x.index[0]).to_dict()
-    dupe_mask = valid_doi.duplicated(subset=[doi_col], keep='first')
+    df_clean['_DOI_NORMALIZADO'] = (
+        df_clean[doi_col]
+        .fillna('')
+        .astype(str)
+        .str.strip()
+        .str.lower()
+    )
+
+    valid_doi = df_clean[df_clean['_DOI_NORMALIZADO'].ne('')]
+    dupe_mask = valid_doi.duplicated(subset=['_DOI_NORMALIZADO'], keep='first')
     dupes_indices = valid_doi[dupe_mask].index
     
     df_dupes = df_clean.loc[dupes_indices].copy()
     
-    # Preenche a nova coluna com o título do documento mantido
     if not df_dupes.empty and title_col:
-        ref_titles = [df_clean.loc[first_occurrence[doi], title_col] for doi in df_dupes[doi_col]]
-        df_dupes['DOCUMENTO DE REFERÊNCIA (MANTIDO)'] = ref_titles
-        
-    df_unified = df_clean.drop(index=dupes_indices).copy()
+        kept_titles = (
+            valid_doi.drop_duplicates(subset=['_DOI_NORMALIZADO'], keep='first')
+            .set_index('_DOI_NORMALIZADO')[title_col]
+            .to_dict()
+        )
+        df_dupes['DOCUMENTO DE REFERÊNCIA (MANTIDO)'] = df_dupes['_DOI_NORMALIZADO'].map(kept_titles)
+
+    df_unified = df_clean.drop(index=dupes_indices).drop(columns=['_DOI_NORMALIZADO']).copy()
+    df_dupes = df_dupes.drop(columns=['_DOI_NORMALIZADO'])
     return df_unified, df_dupes
 
 def deduplicar_por_similaridade(df, threshold=0.90):
-    
-    # Ordenação crucial: coloca os mais citados no topo da lista de comparação
     df_clean = df.sort_values(by='TOTAL CITATIONS', ascending=False, na_position='last').copy()
     
     title_col = next((c for c in ['TITLE', 'TI'] if c in df_clean.columns), None)
@@ -1818,39 +2090,62 @@ def deduplicar_por_similaridade(df, threshold=0.90):
     if not title_col or len(df_clean) < 2: 
         return df_clean, pd.DataFrame()
 
-    # Como o DF está ordenado, indices_reais[0] terá mais citações que indices_reais[10]
-    indices_reais = df_clean.index.tolist()
-    
-    temp_titles = df_clean[title_col].astype(str).str.lower().str.strip()
-    vectorizer = TfidfVectorizer(stop_words='english')
-    
     indices_para_excluir = set()
     ref_mapping = {}
+    normalized_titles = (
+        df_clean[title_col]
+        .fillna('')
+        .astype(str)
+        .str.lower()
+        .str.replace(r'\s+', ' ', regex=True)
+        .str.strip()
+    )
+    df_clean['_TITLE_NORMALIZADO'] = normalized_titles
+
+    valid_titles = df_clean[df_clean['_TITLE_NORMALIZADO'].ne('')].copy()
+
+    exact_dupes = valid_titles.duplicated(subset=['_TITLE_NORMALIZADO'], keep='first')
+    dupes_exact_idx = valid_titles[exact_dupes].index
+    if len(dupes_exact_idx) > 0:
+        first_titles = (
+            valid_titles.drop_duplicates(subset=['_TITLE_NORMALIZADO'], keep='first')
+            .set_index('_TITLE_NORMALIZADO')[title_col]
+            .to_dict()
+        )
+        for idx in dupes_exact_idx:
+            indices_para_excluir.add(idx)
+            ref_mapping[idx] = first_titles.get(df_clean.at[idx, '_TITLE_NORMALIZADO'], df_clean.at[idx, title_col])
 
     try:
-        tfidf_matrix = vectorizer.fit_transform(temp_titles)
-        cosine_sim = cosine_similarity(tfidf_matrix)
-        upper_tri = np.triu(cosine_sim, k=1)
-        
-        # Encontra as posições onde a similaridade é alta
-        rows_pos, cols_pos = np.where(upper_tri >= threshold)
-        
-        for r_p, c_p in zip(rows_pos, cols_pos):
-            # Mapeia a posição (0, 1, 2...) de volta para o Index real (ex: 520, 800...)
-            idx_r = indices_reais[r_p] # Documento que será mantido
-            idx_c = indices_reais[c_p] # Documento identificado como duplicado
-            
-            if idx_c not in indices_para_excluir and idx_r not in indices_para_excluir:
-                indices_para_excluir.add(idx_c)
-                ref_mapping[idx_c] = df_clean.loc[idx_r, title_col]
-                
-    except Exception as e:
-        print(f"Erro na similaridade: {e}")
+        remaining = valid_titles.loc[~valid_titles.index.isin(indices_para_excluir), '_TITLE_NORMALIZADO']
+        if len(remaining) > 1:
+            vectorizer = TfidfVectorizer(stop_words='english', ngram_range=(1, 2), min_df=1)
+            tfidf_matrix = vectorizer.fit_transform(remaining)
+            cosine_sparse = cosine_similarity(tfidf_matrix, dense_output=False).tocoo()
+            remaining_indices = remaining.index.to_numpy()
 
-    df_dupes = df_clean.loc[list(indices_para_excluir)].copy()
+            for row_pos, col_pos, score in zip(cosine_sparse.row, cosine_sparse.col, cosine_sparse.data):
+                if row_pos >= col_pos or score < threshold:
+                    continue
+
+                idx_r = remaining_indices[row_pos]
+                idx_c = remaining_indices[col_pos]
+
+                if idx_r in indices_para_excluir or idx_c in indices_para_excluir:
+                    continue
+
+                indices_para_excluir.add(idx_c)
+                ref_mapping[idx_c] = df_clean.at[idx_r, title_col]
+
+    except Exception:
+        pass
+
+    ordered_exclusions = sorted(indices_para_excluir)
+    df_dupes = df_clean.loc[ordered_exclusions].copy()
     
     if not df_dupes.empty:
-        df_dupes['DOCUMENTO DE REFERÊNCIA (MANTIDO)'] = [ref_mapping[idx] for idx in list(indices_para_excluir)]
-        
-    df_unified = df_clean.drop(index=list(indices_para_excluir)).copy()
+        df_dupes['DOCUMENTO DE REFERÊNCIA (MANTIDO)'] = [ref_mapping.get(idx, '') for idx in ordered_exclusions]
+
+    df_unified = df_clean.drop(index=ordered_exclusions).drop(columns=['_TITLE_NORMALIZADO']).copy()
+    df_dupes = df_dupes.drop(columns=['_TITLE_NORMALIZADO'])
     return df_unified, df_dupes    

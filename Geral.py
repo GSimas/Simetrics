@@ -1,20 +1,35 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from streamlit_agraph import agraph, Config
 import plotly.graph_objects as go
-from utils import gerar_mapa_tematico, gerar_nuvem_echarts, processar_excel_wos, processar_csv_scopus, calcular_metricas_bibliometrix, gerar_tabela_metricas_completas, calcular_similares_biblio, limpar_termo_busca, navegar_busca, process_multiple_ris, criar_grafo_e_metricas, deduplicar_por_doi, deduplicar_por_similaridade
-from pyecharts import options as opts
-from pyecharts.charts import WordCloud as PyechartsWordCloud
-from streamlit_echarts import st_pyecharts
+from streamlit_agraph import agraph, Config
 from streamlit_echarts import st_echarts
-from pyecharts.commons.utils import JsCode
-import json
-import plotly.express as px
 import io
 import os
 from collections import Counter
 import networkx as nx
+from utils import (
+    analisar_completude_metadados,
+    calcular_metricas_bibliometrix,
+    calcular_similares_biblio,
+    criar_grafo_e_metricas,
+    deduplicar_por_doi,
+    deduplicar_por_similaridade,
+    filtrar_por_entidade,
+    gerar_csv_bytes,
+    gerar_mapa_tematico,
+    gerar_nuvem_echarts,
+    gerar_tabela_metricas_completas,
+    limpar_termo_busca,
+    navegar_busca,
+    obter_grafo_global_busca,
+    padronizar_base_bibliometrica,
+    preparar_opcoes_busca,
+    process_multiple_ris,
+    processar_csv_scopus,
+    processar_excel_wos,
+    resumir_base_bibliometrica,
+)
 
 
 st.set_page_config(page_title="Simetrics", page_icon="🧬", layout="wide")
@@ -31,16 +46,15 @@ def create_kpi_card(title, value, color="#f0f2f6", text_color="#31333F", subtitl
     </div>
     """, unsafe_allow_html=True)
 
-# Inicialização segura do session_state
-if 'df_geral' not in st.session_state:
-    st.session_state['df_geral'] = None
-
-if 'df_original' not in st.session_state:
-    st.session_state['df_original'] = None
-
-# Esta lógica garante que se for None ou se não existir, vira um DataFrame
-if 'df_duplicados' not in st.session_state or st.session_state['df_duplicados'] is None:
+def resetar_estado_derivado():
     st.session_state['df_duplicados'] = pd.DataFrame()
+    st.session_state['tabela_sna_completa'] = None
+
+
+st.session_state.setdefault('df_geral', None)
+st.session_state.setdefault('df_original', None)
+st.session_state.setdefault('df_duplicados', pd.DataFrame())
+st.session_state.setdefault('tabela_sna_completa', None)
 
 with st.sidebar:
     st.image("simetrics - logo.png", width='stretch')
@@ -117,32 +131,11 @@ with st.sidebar:
 
             if list_dfs:
                 with st.spinner("Consolidando estrutura final..."):
-                    df_raw = pd.concat(list_dfs, ignore_index=True)
+                    df_raw = padronizar_base_bibliometrica(pd.concat(list_dfs, ignore_index=True))
 
-                    # --- NOVO: UNIFICAÇÃO DE SEGURANÇA ---
-                    # Caso existam colunas antigas (REFERENCES ou CITED REFERENCES), unifica em uma só
-                    cols_para_unificar = ['REFERENCES', 'CITED REFERENCES', 'CR']
-                    if 'REFERENCES_UNIFIED' not in df_raw.columns:
-                        df_raw['REFERENCES_UNIFIED'] = ""
-                        
-                    if col in df_raw.columns:
-                        # 1. Identifica quais linhas ainda estão com a coluna unificada vazia ou nula
-                        linhas_vazias = (df_raw['REFERENCES_UNIFIED'] == "") | (df_raw['REFERENCES_UNIFIED'].isna())
-                        
-                        # 2. Preenche apenas essas linhas vazias com os dados da coluna atual da iteração
-                        df_raw.loc[linhas_vazias, 'REFERENCES_UNIFIED'] = df_raw.loc[linhas_vazias, col]
-                    
-                    # Remove as colunas duplicadas para limpar a memória e a tabela
-                    df_raw = df_raw.drop(columns=[c for c in cols_para_unificar if c in df_raw.columns], errors='ignore')
-                    # -------------------------------------
-                    
-                    # Garante que o ano seja numérico para evitar erros nos gráficos
-                    if 'YEAR CLEAN' not in df_raw.columns and 'YEAR' in df_raw.columns:
-                        df_raw['YEAR CLEAN'] = pd.to_numeric(df_raw['YEAR'], errors='coerce')
-                    
                     st.session_state['df_original'] = df_raw.copy()
-                    st.session_state['df_geral'] = df_raw
-                    st.session_state['df_duplicados'] = pd.DataFrame()
+                    st.session_state['df_geral'] = df_raw.copy()
+                    resetar_estado_derivado()
                     st.success(f"Sucesso! {len(df_raw)} documentos integrados.")
                     st.rerun()
             else:
@@ -183,10 +176,11 @@ with st.sidebar:
                 df_demo = process_multiple_ris(list_mock_files, mapping_demo)
                 
                 if df_demo is not None:
+                    df_demo = padronizar_base_bibliometrica(df_demo)
                     # Atualiza o estado da aplicação com os dados de exemplo
                     st.session_state['df_original'] = df_demo.copy()
-                    st.session_state['df_geral'] = df_demo
-                    st.session_state['df_duplicados'] = pd.DataFrame()
+                    st.session_state['df_geral'] = df_demo.copy()
+                    resetar_estado_derivado()
                     st.success("Exemplo carregado com sucesso!")
                     st.rerun()
 
@@ -212,8 +206,8 @@ if st.session_state['df_geral'] is not None:
                     with st.spinner("Buscando DOIs..."):
                         df_limpo, df_dupes = deduplicar_por_doi(st.session_state['df_geral'])
                         st.session_state['df_geral'] = df_limpo
-                        # ANEXA os novos duplicados aos já existentes
                         st.session_state['df_duplicados'] = pd.concat([st.session_state['df_duplicados'], df_dupes], ignore_index=True)
+                        st.session_state['tabela_sna_completa'] = None
                         st.rerun()
 
             with c_btn2:
@@ -221,14 +215,14 @@ if st.session_state['df_geral'] is not None:
                     with st.spinner("Calculando similaridade..."):
                         df_limpo, df_dupes = deduplicar_por_similaridade(st.session_state['df_geral'], threshold)
                         st.session_state['df_geral'] = df_limpo
-                        # ANEXA os novos duplicados aos já existentes
                         st.session_state['df_duplicados'] = pd.concat([st.session_state['df_duplicados'], df_dupes], ignore_index=True)
+                        st.session_state['tabela_sna_completa'] = None
                         st.rerun()
 
             with c_btn3:
                 if st.button("🔄 Reverter Base"):
                     st.session_state['df_geral'] = st.session_state['df_original'].copy()
-                    st.session_state['df_duplicados'] = pd.DataFrame() # Limpa a lista de excluídos
+                    resetar_estado_derivado()
                     st.rerun()
 
             # Avisos de Sucesso ou Erro
@@ -249,7 +243,7 @@ if st.session_state['df_geral'] is not None:
                 st.dataframe(dupes[cols_exibicao], width='stretch', hide_index=True)
             
                 # Botão para baixar apenas os excluídos (útil para o anexo da metodologia PRISMA)
-                csv_dupes = dupes.to_csv(index=False).encode('utf-8')
+                csv_dupes = gerar_csv_bytes(dupes)
                 st.download_button("Baixar Relatório de Excluídos (CSV)", data=csv_dupes, file_name='documentos_excluidos.csv')
 
             st.write("")
@@ -260,52 +254,7 @@ if st.session_state['df_geral'] is not None:
         st.markdown("##### 🗂️ Qualidade e Completude dos Metadados")
         st.caption(f"Análise de dados faltantes em **{len(df)} documentos**. Metadados incompletos podem reduzir a precisão das redes de conhecimento.")
         
-        # Mapeamento dos campos principais para análise
-        campos_verificacao = [
-            ('AUTHORS', 'Author (AU)'),
-            ('DOCUMENT TYPE', 'Document Type (DT)'),
-            ('ABSTRACT', 'Abstract (AB)'),
-            ('COUNTRY', 'Affiliation/Country (C1)'),
-            ('DOI', 'DOI (DI)'),
-            ('TITLE', 'Title (TI)'),
-            ('SECONDARY TITLE', 'Journal/Source (SO)'),
-            ('YEAR CLEAN', 'Publication Year (PY)'),
-            ('TOTAL CITATIONS', 'Total Citation (TC)'),
-            ('KEYWORDS', 'Keywords (DE/ID)'),
-            ('REFERENCES_UNIFIED', 'Cited References (CR)')
-        ]
-        
-        dados_completude = []
-        tot_docs = len(df)
-        
-        for col_chave, descricao in campos_verificacao:
-            if col_chave in df.columns:
-                # Conta valores nulos (NaN) e strings vazias/só com espaços
-                faltantes = df[col_chave].isna().sum() + (df[col_chave].astype(str).str.strip() == '').sum()
-            else:
-                # Se a coluna nem existir na base, 100% dos dados faltam
-                faltantes = tot_docs
-                
-            pct_faltante = (faltantes / tot_docs) * 100 if tot_docs > 0 else 0
-            
-            # Regras de Status (Inspiradas no Bibliometrix)
-            if pct_faltante == 0:
-                status = "Excelente"
-            elif pct_faltante <= 10:
-                status = "Bom"
-            elif pct_faltante <= 20:
-                status = "Aceitável"
-            else:
-                status = "Ruim"
-                
-            dados_completude.append({
-                "Metadado": descricao,
-                "Faltantes": int(faltantes),
-                "Faltantes (%)": pct_faltante,
-                "Status": status
-            })
-            
-        df_comp = pd.DataFrame(dados_completude).sort_values(by="Faltantes (%)")
+        df_comp = analisar_completude_metadados(df)
         
         # Função para aplicar cores estilo "Semáforo" no Pandas
         def colorir_status(val):
@@ -367,38 +316,15 @@ if st.session_state['df_geral'] is not None:
                     st.toast("Temas gerados com sucesso!", icon="🤖")
                     st.rerun()
 
-        # --- 1. CÁLCULO DE TODAS AS MÉTRICAS ---        
-        total_docs = len(df)
-        b_metrics = calcular_metricas_bibliometrix(df)
-        
-        # Período e Idade Média
-        timespan = f"{int(df['YEAR CLEAN'].min())}:{int(df['YEAR CLEAN'].max())}" if 'YEAR CLEAN' in df.columns and pd.notna(df['YEAR CLEAN'].min()) else "N/S"
-        avg_age = round(2026 - df['YEAR CLEAN'].mean(), 2) if 'YEAR CLEAN' in df.columns else "N/S"
-        
-        # Autores Únicos
-        authors_count = 0
-        if 'AUTHORS' in df.columns:
-            flat_auths = [a.strip() for sublist in df['AUTHORS'].dropna().astype(str).str.split(';') for a in sublist if a.strip()]
-            authors_count = len(set(flat_auths))
-
-        # Países Únicos
-        countries_count = 0
-        if 'COUNTRY' in df.columns:
-            flat_countries = [c.strip() for sublist in df['COUNTRY'].dropna().astype(str).str.split(';') for c in sublist if c.strip()]
-            countries_count = len(set(flat_countries))
-
-        # Palavras-Chave Únicas
-        kw_count = 0
-        col_kw = next((c for c in ['KEYWORDS', 'KW', 'DE'] if c in df.columns), None)
-        if col_kw:
-            flat_kw = [k.strip().lower() for sublist in df[col_kw].dropna().astype(str).str.split(';') for k in sublist if k.strip()]
-            kw_count = len(set(flat_kw))
-
-        # Locais de Publicação (Venues)
-        venues_count = 0
-        col_v = next((c for c in ['SECONDARY TITLE', 'SO', 'JO'] if c in df.columns), None)
-        if col_v:
-            venues_count = df[col_v].dropna().nunique()
+        resumo_base = resumir_base_bibliometrica(df)
+        total_docs = resumo_base["total_docs"]
+        b_metrics = resumo_base["b_metrics"]
+        timespan = resumo_base["timespan"]
+        avg_age = resumo_base["avg_age"]
+        authors_count = resumo_base["authors_count"]
+        countries_count = resumo_base["countries_count"]
+        kw_count = resumo_base["kw_count"]
+        venues_count = resumo_base["venues_count"]
 
         # --- 2. EXIBIÇÃO DOS CARDS EM TRÊS LINHAS SIMÉTRICAS ---
         
@@ -665,21 +591,17 @@ if st.session_state['df_geral'] is not None:
             col_venue_name = next((c for c in ['SECONDARY TITLE', 'SO', 'JO'] if c in df.columns), None)
             
             if col_venue_name:
-                venue_data = []
-                df_with_venue = df.dropna(subset=[col_venue_name])
-                
-                for _, row in df_with_venue.iterrows():
-                    v_name = str(row[col_venue_name]).strip()
-                    cit = row['TOTAL CITATIONS'] if pd.notna(row['TOTAL CITATIONS']) else 0
-                    if v_name:
-                        venue_data.append({'Venue': v_name, 'Documentos': 1, 'Citações': cit})
-                
-                if venue_data:
-                    df_venue_expanded = pd.DataFrame(venue_data)
-                    res_venue = df_venue_expanded.groupby('Venue').agg({
-                        'Documentos': 'sum', 
-                        'Citações': 'sum'
-                    }).reset_index()
+                df_with_venue = df[[col_venue_name, 'TOTAL CITATIONS']].copy()
+                df_with_venue['Venue'] = df_with_venue[col_venue_name].astype(str).str.strip()
+                df_with_venue['Citações'] = pd.to_numeric(df_with_venue['TOTAL CITATIONS'], errors='coerce').fillna(0)
+                df_with_venue = df_with_venue[df_with_venue['Venue'] != '']
+
+                if not df_with_venue.empty:
+                    res_venue = (
+                        df_with_venue.assign(Documentos=1)
+                        .groupby('Venue', as_index=False)[['Documentos', 'Citações']]
+                        .sum()
+                    )
                     res_venue['Média'] = (res_venue['Citações'] / res_venue['Documentos']).round(2)
                     
                     # Corta nomes muito longos de revistas/conferências para o gráfico ficar bonito
@@ -797,13 +719,15 @@ if st.session_state['df_geral'] is not None:
             c_t = next((c for c in ['TITLE', 'TI'] if c in df.columns), None)
             c_k = next((c for c in ['KEYWORDS', 'KW', 'DE'] if c in df.columns), None)
             c_a = next((c for c in ['ABSTRACT', 'AB'] if c in df.columns), None)
+            df_wc = df
 
             if fonte_nuvem == "Título + Resumo + Palavras-chave":
-                # Filtra apenas as colunas que existem na base carregada
                 cols_para_unir = [c for c in [c_t, c_k, c_a] if c]
-                # Cria uma coluna temporária unindo os textos com espaços
-                df['WC_COMBINADO'] = df[cols_para_unir].fillna('').agg(' '.join, axis=1)
-                coluna_escolhida = 'WC_COMBINADO'
+                if cols_para_unir:
+                    df_wc = pd.DataFrame({'WC_COMBINADO': df[cols_para_unir].fillna('').agg(' '.join, axis=1)})
+                    coluna_escolhida = 'WC_COMBINADO'
+                else:
+                    coluna_escolhida = None
             else:
                 mapa_colunas = {
                     "Títulos": c_t,
@@ -815,11 +739,11 @@ if st.session_state['df_geral'] is not None:
             st.info(f"As 'Stopwords' em inglês são removidas automaticamente para destacar termos conceituais.")
 
         with col_wc_img:
-            if coluna_escolhida and coluna_escolhida in df.columns:
+            if coluna_escolhida and coluna_escolhida in df_wc.columns:
                 with st.spinner("Pintando palavras e ajustando tipografia..."):
                     
                     wc_opcoes = gerar_nuvem_echarts(
-                        df, 
+                        df_wc, 
                         coluna_escolhida, 
                         fonte=estilo_fonte, 
                         paleta=paleta_escolhida
@@ -1001,7 +925,7 @@ if st.session_state['df_geral'] is not None:
                     cols.insert(0, cols.pop(cols.index(col_prioritaria)))
             
             st.dataframe(df[cols], width='stretch')
-            csv_geral = df[cols].to_csv(index=False).encode('utf-8')
+            csv_geral = gerar_csv_bytes(df[cols])
             st.download_button("Baixar Base Geral (CSV)", data=csv_geral, file_name='base_simetrics_geral.csv', key='dl_geral')
 
         # --- ABA 2: AUTORES ---
@@ -1011,7 +935,7 @@ if st.session_state['df_geral'] is not None:
                 df_autores = gerar_tabela_autores(df)
                 if not df_autores.empty:
                     st.dataframe(df_autores, width='stretch', hide_index=True)
-                    csv_autores = df_autores.to_csv(index=False).encode('utf-8')
+                    csv_autores = gerar_csv_bytes(df_autores)
                     st.download_button("Baixar Tabela de Autores (CSV)", data=csv_autores, file_name='simetrics_autores.csv', key='dl_aut')
                 else:
                     st.info("Não há dados de autores suficientes para gerar esta tabela.")
@@ -1023,7 +947,7 @@ if st.session_state['df_geral'] is not None:
                 df_paises = gerar_tabela_paises(df)
                 if not df_paises.empty:
                     st.dataframe(df_paises, width='stretch', hide_index=True)
-                    csv_paises = df_paises.to_csv(index=False).encode('utf-8')
+                    csv_paises = gerar_csv_bytes(df_paises)
                     st.download_button("Baixar Tabela de Países (CSV)", data=csv_paises, file_name='simetrics_paises.csv', key='dl_pai')
                 else:
                     st.info("Não há dados de países (COUNTRY) suficientes para gerar esta tabela.")
@@ -1035,7 +959,7 @@ if st.session_state['df_geral'] is not None:
                 df_venues = gerar_tabela_venues(df)
                 if not df_venues.empty:
                     st.dataframe(df_venues, width='stretch', hide_index=True)
-                    csv_venues = df_venues.to_csv(index=False).encode('utf-8')
+                    csv_venues = gerar_csv_bytes(df_venues)
                     st.download_button("Baixar Tabela de Fontes/Venues (CSV)", data=csv_venues, file_name='simetrics_venues.csv', key='dl_ven')
                 else:
                     st.info("Não há dados de fontes de publicação (SECONDARY TITLE) suficientes para gerar esta tabela.")
@@ -1047,7 +971,7 @@ if st.session_state['df_geral'] is not None:
                 df_keywords = gerar_tabela_keywords(df)
                 if not df_keywords.empty:
                     st.dataframe(df_keywords, width='stretch', hide_index=True)
-                    csv_keywords = df_keywords.to_csv(index=False).encode('utf-8')
+                    csv_keywords = gerar_csv_bytes(df_keywords)
                     st.download_button("Baixar Tabela de Palavras-chave (CSV)", data=csv_keywords, file_name='simetrics_keywords.csv', key='dl_kw')
                 else:
                     st.info("Não há palavras-chave (KEYWORDS) suficientes para gerar esta tabela.")
@@ -1077,7 +1001,7 @@ if st.session_state['df_geral'] is not None:
                 coluna_alvo = "AUTHORS"
             elif tipo_grafo == "Rede de Cocitação":
                 # Busca variações comuns de nomes de colunas de referências
-                for col in ['REFERENCES', 'CITED REFERENCES']:
+                for col in ['REFERENCES_UNIFIED', 'REFERENCES', 'CITED REFERENCES', 'CR']:
                     if col in df.columns: 
                         coluna_alvo = col
                         break
@@ -1186,7 +1110,7 @@ if st.session_state['df_geral'] is not None:
                 
                 st.download_button(
                     "📥 Baixar Relatório SNA (CSV)",
-                    data=df_filtrado.to_csv(index=False).encode('utf-8'),
+                    data=gerar_csv_bytes(df_filtrado),
                     file_name="metricas_sna_ecossistema.csv"
                 )
             else:
@@ -1207,22 +1131,16 @@ if st.session_state['df_geral'] is not None:
         st.header("🔍 Motor de Busca e Dossiê Científico")
         st.caption("Investigue as entidades do ecossistema e descubra sua influência topológica na rede.")
 
-        # 1. Preparação das Listas Únicas
-        col_titulos = next((c for c in ['TITLE', 'TI'] if c in df.columns), None)
-        col_autores = next((c for c in ['AUTHORS', 'AU'] if c in df.columns), None)
-        col_paises = next((c for c in ['COUNTRY'] if c in df.columns), None)
-        col_venue = next((c for c in ['SECONDARY TITLE', 'SO', 'JO'] if c in df.columns), None)
-        col_ano = next((c for c in ['YEAR', 'PY'] if c in df.columns), None)
-
-        opcoes_doc = df[col_titulos].dropna().unique().tolist() if col_titulos else []
-        
-        autores_raw = df[col_autores].dropna().tolist() if col_autores else []
-        opcoes_aut = sorted(list(set([a.strip() for sub in autores_raw for a in str(sub).split(';') if a.strip()])))
-        
-        paises_raw = df[col_paises].dropna().tolist() if col_paises else []
-        opcoes_pais = sorted(list(set([p.strip() for sub in paises_raw for p in str(sub).split(';') if p.strip()])))
-        
-        opcoes_venue = sorted(df[col_venue].dropna().unique().tolist()) if col_venue else []
+        info_busca = preparar_opcoes_busca(df)
+        col_titulos = info_busca["col_titulos"]
+        col_autores = info_busca["col_autores"]
+        col_paises = info_busca["col_paises"]
+        col_venue = info_busca["col_venue"]
+        col_ano = info_busca["col_ano"]
+        opcoes_doc = info_busca["opcoes_doc"]
+        opcoes_aut = info_busca["opcoes_aut"]
+        opcoes_pais = info_busca["opcoes_pais"]
+        opcoes_venue = info_busca["opcoes_venue"]
 
         # 2. Interface de Busca
         opcoes_busca = ["Documento", "Autor", "País", "Local de Publicação (Venue)"]
@@ -1241,9 +1159,9 @@ if st.session_state['df_geral'] is not None:
         elif st.session_state['busca_tipo_biblio'] == "Local de Publicação (Venue)": opcoes_lista = opcoes_venue
 
         termo_selecionado = st.selectbox(
-            "Selecione ou digite para pesquisar:", 
-            sorted(opcoes_lista), 
-            index=sorted(opcoes_lista).index(st.session_state['busca_termo_biblio']) if st.session_state['busca_termo_biblio'] in opcoes_lista else None, 
+            "Selecione ou digite para pesquisar:",
+            opcoes_lista,
+            index=opcoes_lista.index(st.session_state['busca_termo_biblio']) if st.session_state['busca_termo_biblio'] in opcoes_lista else None,
             placeholder="Explore o ecossistema..."
         )
 
@@ -1254,39 +1172,11 @@ if st.session_state['df_geral'] is not None:
         termo_ativo = st.session_state['busca_termo_biblio']
         tipo_ativo = st.session_state['busca_tipo_biblio']
 
-        # --- ARQUITETURA ULTRARRÁPIDA: Grafo Global em Memória ---
-        # Usamos cache_resource porque grafos são objetos complexos de rede, não apenas dados tubulares.
-        @st.cache_resource 
-        def obter_grafo_global(df_dados):
-            G = nx.Graph()
-            colunas_necessarias = [c for c in [col_titulos, col_autores, col_paises, col_venue] if c is not None]
-            records = df_dados[colunas_necessarias].to_dict('records')
-            
-            for row in records:
-                doc_node = str(row.get(col_titulos, ''))
-                if not doc_node or doc_node == 'nan': continue
-                G.add_node(doc_node, type='Documento')
-                
-                if col_autores and pd.notna(row.get(col_autores)):
-                    for a in [x.strip() for x in str(row[col_autores]).split(';') if x.strip()]:
-                        G.add_node(a, type='Autor')
-                        G.add_edge(doc_node, a)
-                if col_paises and pd.notna(row.get(col_paises)):
-                    for p in [x.strip() for x in str(row[col_paises]).split(';') if x.strip()]:
-                        G.add_node(p, type='País')
-                        G.add_edge(doc_node, p)
-                if col_venue and pd.notna(row.get(col_venue)):
-                    venue = str(row[col_venue]).strip()
-                    G.add_node(venue, type='Venue')
-                    G.add_edge(doc_node, venue)
-            return G
-
         # 3. Construção do Perfil e Métricas SNA
         if termo_ativo:
             col_info, col_sna = st.columns([2, 1])
             
-            # Recupera a rede global instantaneamente
-            grafo_global = obter_grafo_global(df)
+            grafo_global = obter_grafo_global_busca(df, col_titulos, col_autores, col_paises, col_venue)
             
             def calcular_sna_instantaneo(G, termo):
                 """Calcula métricas localizadas baseadas no Grafo Global pré-carregado."""
@@ -1304,12 +1194,21 @@ if st.session_state['df_geral'] is not None:
                 
                 return {"Grau Absoluto": grau_abs, "Centralidade Grau": cent_grau, "Betweenness": betw, "Closeness": clos}
 
+            with col_sna:
+                sna_local = calcular_sna_instantaneo(grafo_global, termo_ativo)
+                if sna_local:
+                    st.markdown("##### Métricas Locais SNA")
+                    st.metric("Grau Absoluto", sna_local["Grau Absoluto"])
+                    st.metric("Centralidade Grau", f"{sna_local['Centralidade Grau']:.4f}")
+                    st.metric("Betweenness", f"{sna_local['Betweenness']:.4f}")
+                    st.metric("Closeness", f"{sna_local['Closeness']:.4f}")
+
             # --- RENDERIZAÇÃO DO PERFIL (COLUNA ESQUERDA) ---
             with col_info:
                 st.info(f"**{tipo_ativo}:** {termo_ativo}")
                 
                 if tipo_ativo == "Documento":
-                    doc = df[df[col_titulos] == termo_ativo].iloc[0]
+                    doc = filtrar_por_entidade(df, termo_ativo, "Documento").iloc[0]
                     
                     ano = doc[col_ano] if col_ano and pd.notna(doc[col_ano]) else 'N/A'
                     citacoes = doc['TOTAL CITATIONS'] if 'TOTAL CITATIONS' in df.columns and pd.notna(doc['TOTAL CITATIONS']) else 0
@@ -1335,7 +1234,7 @@ if st.session_state['df_geral'] is not None:
                             st.write(doc[col_abstract])
                             
                 elif tipo_ativo == "Autor":
-                    docs_autor = df[df[col_autores].fillna('').str.contains(termo_ativo, regex=False)]
+                    docs_autor = filtrar_por_entidade(df, termo_ativo, "Autor")
                     total_citacoes = docs_autor['TOTAL CITATIONS'].sum() if 'TOTAL CITATIONS' in docs_autor.columns else 0
                     st.write(f"**Impacto Total (Citações):** {total_citacoes}")
                     
@@ -1357,7 +1256,7 @@ if st.session_state['df_geral'] is not None:
                             st.button(f"📄 {titulo_doc} ({r.get(col_ano, 'N/A')})", key=f"btn_nav_doc_aut_{hash(titulo_doc)}_{i}", on_click=navegar_busca, args=("Documento", titulo_doc))
 
                 elif tipo_ativo == "País":
-                    docs_pais = df[df[col_paises].fillna('').str.contains(termo_ativo, regex=False)]
+                    docs_pais = filtrar_por_entidade(df, termo_ativo, "País")
                     total_citacoes = docs_pais['TOTAL CITATIONS'].sum() if 'TOTAL CITATIONS' in docs_pais.columns else 0
                     st.write(f"**Impacto do País (Citações):** {total_citacoes}")
                     
@@ -1367,7 +1266,7 @@ if st.session_state['df_geral'] is not None:
                             st.button(f"📄 {titulo_doc}", key=f"btn_nav_doc_pais_{hash(titulo_doc)}_{i}", on_click=navegar_busca, args=("Documento", titulo_doc))
 
                 elif tipo_ativo == "Local de Publicação (Venue)":
-                    docs_venue = df[df[col_venue] == termo_ativo]
+                    docs_venue = filtrar_por_entidade(df, termo_ativo, "Local de Publicação (Venue)")
                     total_citacoes = docs_venue['TOTAL CITATIONS'].sum() if 'TOTAL CITATIONS' in docs_venue.columns else 0
                     st.write(f"**Citações Acumuladas nesta Fonte:** {total_citacoes}")
                     
@@ -1376,44 +1275,12 @@ if st.session_state['df_geral'] is not None:
                             titulo_doc = r[col_titulos]
                             st.button(f"📄 {titulo_doc}", key=f"btn_nav_doc_venue_{hash(titulo_doc)}_{i}", on_click=navegar_busca, args=("Documento", titulo_doc))
 
-            # --- RENDERIZAÇÃO DAS MÉTRICAS SNA (COLUNA DIREITA) ---
-            with col_sna:
-                st.markdown("##### 🕸️ Métricas Topológicas (SNA)")
-                
-                # Botão sob demanda
-                if st.button(f"⚙️ Calcular SNA para: {termo_ativo}", key=f"btn_calc_sna_{hash(termo_ativo)}", width='stretch'):
-                    with st.spinner("Analisando centralidade na rede..."):
-                        metricas_sna = calcular_sna_instantaneo(grafo_global, termo_ativo)
-                        
-                        if metricas_sna:
-                            st.metric("Grau Absoluto (Conexões)", metricas_sna['Grau Absoluto'], help="Total de conexões diretas desta entidade na rede.")
-                            st.metric("Centralidade de Grau", f"{metricas_sna['Centralidade Grau']:.4f}", help="Proporção da rede com a qual esta entidade se conecta diretamente.")
-                            st.metric("Betweenness Centrality", f"{metricas_sna['Betweenness']:.4f}", help="Capacidade de agir como 'ponte' no fluxo de informação entre outros nós.")
-                            st.metric("Closeness Centrality", f"{metricas_sna['Closeness']:.4f}", help="O quão perto (em saltos) esta entidade está de todas as outras na rede.")
-                        else:
-                            st.warning("Métricas isoladas/não aplicáveis.")
-                else:
-                    st.info("Aperte o botão acima para calcular o impacto topológico (Grau, Betweenness, Closeness) desta entidade específica no ecossistema.")
-
-            st.markdown("---")
-
             # =========================================================
             # ABAS DO DOSSIÊ (HISTÓRICO, NUVEM E SIMILARES)
             # =========================================================
             tab_hist, tab_nuvem, tab_similares = st.tabs(["📈 Evolução Histórica", "☁️ Lexicometria", "🔗 Itens Semelhantes"])
 
-            if not termo_ativo:
-                subset_df = pd.DataFrame(columns=df.columns)
-            elif tipo_ativo == "Documento": 
-                subset_df = df[df[col_titulos] == termo_ativo] if col_titulos else pd.DataFrame(columns=df.columns)
-            elif tipo_ativo == "Autor": 
-                subset_df = df[df[col_autores].fillna('').str.contains(str(termo_ativo), regex=False)] if col_autores else pd.DataFrame(columns=df.columns)
-            elif tipo_ativo == "País": 
-                subset_df = df[df[col_paises].fillna('').str.contains(str(termo_ativo), regex=False)] if col_paises else pd.DataFrame(columns=df.columns)
-            elif tipo_ativo == "Local de Publicação (Venue)": 
-                subset_df = df[df[col_venue] == termo_ativo] if col_venue else pd.DataFrame(columns=df.columns)
-            else:
-                subset_df = pd.DataFrame(columns=df.columns)
+            subset_df = filtrar_por_entidade(df, termo_ativo, tipo_ativo)
 
             # --- ABA 1: HISTÓRICO AVANÇADO ---
             with tab_hist:
