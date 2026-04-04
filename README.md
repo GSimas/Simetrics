@@ -1,2 +1,2 @@
-# Bibliomat
+# Simetrics
 Bibliometrics analysis
