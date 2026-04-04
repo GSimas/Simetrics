@@ -43,7 +43,7 @@ if 'df_duplicados' not in st.session_state or st.session_state['df_duplicados'] 
     st.session_state['df_duplicados'] = pd.DataFrame()
 
 with st.sidebar:
-    st.image("simetrics - logo.png", use_container_width=True)
+    st.image("simetrics - logo.png", width='stretch')
 
     st.header("1. Envio de Arquivos")
     
@@ -57,6 +57,9 @@ with st.sidebar:
         | **.xls / .xlsx**| Web of Science (Full Record) |
         
         **Dica:** Para Excel da WoS, certifique-se de exportar com todas as colunas (Full Record e Cited References).
+
+        ⚠️ O sistema pode apresentar lentidão e até trava em caso de arquivos com +10MB ou com +5000 linhas.
+
         """)
     
     # Adicionamos extensões de Excel
@@ -122,11 +125,12 @@ with st.sidebar:
                     if 'REFERENCES_UNIFIED' not in df_raw.columns:
                         df_raw['REFERENCES_UNIFIED'] = ""
                         
-                    for col in cols_para_unificar:
-                        if col in df_raw.columns:
-                            # Preenche a unificada com os dados da coluna encontrada, caso a unificada esteja vazia
-                            df_raw['REFERENCES_UNIFIED'] = df_raw['REFERENCES_UNIFIED'].fillna(df_raw[col])
-                            df_raw['REFERENCES_UNIFIED'] = df_raw['REFERENCES_UNIFIED'].replace("", df_raw[col])
+                    if col in df_raw.columns:
+                        # 1. Identifica quais linhas ainda estão com a coluna unificada vazia ou nula
+                        linhas_vazias = (df_raw['REFERENCES_UNIFIED'] == "") | (df_raw['REFERENCES_UNIFIED'].isna())
+                        
+                        # 2. Preenche apenas essas linhas vazias com os dados da coluna atual da iteração
+                        df_raw.loc[linhas_vazias, 'REFERENCES_UNIFIED'] = df_raw.loc[linhas_vazias, col]
                     
                     # Remove as colunas duplicadas para limpar a memória e a tabela
                     df_raw = df_raw.drop(columns=[c for c in cols_para_unificar if c in df_raw.columns], errors='ignore')
@@ -149,7 +153,7 @@ with st.sidebar:
     st.subheader("🌟 Modo de Demonstração")
     st.caption("Não tem arquivos agora? Explore o Simetrics com dados de exemplo.")
     
-    if st.button("🚀 Carregar Ecossistema de Exemplo", help="Carrega automaticamente bases pré-configuradas (Scopus, WoS e SciELO) da pasta do projeto."):
+    if st.button("🚀 Carregar Arquivos de Exemplo", help="Carrega automaticamente bases pré-configuradas (Scopus, WoS e SciELO) da pasta do projeto."):
        
         # Lista dos arquivos que devem estar na pasta raiz
         arquivos_demo = ["scopus.ris", "wos.ris", "scielo.ris"]
@@ -242,7 +246,7 @@ if st.session_state['df_geral'] is not None:
                 # Definindo colunas para exibição
                 cols_exibicao = [c for c in ['TITLE', 'TI', 'DOCUMENTO DE REFERÊNCIA (MANTIDO)', 'BASE DE DADOS', 'DOI'] if c in dupes.columns]
             
-                st.dataframe(dupes[cols_exibicao], use_container_width=True, hide_index=True)
+                st.dataframe(dupes[cols_exibicao], width='stretch', hide_index=True)
             
                 # Botão para baixar apenas os excluídos (útil para o anexo da metodologia PRISMA)
                 csv_dupes = dupes.to_csv(index=False).encode('utf-8')
@@ -314,7 +318,7 @@ if st.session_state['df_geral'] is not None:
         tabela_estilizada = df_comp.style.map(colorir_status, subset=['Status']).format({'Faltantes (%)': "{:.2f}%"})
         
         # Exibe a tabela no Streamlit
-        st.dataframe(tabela_estilizada, use_container_width=True, hide_index=True)
+        st.dataframe(tabela_estilizada, width='stretch', hide_index=True)
         st.divider()
 
         # =========================================================
@@ -342,7 +346,7 @@ if st.session_state['df_geral'] is not None:
                 st.markdown("###### 📊 Resumo da Distribuição")
                 st.dataframe(
                     df_resumo.style.bar(subset=['Documentos'], color='#82c2c2'),
-                    use_container_width=True, 
+                    width='stretch', 
                     hide_index=True
                 )
                 
@@ -429,7 +433,7 @@ if st.session_state['df_geral'] is not None:
             if col_tipo:
                 dt_counts = df[col_tipo].value_counts().reset_index()
                 dt_counts.columns = ['Tipo de Documento', 'Quantidade']
-                st.dataframe(dt_counts, use_container_width=True, hide_index=True)
+                st.dataframe(dt_counts, width='stretch', hide_index=True)
             
 
         with col_coll:
@@ -440,7 +444,7 @@ if st.session_state['df_geral'] is not None:
                 "Métrica": ["Documentos de Autor Único", "Índice de Coautoria", "Publicações Multi-País (MCP)", "Publicações Mono-País (SCP)"],
                 "Valor": [b_metrics['single_author_docs'], b_metrics['coauth_index'], b_metrics['mcp'], b_metrics['scp']]
             })
-            st.dataframe(coll_data, use_container_width=True, hide_index=True)
+            st.dataframe(coll_data, width='stretch', hide_index=True)
             
             # Ratio de Internacionalização
             intl_ratio = (b_metrics['mcp'] / len(df)) * 100 if len(df) > 0 else 0
@@ -523,7 +527,7 @@ if st.session_state['df_geral'] is not None:
                     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
                     template="plotly_white"
                 )
-                st.plotly_chart(fig_year, use_container_width=True)
+                st.plotly_chart(fig_year, width='stretch')
             else:
                 st.warning("Coluna 'YEAR CLEAN' necessária para esta análise.")
 
@@ -535,7 +539,7 @@ if st.session_state['df_geral'] is not None:
             if chart_type == "Barras": fig_db = px.bar(db_counts, x='Base', y='Quantidade', color='Base', color_discrete_sequence=px.colors.qualitative.Pastel)
             elif chart_type == "Donut": fig_db = px.pie(db_counts, names='Base', values='Quantidade', hole=0.4, color_discrete_sequence=px.colors.qualitative.Pastel)
             else: fig_db = px.pie(db_counts, names='Base', values='Quantidade', color_discrete_sequence=px.colors.qualitative.Pastel)
-            st.plotly_chart(fig_db, use_container_width=True)
+            st.plotly_chart(fig_db, width='stretch')
 
         st.divider()
 
@@ -581,7 +585,7 @@ if st.session_state['df_geral'] is not None:
                     fig_auth = px.bar(top_authors, x='Média', y='Autor', orientation='h', color='Média', color_continuous_scale='GnBu')
                 
                 fig_auth.update_layout(yaxis={'categoryorder':'total ascending'})
-                st.plotly_chart(fig_auth, use_container_width=True)
+                st.plotly_chart(fig_auth, width='stretch')
 
         with col_docs:
             st.markdown("##### 📄 Top 20 Documentos Mais Citados")
@@ -597,7 +601,7 @@ if st.session_state['df_geral'] is not None:
                     fig_d = px.bar(top_d, x='TOTAL CITATIONS', y='Título Curto', orientation='h', 
                                     color='TOTAL CITATIONS', color_continuous_scale='Reds')
                     fig_d.update_layout(yaxis={'categoryorder':'total ascending'})
-                    st.plotly_chart(fig_d, use_container_width=True)
+                    st.plotly_chart(fig_d, width='stretch')
                 except Exception as e:
                     st.warning("Não foi possível gerar o ranking de citações com os dados disponíveis.")
             else:
@@ -646,7 +650,7 @@ if st.session_state['df_geral'] is not None:
                     fig_c = px.bar(top_c, x='Média', y='País', orientation='h', color='Média', color_continuous_scale='YlGnBu')
                 
                 fig_c.update_layout(yaxis={'categoryorder':'total ascending'})
-                st.plotly_chart(fig_c, use_container_width=True)
+                st.plotly_chart(fig_c, width='stretch')
 
         with col_venue:
             st.markdown("##### 🏢 Top 20 Locais de Publicação (Venues)")
@@ -695,7 +699,7 @@ if st.session_state['df_geral'] is not None:
                     # Adiciona tooltip completo para quando passar o mouse
                     fig_v.update_traces(customdata=top_v['Venue'], hovertemplate='<b>%{customdata}</b><br>Valor: %{x}<extra></extra>')
                     
-                    st.plotly_chart(fig_v, use_container_width=True)
+                    st.plotly_chart(fig_v, width='stretch')
             else:
                 st.info("ℹ️ Nenhuma coluna de Local de Publicação (ex: SECONDARY TITLE, SO, JO) foi encontrada nos dados.")
 
@@ -719,7 +723,7 @@ if st.session_state['df_geral'] is not None:
                 fig_kw = plot_top_keywords_metric(df, metric_kw, top_n=20)
                 
                 if fig_kw:
-                    st.plotly_chart(fig_kw, use_container_width=True)
+                    st.plotly_chart(fig_kw, width='stretch')
                 else:
                     st.warning("Não foram encontradas palavras-chave válidas.")
 
@@ -735,7 +739,7 @@ if st.session_state['df_geral'] is not None:
                 from utils import plot_circular_collaboration
                 fig_circ = plot_circular_collaboration(df, top_n=30)
                 if fig_circ:
-                    st.plotly_chart(fig_circ, use_container_width=True)
+                    st.plotly_chart(fig_circ, width='stretch')
                 else:
                     st.warning("Não há dados de países suficientes para formar redes de colaboração.")
 
@@ -744,7 +748,7 @@ if st.session_state['df_geral'] is not None:
                 from utils import plot_map_collaboration
                 fig_map = plot_map_collaboration(df, top_n=30)
                 if fig_map:
-                    st.plotly_chart(fig_map, use_container_width=True)
+                    st.plotly_chart(fig_map, width='stretch')
                 else:
                     st.info("Aguardando conexões geográficas...")
 
@@ -855,10 +859,10 @@ if st.session_state['df_geral'] is not None:
                     c2d, c3d = st.columns(2)
                     with c2d:
                         st.markdown("**Projeção Plana (2D)**")
-                        st.plotly_chart(fig_2d, use_container_width=True)
+                        st.plotly_chart(fig_2d, width='stretch')
                     with c3d:
                         st.markdown("**Projeção Imersiva (3D)**")
-                        st.plotly_chart(fig_3d, use_container_width=True)
+                        st.plotly_chart(fig_3d, width='stretch')
                 else:
                     st.warning("Não há palavras-chave válidas ou diversidade suficiente na amostra para processar a topologia matemática.")
 
@@ -876,7 +880,7 @@ if st.session_state['df_geral'] is not None:
                 from utils import plot_lotkas_law
                 fig_lotka = plot_lotkas_law(df)
                 if fig_lotka:
-                    st.plotly_chart(fig_lotka, use_container_width=True)
+                    st.plotly_chart(fig_lotka, width='stretch')
                 else:
                     st.info("Dados insuficientes para gerar a Lei de Lotka.")
                     
@@ -886,7 +890,7 @@ if st.session_state['df_geral'] is not None:
                 from utils import plot_author_production_over_time
                 fig_prod = plot_author_production_over_time(df, top_n=15)
                 if fig_prod:
-                    st.plotly_chart(fig_prod, use_container_width=True)
+                    st.plotly_chart(fig_prod, width='stretch')
                 else:
                     st.info("Dados insuficientes para mapear a produção ao longo do tempo.")
 
@@ -924,7 +928,7 @@ if st.session_state['df_geral'] is not None:
                 fig_hist = gerar_historiograph(df, top_n=top_n_hist)
                 
                 if fig_hist:
-                    st.plotly_chart(fig_hist, use_container_width=True)
+                    st.plotly_chart(fig_hist, width='stretch')
                 else:
                     st.warning("Não foi possível traçar a rede histórica. Certifique-se de que sua base contém a coluna de 'Referências' (Cited References).")
 
@@ -965,7 +969,7 @@ if st.session_state['df_geral'] is not None:
                     fig_mapa = gerar_mapa_tematico(df, coluna_texto=coluna_mapa_escolhida, n_palavras=n_termos_mapa)
                     
                     if fig_mapa:
-                        st.plotly_chart(fig_mapa, use_container_width=True)
+                        st.plotly_chart(fig_mapa, width='stretch')
                     else:
                         st.warning("Volume de texto insuficiente ou sem padrões de co-ocorrência claros para gerar os quadrantes.")
             else:
@@ -996,7 +1000,7 @@ if st.session_state['df_geral'] is not None:
                 if col_prioritaria in cols:
                     cols.insert(0, cols.pop(cols.index(col_prioritaria)))
             
-            st.dataframe(df[cols], use_container_width=True)
+            st.dataframe(df[cols], width='stretch')
             csv_geral = df[cols].to_csv(index=False).encode('utf-8')
             st.download_button("Baixar Base Geral (CSV)", data=csv_geral, file_name='base_simetrics_geral.csv', key='dl_geral')
 
@@ -1006,7 +1010,7 @@ if st.session_state['df_geral'] is not None:
                 from utils import gerar_tabela_autores
                 df_autores = gerar_tabela_autores(df)
                 if not df_autores.empty:
-                    st.dataframe(df_autores, use_container_width=True, hide_index=True)
+                    st.dataframe(df_autores, width='stretch', hide_index=True)
                     csv_autores = df_autores.to_csv(index=False).encode('utf-8')
                     st.download_button("Baixar Tabela de Autores (CSV)", data=csv_autores, file_name='simetrics_autores.csv', key='dl_aut')
                 else:
@@ -1018,7 +1022,7 @@ if st.session_state['df_geral'] is not None:
                 from utils import gerar_tabela_paises
                 df_paises = gerar_tabela_paises(df)
                 if not df_paises.empty:
-                    st.dataframe(df_paises, use_container_width=True, hide_index=True)
+                    st.dataframe(df_paises, width='stretch', hide_index=True)
                     csv_paises = df_paises.to_csv(index=False).encode('utf-8')
                     st.download_button("Baixar Tabela de Países (CSV)", data=csv_paises, file_name='simetrics_paises.csv', key='dl_pai')
                 else:
@@ -1030,7 +1034,7 @@ if st.session_state['df_geral'] is not None:
                 from utils import gerar_tabela_venues
                 df_venues = gerar_tabela_venues(df)
                 if not df_venues.empty:
-                    st.dataframe(df_venues, use_container_width=True, hide_index=True)
+                    st.dataframe(df_venues, width='stretch', hide_index=True)
                     csv_venues = df_venues.to_csv(index=False).encode('utf-8')
                     st.download_button("Baixar Tabela de Fontes/Venues (CSV)", data=csv_venues, file_name='simetrics_venues.csv', key='dl_ven')
                 else:
@@ -1042,7 +1046,7 @@ if st.session_state['df_geral'] is not None:
                 from utils import gerar_tabela_keywords
                 df_keywords = gerar_tabela_keywords(df)
                 if not df_keywords.empty:
-                    st.dataframe(df_keywords, use_container_width=True, hide_index=True)
+                    st.dataframe(df_keywords, width='stretch', hide_index=True)
                     csv_keywords = df_keywords.to_csv(index=False).encode('utf-8')
                     st.download_button("Baixar Tabela de Palavras-chave (CSV)", data=csv_keywords, file_name='simetrics_keywords.csv', key='dl_kw')
                 else:
@@ -1168,7 +1172,7 @@ if st.session_state['df_geral'] is not None:
                 # Exibição da Tabela com a configuração correta de colunas
                 st.dataframe(
                     df_filtrado,
-                    use_container_width=True,
+                    width='stretch',
                     hide_index=True,
                     column_config={
                         "Item": st.column_config.TextColumn("Item"),
@@ -1377,7 +1381,7 @@ if st.session_state['df_geral'] is not None:
                 st.markdown("##### 🕸️ Métricas Topológicas (SNA)")
                 
                 # Botão sob demanda
-                if st.button(f"⚙️ Calcular SNA para: {termo_ativo}", key=f"btn_calc_sna_{hash(termo_ativo)}", use_container_width=True):
+                if st.button(f"⚙️ Calcular SNA para: {termo_ativo}", key=f"btn_calc_sna_{hash(termo_ativo)}", width='stretch'):
                     with st.spinner("Analisando centralidade na rede..."):
                         metricas_sna = calcular_sna_instantaneo(grafo_global, termo_ativo)
                         
@@ -1460,7 +1464,7 @@ if st.session_state['df_geral'] is not None:
                                 yaxis2=dict(title=dict(text="Total de Citações", font=dict(color="#e76f51")), tickfont=dict(color="#e76f51"), overlaying='y', side='right'),
                                 template="plotly_white", margin=dict(l=0, r=0, t=40, b=0), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
                             )
-                            st.plotly_chart(fig_hist, use_container_width=True)
+                            st.plotly_chart(fig_hist, width='stretch')
                         else:
                             df_ano[col_tipo_doc] = df_ano[col_tipo_doc].fillna("Desconhecido")
                             hist_data = df_ano.groupby([col_ano, col_tipo_doc]).size().reset_index(name='Volume')
@@ -1470,7 +1474,7 @@ if st.session_state['df_geral'] is not None:
                             
                             fig_hist = px.bar(hist_data, x=col_ano, y='Volume', color=col_tipo_doc, title="Volume de Documentos por Tipo e Ano", template="plotly_white")
                             fig_hist.update_layout(xaxis=dict(tickmode='linear', dtick=1))
-                            st.plotly_chart(fig_hist, use_container_width=True)
+                            st.plotly_chart(fig_hist, width='stretch')
                     else:
                         st.info("Não há dados temporais válidos para gerar o histórico.")
                 else:
@@ -1546,7 +1550,7 @@ if st.session_state['df_geral'] is not None:
                     st.dataframe(
                         df_sim, 
                         hide_index=True, 
-                        use_container_width=True,
+                        width='stretch',
                         column_config={
                             "Similaridade (%)": st.column_config.ProgressColumn("Similaridade (%)", min_value=0, max_value=100, format="%.1f%%")
                         }
