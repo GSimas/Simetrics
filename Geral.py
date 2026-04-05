@@ -62,12 +62,14 @@ def get_gemini_api_key():
 def resetar_estado_derivado():
     st.session_state['df_duplicados'] = pd.DataFrame()
     st.session_state['tabela_sna_completa'] = None
+    st.session_state['metricas_globais_sna'] = None
 
 
 st.session_state.setdefault('df_geral', None)
 st.session_state.setdefault('df_original', None)
 st.session_state.setdefault('df_duplicados', pd.DataFrame())
 st.session_state.setdefault('tabela_sna_completa', None)
+
 
 with st.sidebar:
     st.image("simetrics - logo.png", width='stretch')
@@ -791,7 +793,140 @@ if st.session_state['df_geral'] is not None:
                 st.warning(f"A coluna de {fonte_nuvem} não foi encontrada nos dados.")
 
         # =========================================================
-        # --- NOVO BLOCO: MAPAS CONCEITUAIS 2D E 3D ---
+        # --- FLUXO DE EVOLUÇÃO TEMÁTICA (SANKEY) ---
+        # =========================================================
+        st.divider()
+        st.markdown("##### 🌊 Fluxo de Evolução Temática (Sankey)")
+        st.caption("Acompanhe como as palavras-chave surgem, se conectam e evoluem ao longo de três períodos distintos. As linhas espessas representam a continuidade do termo, enquanto as linhas cruzadas indicam forte co-ocorrência histórica.")
+
+        if 'YEAR CLEAN' in df.columns and df['YEAR CLEAN'].notna().any():
+            ano_min = int(df['YEAR CLEAN'].min())
+            ano_max = int(df['YEAR CLEAN'].max())
+
+            if ano_max > ano_min:
+                # Divide o tempo total em 3 terços para os valores padrão iniciais
+                terco = max(1, (ano_max - ano_min) // 3)
+                
+                col_p1, col_p2, col_p3 = st.columns(3)
+                with col_p1:
+                    p1_range = st.slider("Período 1:", min_value=ano_min, max_value=ano_max, value=(ano_min, ano_min + terco - 1), key="sankey_p1")
+                with col_p2:
+                    p2_range = st.slider("Período 2:", min_value=ano_min, max_value=ano_max, value=(ano_min + terco, ano_min + 2*terco - 1), key="sankey_p2")
+                with col_p3:
+                    p3_range = st.slider("Período 3:", min_value=ano_min, max_value=ano_max, value=(ano_min + 2*terco, ano_max), key="sankey_p3")
+
+                top_n_sankey = st.slider("Qtd. Palavras-chave Principais por Período:", min_value=3, max_value=25, value=10, step=1, key="sankey_kw_slider")
+
+                with st.spinner("Calculando fluxos e conectando nós temporais..."):
+                    from utils import plot_sankey_evolution
+                    fig_sankey = plot_sankey_evolution(df, p1_range, p2_range, p3_range, top_n=top_n_sankey)
+
+                    if fig_sankey:
+                        st.plotly_chart(fig_sankey, width='stretch')
+                    else:
+                        st.warning("Não há palavras-chave suficientes nestas faixas de tempo para gerar o fluxo.")
+            else:
+                st.info("A base de dados atual compreende apenas um único ano. A divisão em períodos evolutivos requer dados de múltiplos anos.")
+        else:
+            st.warning("A coluna 'Ano' (YEAR CLEAN) é obrigatória para rastrear a evolução temporal.")
+
+        # =========================================================
+        # --- NOVO BLOCO: GENÉTICA DAS IDEIAS (EVOLUÇÃO) ---
+        # =========================================================
+        st.divider()
+        st.markdown("##### 🧬 Genética das Ideias")
+        st.caption("Análise do ciclo de vida e taxa de replicação das palavras-chave como unidades de conhecimento no ecossistema científico.")
+
+        with st.spinner("Decodificando DNA acadêmico..."):
+            from utils import calcular_genetica_palavras
+            df_gen = calcular_genetica_palavras(df)
+
+        if df_gen is not None and not df_gen.empty:
+            col_gen1, col_gen2 = st.columns([1, 1.5])
+
+            with col_gen1:
+                st.markdown("**Fecundidade vs. Mortalidade**")
+                st.caption("Termos mortos vs. Sobreviventes.")
+
+                mortos = len(df_gen[df_gen['total_aparicoes'] == 1])
+                vivos = len(df_gen[df_gen['total_aparicoes'] > 1])
+
+                fig_mortalidade = go.Figure(data=[go.Pie(
+                    labels=['Mortos (1 aparição)', 'Sobreviventes (>1 aparição)'],
+                    values=[mortos, vivos],
+                    hole=.6,
+                    marker_colors=['#E74C3C', '#2ECC71']
+                )])
+                fig_mortalidade.update_layout(
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    showlegend=True,
+                    legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
+                    margin=dict(t=20, b=20, l=20, r=20),
+                    height=350
+                )
+                st.plotly_chart(fig_mortalidade, width='stretch')
+
+                with st.expander("👁️ Ver Catálogo Completo", expanded=False):
+                    st.write("**🟢 Sobreviventes (Top Fecundidade)**")
+                    df_vivos = df_gen[df_gen['total_aparicoes'] > 1].sort_values('total_aparicoes', ascending=False)
+                    st.dataframe(df_vivos[['Palavra-chave', 'total_aparicoes']].rename(columns={'total_aparicoes': 'Nº de Aparições'}), width='stretch', hide_index=True, height=250)
+
+                    st.write("**🔴 Mortos (Cemitério de Ideias)**")
+                    df_mortos = df_gen[df_gen['total_aparicoes'] == 1]
+                    amostra_mortos = df_mortos.sample(min(100, len(df_mortos))) if len(df_mortos) > 0 else df_mortos
+                    st.dataframe(amostra_mortos[['Palavra-chave', 'ano_nascimento']].rename(columns={'ano_nascimento': 'Ano'}), width='stretch', hide_index=True, height=250)
+
+            with col_gen2:
+                st.markdown("**Tempo de Meia-Vida do Conhecimento (Longevidade)**")
+                st.caption("Analisa a 'idade' de sobrevivência. Palavras com vida longa indicam pilares estruturais da pesquisa.")
+
+                min_aparicoes_long = st.slider("Filtrar por nº mínimo de replicações:", min_value=2, max_value=50, value=2, key="slider_longevidade_kw")
+
+                df_long_filtrado = df_gen[df_gen['total_aparicoes'] >= min_aparicoes_long].copy()
+
+                if not df_long_filtrado.empty:
+                    fig_longevidade = px.scatter(
+                        df_long_filtrado,
+                        x="ano_nascimento",
+                        y="tempo_vida_anos",
+                        size="total_aparicoes",
+                        color="ano_extincao",
+                        hover_name="Palavra-chave",
+                        color_continuous_scale='Plasma',
+                        labels={
+                            "ano_nascimento": "Ano de Nascimento (1ª Aparição)",
+                            "tempo_vida_anos": "Longevidade (Anos de Sobrevivência)",
+                            "total_aparicoes": "Total de Réplicas (Fecundidade)",
+                            "ano_extincao": "Ano da Última Aparição",
+                            "Palavra-chave": "Termo Acadêmico"
+                        }
+                    )
+                    
+                    # --- ATUALIZAÇÃO: Contorno nas bolhas para alto contraste no Modo Claro ---
+                    fig_longevidade.update_traces(
+                        marker=dict(line=dict(width=1, color='rgba(128, 128, 128, 0.7)'))
+                    )
+
+                    fig_longevidade.update_layout(
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        plot_bgcolor='rgba(0,0,0,0)',
+                        height=450,
+                        margin=dict(l=20, r=20, t=20, b=20)
+                    )
+                    
+                    # Força o eixo X a usar inteiros (anos)
+                    fig_longevidade.update_xaxes(tickformat="d")
+                    
+                    st.plotly_chart(fig_longevidade, width='stretch', theme="streamlit")
+                else:
+                    st.info("Nenhuma palavra-chave encontrada com essa taxa de replicação mínima.")
+        
+        else:
+            st.warning("Dados insuficientes para calcular a genética das ideias (Faltam anos de publicação ou palavras-chave).")
+
+        # =========================================================
+        # --- MAPAS CONCEITUAIS 2D E 3D ---
         # =========================================================
         st.divider()
         st.markdown("##### 🧠 Estrutura Intelectual (Mapa Conceitual PCA)")
@@ -1100,34 +1235,91 @@ if st.session_state['df_geral'] is not None:
 
         
         st.divider()
-        st.markdown("### 📊 Tabela de Nós e Métricas SNA (Rede Heterogênea)")
-        st.caption("Esta tabela integra Autores, Documentos, Países e Venues, permitindo comparar a influência transversal de diferentes entidades. Por exigir alto processamento, o cálculo é feito sob demanda.")
+        st.markdown("### 📊 Ecologia Profunda e Tabela de Nós SNA (Rede Heterogênea)")
+        st.caption("Esta área integra Autores, Documentos, Países e Venues, extraindo tanto a saúde topológica global da rede quanto a influência de cada nó individualmente.")
         
-        # Cria um espaço na memória da sessão para guardar a tabela gerada
+        # Cria um espaço na memória da sessão para guardar os dados gerados
         if "tabela_sna_completa" not in st.session_state:
             st.session_state["tabela_sna_completa"] = None
+            st.session_state["metricas_globais_sna"] = None
 
         # Botão de Ação
-        if st.button("🚀 Iniciar Cálculo da Tabela SNA Completa", type="primary"):
+        if st.button("🚀 Iniciar Cálculo da Rede SNA Completa", type="primary"):
             pbar_sna = st.progress(0, text="Calculando centralidades de todo o ecossistema...")
             
-            # Executa o cálculo e guarda na memória da sessão
-            st.session_state["tabela_sna_completa"] = gerar_tabela_metricas_completas(df, _pbar=pbar_sna)
+            # Executa o cálculo e guarda as duas variáveis
+            df_sna, globais_sna = gerar_tabela_metricas_completas(df, _pbar=pbar_sna)
+            st.session_state["tabela_sna_completa"] = df_sna
+            st.session_state["metricas_globais_sna"] = globais_sna
             
             pbar_sna.empty() # Remove a barra ao terminar
 
-        # Renderização da Tabela (Ocorre se a tabela já existir na memória)
+        # Renderização do Painel Global e Tabela (Ocorre se os dados existirem na memória)
         if st.session_state["tabela_sna_completa"] is not None:
             df_metricas = st.session_state["tabela_sna_completa"]
+            globais = st.session_state["metricas_globais_sna"]
             
+            # --- RENDERIZAÇÃO DO PAINEL DASHBOARD GLOBAL ---
+            if globais:
+                st.markdown("#### 🧬 Métricas de Redes Complexas")
+                g1, g2, g3, g4 = st.columns(4)
+                with g1: create_kpi_card("Densidade da Rede", f"{globais['densidade']:.5f}")
+                with g2: create_kpi_card("Eficiência Global", f"{globais['eficiencia']:.4f}" if isinstance(globais['eficiencia'], float) else globais['eficiencia'])
+                with g3: create_kpi_card("Entropia (H)", f"{globais['entropia']:.2f} bits")
+                with g4: create_kpi_card("Clustering Médio", f"{globais['clustering']:.4f}")
+                
+                with st.expander("📊 Estatísticas de Conectividade & Influência (Médias)"):
+                    st.markdown("**Conectividade (Links por Nó)**")
+                    c1, c2, c3, c4 = st.columns(4)
+                    c1.metric("Média de Links", f"{globais['media_links']:.2f}")
+                    c2.metric("Desvio Padrão", f"{globais['std_links']:.2f}")
+                    c3.metric("Mínimo", globais['min_links'])
+                    c4.metric("Máximo", globais['max_links'])
+                    
+                    st.markdown("**Influência Estrutural**")
+                    i1, i2, i3, i4 = st.columns(4)
+                    i1.metric("PageRank Médio", f"{globais['mean_pr']:.6f}")
+                    i2.metric("Eigenvector Médio", f"{globais['mean_eig']:.6f}")
+                    i3.metric("Restrição (Burt)", globais['restricao'])
+                    i4.metric("Redundância", globais['redundancia'])
+
+                st.markdown("#### 🧬 Métricas de Ecologia Profunda (SNA Avançado)")
+                e1, e2, e3, e4 = st.columns(4)
+                
+                # Regras de negócio visuais do Simetrics
+                status_lei = "Saudável" if 2 < globais['lei_potencia'] < 3 else "Atípico"
+                with e1: create_kpi_card("Lei de Potência (γ)", f"{globais['lei_potencia']:.2f}", subtitle=f"↑ {status_lei}")
+                
+                status_spearman = "Inovação (Brokers)" if globais['spearman'] < 0.8 else "Hierárquica"
+                with e2: create_kpi_card("Correlação Spearman (ρ)", f"{globais['spearman']:.2f}", subtitle=f"↑ {status_spearman}")
+                
+                status_assort = "Expansiva" if globais['assortatividade'] < 0 else "Fechada (Endógena)"
+                with e3: create_kpi_card("Assortatividade (r)", f"{globais['assortatividade']:.2f}", subtitle=f"↑ {status_assort}")
+                
+                with e4: create_kpi_card("Coeficiente Rich-Club (Φ)", globais['rich_club'], subtitle="↑ Hubs Isolados")
+
+                # Glossário
+                with st.expander("📖 Glossário de Métricas SNA"):
+                    st.markdown("""
+                    * **Densidade:** Proporção de conexões reais em relação ao total possível. Redes acadêmicas costumam ser naturalmente esparsas (baixa densidade).
+                    * **Eficiência Global:** Quão rápido a informação viaja pela rede. Valores altos indicam forte conectividade e fluidez de ideias entre diferentes campos.
+                    * **Entropia (H):** Grau de desordem estrutural da rede. Redes com alta entropia são mais orgânicas e resilientes à remoção de nós críticos.
+                    * **Clustering Médio:** Tendência de os vizinhos de um autor também estarem conectados entre si (formação de "panelinhas" ou colegiados isolados).
+                    * **Lei de Potência (γ):** Define se a rede é *Scale-Free* (muitos pesquisadores com poucos links orbitando poucos gigantes). Valores entre 2 e 3 indicam redes naturais saudáveis.
+                    * **Correlação Spearman (ρ):** Mede a dependência entre quem tem mais links e quem atua como ponte de conhecimento. Valores baixos indicam a presença forte de *Brokers* (inovadores transversais).
+                    * **Assortatividade (r):** Se pesquisadores de grande renome preferem colaborar apenas com outros gigantes (r > 0, fechada) ou se eles nutrem autores menores (r < 0, expansiva).
+                    """)
+                
+                st.write("")
+
+            # --- RENDERIZAÇÃO DA TABELA ---
             if not df_metricas.empty:
-                # Filtro rápido por tipo para o usuário
+                st.markdown("#### 📄 Tabela de Métricas Individuais")
                 tipos_disponiveis = ["Todos"] + sorted(df_metricas["Tipo"].unique().tolist())
                 filtro_tipo = st.selectbox("Filtrar por Tipo de Item:", tipos_disponiveis)
 
                 df_filtrado = df_metricas if filtro_tipo == "Todos" else df_metricas[df_metricas["Tipo"] == filtro_tipo]
 
-                # Exibição da Tabela com a configuração correta de colunas
                 st.dataframe(
                     df_filtrado,
                     width='stretch',
@@ -1150,10 +1342,9 @@ if st.session_state['df_geral'] is not None:
             else:
                 st.warning("Não há dados suficientes para calcular a rede heterogênea.")
         else:
-            st.info("A tabela está em modo de espera. Clique no botão azul acima para iniciar o processamento topológico.")
+            st.info("A topologia global está em modo de espera. Clique no botão azul acima para extrair o DNA da sua rede.")
 
         
-
     # Inicializa o estado de busca se não existir
     if 'busca_tipo_biblio' not in st.session_state:
         st.session_state['busca_tipo_biblio'] = "Documento"

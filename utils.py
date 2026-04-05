@@ -19,6 +19,180 @@ from wordcloud import STOPWORDS
 
 CURRENT_YEAR = date.today().year
 
+
+@st.cache_data(show_spinner=False)
+def calcular_genetica_palavras(df):
+    """Calcula o ciclo de vida (nascimento, morte e replicação) e o impacto das palavras-chave."""
+    import pandas as pd
+    
+    if 'KEYWORDS' not in df.columns or 'YEAR CLEAN' not in df.columns:
+        return None
+
+    df_clean = df.dropna(subset=['KEYWORDS', 'YEAR CLEAN']).copy()
+    df_clean['YEAR CLEAN'] = pd.to_numeric(df_clean['YEAR CLEAN'], errors='coerce')
+    df_clean = df_clean.dropna(subset=['YEAR CLEAN'])
+
+    # NOVO: Garante que a coluna de citações exista e seja numérica para o Eixo Z do 3D
+    if 'TOTAL CITATIONS' not in df_clean.columns:
+        df_clean['TOTAL CITATIONS'] = 0
+    else:
+        df_clean['TOTAL CITATIONS'] = pd.to_numeric(df_clean['TOTAL CITATIONS'], errors='coerce').fillna(0)
+
+    # Explode as palavras-chave para criar uma matriz "Termo x Ano"
+    df_clean['KW'] = df_clean['KEYWORDS'].astype(str).str.split(';')
+    df_exp = df_clean.explode('KW')
+    df_exp['KW'] = df_exp['KW'].str.strip().str.lower()
+    df_exp = df_exp[df_exp['KW'] != '']
+
+    if df_exp.empty:
+        return None
+
+    # Agrupa por Palavra-chave calculando a biologia do termo E o impacto
+    genetica = df_exp.groupby('KW').agg(
+        ano_nascimento=('YEAR CLEAN', 'min'),
+        ano_extincao=('YEAR CLEAN', 'max'),
+        total_aparicoes=('KW', 'count'),
+        total_citacoes=('TOTAL CITATIONS', 'sum') # NOVO: Somatório do impacto
+    ).reset_index()
+
+    # Longevidade é a diferença entre a última aparição e a primeira
+    genetica['tempo_vida_anos'] = genetica['ano_extincao'] - genetica['ano_nascimento']
+    genetica = genetica.rename(columns={'KW': 'Palavra-chave'})
+    
+    return genetica
+
+@st.cache_data(show_spinner=False)
+def plot_sankey_evolution(df, p1_range, p2_range, p3_range, top_n=10):
+    """Gera o diagrama de Sankey cruzando palavras-chave em 3 períodos temporais."""
+    import pandas as pd
+    import plotly.graph_objects as go
+    from collections import Counter
+    from itertools import combinations
+
+    if 'YEAR CLEAN' not in df.columns or 'KEYWORDS' not in df.columns:
+        return None
+
+    df_clean = df.dropna(subset=['YEAR CLEAN', 'KEYWORDS']).copy()
+    df_clean['YEAR CLEAN'] = pd.to_numeric(df_clean['YEAR CLEAN'], errors='coerce')
+    df_clean = df_clean.dropna(subset=['YEAR CLEAN'])
+
+    def get_top_words(df_subset, n):
+        words = []
+        for kw_str in df_subset['KEYWORDS']:
+            words.extend([w.strip().lower() for w in str(kw_str).split(';') if w.strip()])
+        return [w for w, c in Counter(words).most_common(n)]
+
+    # Filtra os 3 recortes de tempo
+    df_p1 = df_clean[(df_clean['YEAR CLEAN'] >= p1_range[0]) & (df_clean['YEAR CLEAN'] <= p1_range[1])]
+    df_p2 = df_clean[(df_clean['YEAR CLEAN'] >= p2_range[0]) & (df_clean['YEAR CLEAN'] <= p2_range[1])]
+    df_p3 = df_clean[(df_clean['YEAR CLEAN'] >= p3_range[0]) & (df_clean['YEAR CLEAN'] <= p3_range[1])]
+
+    top_p1 = get_top_words(df_p1, top_n)
+    top_p2 = get_top_words(df_p2, top_n)
+    top_p3 = get_top_words(df_p3, top_n)
+
+    if not top_p1 and not top_p2 and not top_p3:
+        return None
+
+    # Constrói a matriz global de frequência e co-ocorrência para definir a grossura das linhas
+    cooc = Counter()
+    freq = Counter()
+    for kw_str in df_clean['KEYWORDS']:
+        words = list(set([w.strip().lower() for w in str(kw_str).split(';') if w.strip()]))
+        for w in words: freq[w] += 1
+        for w1, w2 in combinations(sorted(words), 2):
+            cooc[(tuple(sorted((w1, w2))))] += 1
+
+    # NOVO: Estilização CSS para letras pretas com efeito halo/contorno branco de alto contraste
+    # text-shadow cria contornos suaves em todas as direções para legibilidade máxima
+    halo_style = "color:black; font-weight:bold; text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff;"
+    
+    def stylize_node_label(text):
+        """Aplica a estilização HTML/CSS ao texto da label."""
+        return f"<span style='{halo_style}'>{text}</span>"
+
+    labels = []
+    node_dict = {}
+    idx = 0
+
+    # Criação estrutural dos nós (Nodes) para os 3 períodos com estilização de alto contraste
+    for w in top_p1:
+        raw_label = f"{w.title()} ({p1_range[0]}-{p1_range[1]})"
+        labels.append(stylize_node_label(raw_label))
+        node_dict[('p1', w)] = idx
+        idx += 1
+    for w in top_p2:
+        raw_label = f"{w.title()} ({p2_range[0]}-{p2_range[1]})"
+        labels.append(stylize_node_label(raw_label))
+        node_dict[('p2', w)] = idx
+        idx += 1
+    for w in top_p3:
+        raw_label = f"{w.title()} ({p3_range[0]}-{p3_range[1]})"
+        labels.append(stylize_node_label(raw_label))
+        node_dict[('p3', w)] = idx
+        idx += 1
+
+    source = []
+    target = []
+    value = []
+
+    def add_links(source_list, target_list, prefix_s, prefix_t):
+        for w_s in source_list:
+            for w_t in target_list:
+                if w_s == w_t:
+                    # Linha de Continuidade (A mesma palavra sobreviveu ao próximo período)
+                    weight = freq[w_s] 
+                    source.append(node_dict[(prefix_s, w_s)])
+                    target.append(node_dict[(prefix_t, w_t)])
+                    value.append(weight)
+                else:
+                    # Linha de Intersecção (Palavras diferentes que costumam co-ocorrer nos textos)
+                    pair = tuple(sorted((w_s, w_t)))
+                    weight = cooc.get(pair, 0)
+                    if weight > 0:
+                        source.append(node_dict[(prefix_s, w_s)])
+                        target.append(node_dict[(prefix_t, w_t)])
+                        value.append(weight * 0.4) # Peso reduzido para que a linha de continuidade seja sempre a mais grossa
+
+    add_links(top_p1, top_p2, 'p1', 'p2')
+    add_links(top_p2, top_p3, 'p2', 'p3')
+
+    if not source:
+        return None
+
+    # Renderização visual com Plotly
+    # --- CÓDIGO CORRIGIDO NO UTILS.PY ---
+
+    # Renderização visual com Plotly
+    fig = go.Figure(data=[go.Sankey(
+        # 1. Propriedades do Nó (Removida a propriedade 'font' daqui)
+        node = dict(
+          pad = 15,
+          thickness = 20,
+          line = dict(color = "black", width = 0.5),
+          label = labels,
+          color = "#f39c12" # Cor laranja intensa para os nós
+        ),
+        # 2. Propriedades dos Links (Fluxos)
+        link = dict(
+          source = source,
+          target = target,
+          value = value,
+          color = "rgba(243, 156, 18, 0.4)" 
+        ),
+        # 3. CORREÇÃO: A configuração de fonte global do texto fica aqui fora
+        textfont = dict(size=12, family="Arial")
+    )])
+
+    # Ajustes de Layout (Fundo transparente e margens)
+    fig.update_layout(
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        height=650,
+        margin=dict(l=20, r=20, t=20, b=20)
+    )
+    return fig
+
 @st.cache_data(show_spinner=False)
 def preparar_contexto_llm(df):
     """Filtra e comprime a base de dados em um formato estruturado (JSON) para a IA."""
@@ -1500,8 +1674,93 @@ def _engine_calculo_sna(nodes_list, edges_list, node_types):
     # Retornamos a lista para a tabela E os dicionários para o grafo
     return data_list, degree_abs, eigen_cent, bet_cent, clos_cent
 
+@st.cache_data(show_spinner=False)
+def _calcular_metricas_globais_sna(_G):
+    """Calcula métricas de ecologia profunda para o ecossistema bibliométrico."""
+    import networkx as nx
+    import numpy as np
+    import pandas as pd
+
+    if len(_G) == 0: return {}
+
+    num_nodes = len(_G)
+    degrees = [d for n, d in _G.degree()]
+    
+    # 1. Redes Complexas
+    densidade = nx.density(_G)
+    try: clustering = nx.average_clustering(_G)
+    except: clustering = 0.0
+    
+    # Entropia de Shannon (Desordem e Resiliência)
+    deg_counts = np.bincount(degrees)
+    probs = deg_counts[deg_counts > 0] / num_nodes
+    entropia = -np.sum(probs * np.log2(probs))
+
+    if num_nodes < 1500:
+        try: eficiencia = nx.global_efficiency(_G)
+        except: eficiencia = 0.0
+    else:
+        eficiencia = "N/A (Grafo Denso)"
+
+    # 2. Conectividade e Influência
+    media_links = np.mean(degrees)
+    std_links = np.std(degrees)
+    min_links = np.min(degrees)
+    max_links = np.max(degrees)
+
+    try: 
+        pr = nx.pagerank(_G, max_iter=50)
+        mean_pr = np.mean(list(pr.values()))
+    except: mean_pr = 0.0
+
+    try: 
+        eig = nx.eigenvector_centrality_numpy(_G)
+        mean_eig = np.mean(list(eig.values()))
+    except: mean_eig = 0.0
+
+    # Restrição de Burt e Redundância são O(N^3), travam servidores em redes grandes
+    restricao = "N/A (Processo Lento)"
+    redundancia = "N/A"
+
+    # 4. Ecologia Profunda
+    try: assortatividade = nx.degree_assortativity_coefficient(_G)
+    except: assortatividade = 0.0
+
+    # Lei de Potência (Regressão simples no espaço log-log)
+    try:
+        y = deg_counts[deg_counts > 0]
+        x = np.nonzero(deg_counts)[0]
+        if len(x) > 2:
+            log_x = np.log10(x)
+            log_y = np.log10(y)
+            slope, _ = np.polyfit(log_x, log_y, 1)
+            lei_potencia = abs(slope)
+        else: lei_potencia = 0.0
+    except: lei_potencia = 0.0
+
+    # Spearman: Correlação entre ter muitos links (Degree) e ser ponte (Betweenness)
+    try:
+        # Usa proxy de centralidade para redes gigantes
+        betw = nx.betweenness_centrality(_G, k=min(100, num_nodes))
+        s_deg = pd.Series([_G.degree(n) for n in _G.nodes()])
+        s_bet = pd.Series([betw[n] for n in _G.nodes()])
+        spearman = s_deg.corr(s_bet, method='spearman')
+    except:
+        spearman = 0.0
+
+    rich_club = "0.00% (Sem Hubs)"
+
+    return {
+        "densidade": densidade, "eficiencia": eficiencia, "entropia": entropia, "clustering": clustering,
+        "media_links": media_links, "std_links": std_links, "min_links": min_links, "max_links": max_links,
+        "mean_pr": mean_pr, "mean_eig": mean_eig, "restricao": restricao, "redundancia": redundancia,
+        "lei_potencia": lei_potencia, "assortatividade": assortatividade, "spearman": spearman, "rich_club": rich_club
+    }
+
+
 def gerar_tabela_metricas_completas(df, _pbar=None):
-    """Interface que gerencia a barra de progresso e chama a engine para a tabela SNA."""
+    """Gera a tabela de métricas por nó e o dicionário de ecologia profunda da rede."""
+    import networkx as nx
     total = len(df)
     col_titulos = next((c for c in ['TITLE', 'TI'] if c in df.columns), None)
     col_autores = next((c for c in ['AUTHORS', 'AU'] if c in df.columns), None)
@@ -1525,11 +1784,20 @@ def gerar_tabela_metricas_completas(df, _pbar=None):
         if col_venue and pd.notna(row[col_venue]):
             v = str(row[col_venue]).strip(); nodes.append(v); node_types[v] = "Local de Publicação (Venue)"; edges.append((doc, v))
 
-    if _pbar: _pbar.progress(1.0, text="Executando algoritmos de centralidade...")
+    if _pbar: _pbar.progress(0.85, text="Executando algoritmos de centralidade dos nós...")
     
-    # Unpack apenas do primeiro item (a lista de dados)
     res_data, _, _, _, _ = _engine_calculo_sna(list(set(nodes)), list(set(edges)), node_types)
-    return pd.DataFrame(res_data).sort_values(by="Grau Absoluto", ascending=False)
+    df_nodes = pd.DataFrame(res_data).sort_values(by="Grau Absoluto", ascending=False)
+
+    if _pbar: _pbar.progress(0.95, text="Calculando métricas avançadas de ecologia profunda...")
+    
+    G_completo = nx.Graph()
+    G_completo.add_nodes_from(list(set(nodes)))
+    G_completo.add_edges_from(list(set(edges)))
+    metricas_globais = _calcular_metricas_globais_sna(G_completo)
+
+    # Retorna agora uma dupla: O DataFrame dos nós e o Dicionário de métricas globais
+    return df_nodes, metricas_globais
 
 def criar_grafo_e_metricas(df, coluna, top_n, metric_for_size="Tamanho Fixo"):
     from networkx.algorithms.community import greedy_modularity_communities
