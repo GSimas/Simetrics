@@ -1604,38 +1604,40 @@ if st.session_state['df_geral'] is not None:
     # =========================================================
     # --- ABA 4: ASSISTENTE CIENTÍFICO (CHATBOT) ---
     # =========================================================
+    # =========================================================
+    # --- ABA 4: ASSISTENTE CIENTÍFICO (CHATBOT) ---
+    # =========================================================
     with tab_chat:
         st.header("🤖 Assistente Científico (Simetrics AI)")
         st.caption("Converse com a base de dados. Peça recomendações de leitura, indicação de especialistas ou sugestões de periódicos (venues) para submeter seu artigo com base no seu tema de pesquisa atual. \n ⚠️ Esteja ciente de que a qualidade das respostas depende da qualidade dos dados carregados. Este chatbot pode errar, sempre verifique as informações.")
 
-        api_key_valida = False
-        try:
-            api_key = st.secrets["GEMINI_API_KEY"]
-            api_key_valida = True
-        except KeyError:
-            st.error("⚠️ Chave 'GEMINI_API_KEY' não encontrada no arquivo `.streamlit/secrets.toml`. O Assistente requer acesso à API para funcionar.")
+        # 1. Verificação Segura da Chave de API
+        # Usamos .get() para evitar o erro fatal StreamlitSecretNotFoundError no deploy (Railway)
+        api_key = st.secrets.get("GEMINI_API_KEY")
 
-        if api_key_valida:
-            # 1. Configuração de Estado e Histórico
+        if not api_key:
+            st.warning("⚠️ O Assistente Científico está desativado. Certifique-se de que a 'GEMINI_API_KEY' está configurada nas Variáveis de Ambiente do Railway ou nos Secrets do Streamlit.")
+        else:
+            # 2. Inicialização do Cliente e Gestão de Estado
+            from google import genai
+            from google.genai import types
+            
+            client = genai.Client(api_key=api_key)
+            
             if "chat_messages" not in st.session_state:
                 st.session_state.chat_messages = [
                     {"role": "assistant", "content": "Olá! Sou a IA do Simetrics. Já injetei toda a sua base de dados, autores, temas e métricas na minha memória de contexto. Qual desafio acadêmico posso ajudar a resolver hoje?"}
                 ]
 
-            # Exibe o histórico salvo na tela
+            # Renderiza o histórico de mensagens
             for msg in st.session_state.chat_messages:
                 with st.chat_message(msg["role"]):
                     st.markdown(msg["content"])
 
-            # 2. Inicialização Dinâmica do Motor da IA
-            from google import genai
-            from google.genai import types
-            
-            # --- NOVA INICIALIZAÇÃO DE CLIENTE ---
-            client = genai.Client(api_key=api_key)
-            
+            # 3. Sincronização de Contexto e Criação da Sessão
             with st.spinner("Sincronizando sinapses com a base de dados..."):
                 from utils import preparar_contexto_llm
+                # O contexto é extraído da base de dados ativa (considerando filtros e deduplicação)
                 dados_json = preparar_contexto_llm(st.session_state['df_geral'])
                 
                 instrucao_sistema = f"""
@@ -1645,20 +1647,20 @@ if st.session_state['df_geral'] is not None:
                 {dados_json}
                 
                 Suas tarefas:
-                - Responder perguntas sobre a base de dados.
-                - Recomendar artigos fundamentais para leitura baseando-se nos temas, resumos e total de citações.
-                - Recomendar revistas (SECONDARY TITLE) ideais para submissão caso o usuário descreva a pesquisa que está fazendo.
-                - Identificar os autores mais adequados para parceria ou citação.
+                - Responder perguntas baseadas exclusivamente nos dados fornecidos.
+                - Recomendar artigos fundamentais baseando-se nos temas, resumos e impacto (citações).
+                - Sugerir periódicos (SECONDARY TITLE) para submissão com base no perfil do manuscrito do usuário.
+                - Identificar especialistas (autores) para parcerias ou referências.
                 
                 Regras Absolutas:
                 - Você SÓ PODE fazer recomendações usando os itens que existem no JSON acima. 
-                - Cite os títulos exatos dos documentos ou nomes dos autores como estão na base.
+                - Cite os títulos exatos dos documentos ou nomes dos autores como aparecem na base.
                 - Responda em Português de forma acadêmica, analítica e direta.
                 """
 
-                # --- NOVO FORMATO ESTRITO DE HISTÓRICO ---
+                # Converte o histórico para o formato de objetos estritos exigido pela google-genai
                 gemini_history = []
-                for m in st.session_state.chat_messages[1:]: # Pula a mensagem inicial estática
+                for m in st.session_state.chat_messages[1:]: 
                     role_map = "user" if m["role"] == "user" else "model"
                     gemini_history.append(
                         types.Content(
@@ -1667,7 +1669,7 @@ if st.session_state['df_geral'] is not None:
                         )
                     )
                 
-                # --- NOVA SINTAXE PARA CRIAR SESSÃO DE CHAT ---
+                # Inicializa a sessão de chat com a instrução de sistema injetada na configuração
                 chat_session = client.chats.create(
                     model="gemini-1.5-flash",
                     history=gemini_history,
@@ -1676,19 +1678,18 @@ if st.session_state['df_geral'] is not None:
                     )
                 )
 
-            # 3. Input do Usuário e Geração de Resposta
-            if prompt := st.chat_input("Ex: Estou escrevendo sobre Ecologia do Conhecimento. Quais os 3 documentos essenciais para ler?"):
+            # 4. Interface de Entrada e Geração de Resposta
+            if prompt := st.chat_input("Ex: Quais são os 3 documentos fundamentais para ler sobre este tema?"):
                 
-                # Renderiza e salva a mensagem do usuário
+                # Registra e exibe a pergunta do usuário
                 st.session_state.chat_messages.append({"role": "user", "content": prompt})
                 with st.chat_message("user"):
                     st.markdown(prompt)
 
-                # Gera e renderiza a resposta do assistente
+                # Processa a resposta da IA
                 with st.chat_message("assistant"):
                     with st.spinner("Analisando topologia do conhecimento..."):
                         try:
-                            # A execução do prompt em si continua igual
                             response = chat_session.send_message(prompt)
                             texto_resposta = response.text
                             
@@ -1696,6 +1697,6 @@ if st.session_state['df_geral'] is not None:
                             st.session_state.chat_messages.append({"role": "assistant", "content": texto_resposta})
                             
                         except Exception as e:
-                            erro = f"Ocorreu um erro de comunicação neurológica: {e}"
+                            erro = f"Ocorreu um erro na geração da resposta: {e}"
                             st.error(erro)
                             st.session_state.chat_messages.append({"role": "assistant", "content": erro})
