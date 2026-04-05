@@ -277,12 +277,14 @@ if st.session_state['df_geral'] is not None:
         st.markdown("##### 🤖 Inteligência Artificial: Categorização de Temas")
         
         with st.expander("Identificar Escolas de Pesquisa via Machine Learning", expanded=True):
-            api_key_valida = False
-            try:
-                api_key = st.secrets["GEMINI_API_KEY"]
+            # Tenta obter a chave de forma segura
+            api_key = st.secrets.get("GEMINI_API_KEY")
+            
+            if not api_key:
+                api_key_valida = False
+                st.warning("⚠️ Chave 'GEMINI_API_KEY' não encontrada nas variáveis de ambiente. O mapeamento via IA está temporariamente desativado.")
+            else:
                 api_key_valida = True
-            except KeyError:
-                st.error("Chave 'GEMINI_API_KEY' não encontrada.")
             
             if 'TEMA_GEMINI' in st.session_state['df_geral'].columns:
                 st.success("✅ O corpus foi categorizado com sucesso!")
