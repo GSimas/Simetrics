@@ -1874,7 +1874,7 @@ if st.session_state['df_geral'] is not None:
                 
                 # Inicializa a sessão de chat com a instrução de sistema injetada na configuração
                 chat_session = client.chats.create(
-                    model="gemini-1.5-flash",
+                    model="gemini-2.5-flash-lite",
                     history=gemini_history,
                     config=types.GenerateContentConfig(
                         system_instruction=instrucao_sistema
