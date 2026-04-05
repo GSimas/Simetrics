@@ -8,6 +8,7 @@ import io
 import os
 from collections import Counter
 import networkx as nx
+import google.generativeai as genai
 from utils import (
     analisar_completude_metadados,
     calcular_metricas_bibliometrix,
@@ -187,7 +188,7 @@ with st.sidebar:
 if st.session_state['df_geral'] is not None:
     df = st.session_state['df_geral']
     
-    tab_main, tab_grafos, tab_search = st.tabs(["📊 Informações Principais", "🕸️ Redes e Grafos de Conhecimento","🔍 Motor de Busca"])
+    tab_main, tab_grafos, tab_search, tab_chat = st.tabs(["📊 Informações Principais", "🕸️ Redes e Grafos de Conhecimento","🔍 Motor de Busca","🤖 Assistente Científico"])
     
     with tab_main:
         st.subheader("Resumo Estrutural da Amostra")
@@ -283,15 +284,21 @@ if st.session_state['df_geral'] is not None:
             except KeyError:
                 st.error("Chave 'GEMINI_API_KEY' não encontrada.")
             
-            # --- CORREÇÃO: Lendo e gravando na base ATIVA (df_geral) ---
             if 'TEMA_GEMINI' in st.session_state['df_geral'].columns:
                 st.success("✅ O corpus foi categorizado com sucesso!")
                 
-                # Exibe a tabela de resumo sempre que a coluna existir
                 df_resumo = st.session_state['df_geral']['TEMA_GEMINI'].value_counts().reset_index()
                 df_resumo.columns = ['Escola Temática (IA)', 'Documentos']
                 
-                st.markdown("###### 📊 Resumo da Distribuição")
+                # --- NOVO: Integração do Quociente Locacional (QL) ---
+                from utils import obter_top_ql_por_tema
+                top_a, top_p, top_v = obter_top_ql_por_tema(st.session_state['df_geral'])
+                
+                df_resumo['Autor Top QL'] = df_resumo['Escola Temática (IA)'].map(top_a).fillna("-")
+                df_resumo['País Top QL'] = df_resumo['Escola Temática (IA)'].map(top_p).fillna("-")
+                df_resumo['Venue Top QL'] = df_resumo['Escola Temática (IA)'].map(top_v).fillna("-")
+                
+                st.markdown("###### 📊 Resumo da Distribuição e Especialização Vocacional (QL)")
                 st.dataframe(
                     df_resumo.style.bar(subset=['Documentos'], color='#82c2c2'),
                     width='stretch', 
@@ -977,8 +984,10 @@ if st.session_state['df_geral'] is not None:
 
     # === ABA 2: REDES E GRAFOS ===
     with tab_grafos:
-        st.subheader("Mapeamento do Ecossistema de Conhecimento")
+        st.subheader("Mapeamento do Ecossistema de Conhecimento (Em breve...)")
+        
         col_opcoes, col_grafo = st.columns([1, 3])
+        
         
         with col_opcoes:
             # 1. Adicionamos a opção no Selectbox
@@ -1064,6 +1073,7 @@ if st.session_state['df_geral'] is not None:
                     else: st.warning("Sem conexões suficientes.")
             else: st.warning("Coluna não encontrada.")
 
+        
         st.divider()
         st.markdown("### 📊 Tabela de Nós e Métricas SNA (Rede Heterogênea)")
         st.caption("Esta tabela integra Autores, Documentos, Países e Venues, permitindo comparar a influência transversal de diferentes entidades. Por exigir alto processamento, o cálculo é feito sob demanda.")
@@ -1117,6 +1127,8 @@ if st.session_state['df_geral'] is not None:
         else:
             st.info("A tabela está em modo de espera. Clique no botão azul acima para iniciar o processamento topológico.")
 
+        
+
     # Inicializa o estado de busca se não existir
     if 'busca_tipo_biblio' not in st.session_state:
         st.session_state['busca_tipo_biblio'] = "Documento"
@@ -1142,7 +1154,7 @@ if st.session_state['df_geral'] is not None:
         opcoes_venue = info_busca["opcoes_venue"]
 
         # 2. Interface de Busca
-        opcoes_busca = ["Documento", "Autor", "País", "Local de Publicação (Venue)"]
+        opcoes_busca = ["Documento", "Autor", "País", "Local de Publicação (Venue)", "Tema"] # Adicionado "Tema"
         
         tipo_busca = st.radio(
             "Procurar por Entidade:", 
@@ -1156,6 +1168,7 @@ if st.session_state['df_geral'] is not None:
         elif st.session_state['busca_tipo_biblio'] == "Autor": opcoes_lista = opcoes_aut
         elif st.session_state['busca_tipo_biblio'] == "País": opcoes_lista = opcoes_pais
         elif st.session_state['busca_tipo_biblio'] == "Local de Publicação (Venue)": opcoes_lista = opcoes_venue
+        elif st.session_state['busca_tipo_biblio'] == "Tema": opcoes_lista = info_busca["opcoes_tema"]
 
         termo_selecionado = st.selectbox(
             "Selecione ou digite para pesquisar:",
@@ -1170,6 +1183,106 @@ if st.session_state['df_geral'] is not None:
 
         termo_ativo = st.session_state['busca_termo_biblio']
         tipo_ativo = st.session_state['busca_tipo_biblio']
+
+        # Função para calcular e exibir QL no momento da busca
+        # Função para calcular e exibir QL em formato de TABELA no momento da busca
+        def mostrar_ql_perfil(docs_subset, df_global):
+            import pandas as pd
+            if 'TEMA_GEMINI' not in df_global.columns or docs_subset.empty: return
+            
+            st.markdown("**🎯 Especialização Temática (Quociente Locacional):**")
+            
+            Q = df_global['TITLE'].nunique() if 'TITLE' in df_global.columns else len(df_global)
+            Qi_s = df_global.drop_duplicates('TITLE')['TEMA_GEMINI'].value_counts() if 'TITLE' in df_global.columns else df_global['TEMA_GEMINI'].value_counts()
+            
+            Qk = len(docs_subset)
+            Qik_s = docs_subset['TEMA_GEMINI'].value_counts()
+            
+            ql_data = []
+            for tema, q_ik in Qik_s.items():
+                q_i = Qi_s.get(tema, 0)
+                if q_i > 0 and Qk > 0:
+                    ql = (q_ik / Qk) / (q_i / Q)
+                    ql_data.append({
+                        "Tema / Escola de Pesquisa": tema, 
+                        "Docs no Tema": q_ik,
+                        "QL (Grau de Especialização)": round(ql, 2)
+                    })
+            
+            if ql_data:
+                # Cria o DataFrame e ordena do maior QL para o menor
+                df_ql = pd.DataFrame(ql_data).sort_values(by="QL (Grau de Especialização)", ascending=False)
+                
+                # Exibe a tabela formatada no estilo do Streamlit
+                st.dataframe(
+                    df_ql.style.background_gradient(subset=["QL (Grau de Especialização)"], cmap="Blues"),
+                    width='stretch', 
+                    hide_index=True
+                )
+
+        # --- NOVA FUNÇÃO: Lideranças do Tema ---
+        def mostrar_liderancas_tema(tema_alvo, df_global):
+            import pandas as pd
+            if 'TEMA_GEMINI' not in df_global.columns: return
+            
+            # Base global de documentos (Q) e documentos no tema (Qi)
+            Q = df_global['TITLE'].nunique() if 'TITLE' in df_global.columns else len(df_global)
+            df_tema_global = df_global[df_global['TEMA_GEMINI'] == tema_alvo]
+            Qi = df_tema_global['TITLE'].nunique() if 'TITLE' in df_global.columns else len(df_tema_global)
+            
+            if Q == 0 or Qi == 0: return
+            
+            liderancas = []
+            
+            def processar_entidade(col, tipo_nome):
+                if col not in df_global.columns: return
+                
+                # Prepara os dados explodindo as células com múltiplos valores (ex: A; B; C)
+                df_exp = df_global[['TITLE', col, 'TEMA_GEMINI']].copy()
+                df_exp[col] = df_exp[col].astype(str).str.split(';')
+                df_exp = df_exp.explode(col)
+                
+                if tipo_nome == 'Local de Publicação (Venue)':
+                    df_exp[col] = df_exp[col].str.strip().str.upper()
+                else:
+                    df_exp[col] = df_exp[col].str.strip().str.title()
+                    
+                df_exp = df_exp[(df_exp[col] != '') & (df_exp[col] != 'Nan') & (df_exp[col].notna())]
+                df_exp = df_exp.drop_duplicates(subset=['TITLE', col]) # Garante unicidade
+                
+                # Qk: Produção total do item | Qik: Produção do item neste tema
+                Qk_s = df_exp[col].value_counts()
+                Qik_s = df_exp[df_exp['TEMA_GEMINI'] == tema_alvo][col].value_counts()
+                
+                for item, q_ik in Qik_s.items():
+                    q_k = Qk_s.get(item, 0)
+                    if q_k > 0:
+                        ql = (q_ik / q_k) / (Qi / Q)
+                        liderancas.append({
+                            "Nome do Item": item,
+                            "Tipo do Item": tipo_nome,
+                            "Quantidade de Documentos": q_ik,
+                            "Valor QL": round(ql, 2)
+                        })
+                        
+            # Roda o processamento para as 3 categorias
+            processar_entidade(next((c for c in ['AUTHORS', 'AU'] if c in df_global.columns), 'AUTHORS'), "Autor")
+            processar_entidade('COUNTRY', "País")
+            processar_entidade(next((c for c in ['SECONDARY TITLE', 'SO', 'JO'] if c in df_global.columns), 'SECONDARY TITLE'), "Local de Publicação (Venue)")
+            
+            if liderancas:
+                df_lid = pd.DataFrame(liderancas)
+                # Ordena primeiro pelo maior QL, depois pela quantidade de documentos para desempate
+                df_lid = df_lid.sort_values(by=["Valor QL", "Quantidade de Documentos"], ascending=[False, False])
+                df_lid = df_lid.head(50) # Exibe apenas o Top 50 para não poluir a interface
+                
+                st.dataframe(
+                    df_lid.style.background_gradient(subset=["Valor QL"], cmap="Purples"),
+                    width='stretch',
+                    hide_index=True
+                )
+            else:
+                st.info("Nenhuma liderança destacada encontrada para este tema.")
 
         # 3. Construção do Perfil e Métricas SNA
         if termo_ativo:
@@ -1237,6 +1350,8 @@ if st.session_state['df_geral'] is not None:
                     total_citacoes = docs_autor['TOTAL CITATIONS'].sum() if 'TOTAL CITATIONS' in docs_autor.columns else 0
                     st.write(f"**Impacto Total (Citações):** {total_citacoes}")
                     
+                    mostrar_ql_perfil(docs_autor, df) # INJETANDO O QL
+                                        
                     # Coautores
                     parceiros = []
                     for _, r in docs_autor.iterrows():
@@ -1258,6 +1373,8 @@ if st.session_state['df_geral'] is not None:
                     docs_pais = filtrar_por_entidade(df, termo_ativo, "País")
                     total_citacoes = docs_pais['TOTAL CITATIONS'].sum() if 'TOTAL CITATIONS' in docs_pais.columns else 0
                     st.write(f"**Impacto do País (Citações):** {total_citacoes}")
+
+                    mostrar_ql_perfil(docs_pais, df)
                     
                     with st.expander(f"📚 Ver Documentos Associados ({len(docs_pais)})"):
                         for i, (_, r) in enumerate(docs_pais.iterrows()):
@@ -1268,11 +1385,28 @@ if st.session_state['df_geral'] is not None:
                     docs_venue = filtrar_por_entidade(df, termo_ativo, "Local de Publicação (Venue)")
                     total_citacoes = docs_venue['TOTAL CITATIONS'].sum() if 'TOTAL CITATIONS' in docs_venue.columns else 0
                     st.write(f"**Citações Acumuladas nesta Fonte:** {total_citacoes}")
+
+                    mostrar_ql_perfil(docs_venue, df)
                     
                     with st.expander(f"📚 Ver Documentos Publicados Aqui ({len(docs_venue)})"):
                         for i, (_, r) in enumerate(docs_venue.iterrows()):
                             titulo_doc = r[col_titulos]
                             st.button(f"📄 {titulo_doc}", key=f"btn_nav_doc_venue_{hash(titulo_doc)}_{i}", on_click=navegar_busca, args=("Documento", titulo_doc))
+                
+                elif tipo_ativo == "Tema":
+                    docs_tema = filtrar_por_entidade(df, termo_ativo, "Tema")
+                    total_citacoes = docs_tema['TOTAL CITATIONS'].sum() if 'TOTAL CITATIONS' in docs_tema.columns else 0
+                    st.write(f"**Impacto Total desta Escola de Pesquisa (Citações):** {total_citacoes}")
+
+                    # Como o usuário quer ver o QL aqui também:
+                    st.markdown("**🎯 Lideranças e Especialistas neste Tema:**")
+
+                    mostrar_liderancas_tema(termo_ativo, df)
+
+                    with st.expander(f"📚 Ver Documentos desta Escola ({len(docs_tema)})"):
+                        for i, (_, r) in enumerate(docs_tema.iterrows()):
+                            titulo_doc = r[col_titulos]
+                            st.button(f"📄 {titulo_doc}", key=f"btn_nav_doc_tema_{hash(titulo_doc)}_{i}", on_click=navegar_busca, args=("Documento", titulo_doc))
 
             # =========================================================
             # ABAS DO DOSSIÊ (HISTÓRICO, NUVEM E SIMILARES)
@@ -1295,7 +1429,9 @@ if st.session_state['df_geral'] is not None:
                 opcoes_visao = ["Visão Geral"]
                 if col_tipo_doc: 
                     opcoes_visao.append("Separado por Tipo de Documento")
-                
+                if 'TEMA_GEMINI' in df.columns:
+                    opcoes_visao.append("Separado por Temas") # Nova Opção
+
                 visao_hist = st.radio(
                     "Análise Histórica:", 
                     opcoes_visao, 
@@ -1331,7 +1467,7 @@ if st.session_state['df_geral'] is not None:
                                 template="plotly_white", margin=dict(l=0, r=0, t=40, b=0), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
                             )
                             st.plotly_chart(fig_hist, width='stretch')
-                        else:
+                        elif visao_hist == "Separado por Tipo de Documento":
                             df_ano[col_tipo_doc] = df_ano[col_tipo_doc].fillna("Desconhecido")
                             hist_data = df_ano.groupby([col_ano, col_tipo_doc]).size().reset_index(name='Volume')
                             
@@ -1339,6 +1475,19 @@ if st.session_state['df_geral'] is not None:
                             hist_data['Volume'] = pd.to_numeric(hist_data['Volume'], errors='coerce').fillna(0).astype(int)
                             
                             fig_hist = px.bar(hist_data, x=col_ano, y='Volume', color=col_tipo_doc, title="Volume de Documentos por Tipo e Ano", template="plotly_white")
+                            fig_hist.update_layout(xaxis=dict(tickmode='linear', dtick=1))
+                            st.plotly_chart(fig_hist, width='stretch')
+                        elif visao_hist == "Separado por Temas":
+                            df_ano['TEMA_GEMINI'] = df_ano['TEMA_GEMINI'].fillna("Não Categorizado")
+                            hist_data = df_ano.groupby([col_ano, 'TEMA_GEMINI']).size().reset_index(name='Volume')
+                            hist_data['Volume'] = pd.to_numeric(hist_data['Volume'], errors='coerce').fillna(0).astype(int)
+
+                            fig_hist = px.bar(
+                                hist_data, x=col_ano, y='Volume', color='TEMA_GEMINI', 
+                                title=f"Evolução Temporal: {termo_ativo}", 
+                                template="plotly_white",
+                                color_discrete_sequence=px.colors.qualitative.Pastel
+                            )
                             fig_hist.update_layout(xaxis=dict(tickmode='linear', dtick=1))
                             st.plotly_chart(fig_hist, width='stretch')
                     else:
@@ -1439,3 +1588,93 @@ if st.session_state['df_geral'] is not None:
                     elif tipo_ativo in ['País', 'Local de Publicação (Venue)']:
                         st.markdown(f"##### 🔗 Entidades Semelhantes ({tipo_ativo})")
                         render_tabela_similares(similares.get('Itens', []), tipo_ativo, tipo_ativo)
+    
+    # =========================================================
+    # --- ABA 4: ASSISTENTE CIENTÍFICO (CHATBOT) ---
+    # =========================================================
+    with tab_chat:
+        st.header("🤖 Assistente Científico (Simetrics AI)")
+        st.caption("Converse com a base de dados. Peça recomendações de leitura, indicação de especialistas ou sugestões de periódicos (venues) para submeter seu artigo com base no seu tema de pesquisa atual. \n ⚠️ Esteja ciente de que a qualidade das respostas depende da qualidade dos dados carregados. Este chatbot pode errar, sempre verifique as informações.")
+
+        api_key_valida = False
+        try:
+            api_key = st.secrets["GEMINI_API_KEY"]
+            api_key_valida = True
+        except KeyError:
+            st.error("⚠️ Chave 'GEMINI_API_KEY' não encontrada no arquivo `.streamlit/secrets.toml`. O Assistente requer acesso à API para funcionar.")
+
+        if api_key_valida:
+            # 1. Configuração de Estado e Histórico
+            if "chat_messages" not in st.session_state:
+                st.session_state.chat_messages = [
+                    {"role": "assistant", "content": "Olá! Sou a IA do Simetrics. Já injetei toda a sua base de dados, autores, temas e métricas na minha memória de contexto. Qual desafio acadêmico posso ajudar a resolver hoje?"}
+                ]
+
+            # Exibe o histórico salvo na tela
+            for msg in st.session_state.chat_messages:
+                with st.chat_message(msg["role"]):
+                    st.markdown(msg["content"])
+
+            # 2. Inicialização Dinâmica do Motor da IA
+            import google.generativeai as genai
+            genai.configure(api_key=api_key)
+            
+            with st.spinner("Sincronizando sinapses com a base de dados..."):
+                from utils import preparar_contexto_llm
+                dados_json = preparar_contexto_llm(st.session_state['df_geral'])
+                
+                instrucao_sistema = f"""
+                Você é um conselheiro acadêmico sênior e especialista em cienciometria operando dentro da plataforma 'Simetrics'.
+                Abaixo estão os dados ESTRITOS da revisão de literatura do usuário em formato JSON:
+                
+                {dados_json}
+                
+                Suas tarefas:
+                - Saber responder perguntas sobre a base de dados.
+                - Recomendar artigos fundamentais para leitura baseando-se nos temas, resumos e total de citações.
+                - Recomendar venues (SECONDARY TITLE) ideais para submissão caso o usuário descreva a pesquisa que está fazendo.
+                - Identificar os autores mais adequados para parceria ou citação.
+                
+                Regras Absolutas:
+                - Você SÓ PODE fazer recomendações usando os itens que existem no JSON acima. 
+                - Cite os títulos exatos dos documentos ou nomes dos autores como estão na base.
+                - Responda de forma acadêmica, analítica e direta.
+                """
+                
+                # Gemini 2.5 Flash é ideal pois suporta mais que 1 milhão de tokens de contexto
+                model = genai.GenerativeModel(
+                    model_name="gemini-2.5-flash-lite",
+                    system_instruction=instrucao_sistema
+                )
+
+                # Traduz o histórico do Streamlit para o formato que o Gemini exige
+                gemini_history = []
+                for m in st.session_state.chat_messages[1:]: # Pula a mensagem inicial estática
+                    role_map = "user" if m["role"] == "user" else "model"
+                    gemini_history.append({"role": role_map, "parts": [m["content"]]})
+                
+                chat_session = model.start_chat(history=gemini_history)
+
+            # 3. Input do Usuário e Geração de Resposta
+            if prompt := st.chat_input("Ex: Estou escrevendo sobre Ecologia do Conhecimento. Quais os 3 documentos essenciais para ler e em qual revista devo publicar?"):
+                
+                # Renderiza e salva a mensagem do usuário
+                st.session_state.chat_messages.append({"role": "user", "content": prompt})
+                with st.chat_message("user"):
+                    st.markdown(prompt)
+
+                # Gera e renderiza a resposta do assistente
+                with st.chat_message("assistant"):
+                    with st.spinner("Analisando topologia do conhecimento..."):
+                        try:
+                            # Executa a requisição
+                            response = chat_session.send_message(prompt)
+                            texto_resposta = response.text
+                            
+                            st.markdown(texto_resposta)
+                            st.session_state.chat_messages.append({"role": "assistant", "content": texto_resposta})
+                            
+                        except Exception as e:
+                            erro = f"Ocorreu um erro de comunicação: {e}"
+                            st.error(erro)
+                            st.session_state.chat_messages.append({"role": "assistant", "content": erro})

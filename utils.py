@@ -19,6 +19,21 @@ from wordcloud import STOPWORDS
 
 CURRENT_YEAR = date.today().year
 
+@st.cache_data(show_spinner=False)
+def preparar_contexto_llm(df):
+    """Filtra e comprime a base de dados em um formato estruturado (JSON) para a IA."""
+    # Selecionamos apenas as colunas vitais para economizar tokens e focar a IA
+    colunas_alvo = ['TITLE', 'AUTHORS', 'YEAR CLEAN', 'SECONDARY TITLE', 'TOTAL CITATIONS', 'TEMA_GEMINI', 'KEYWORDS', 'COUNTRY', 'ABSTRACT']
+    colunas_presentes = [c for c in colunas_alvo if c in df.columns]
+    
+    df_contexto = df[colunas_presentes].copy()
+    
+    # Tratamento para evitar que textos muito longos ou nulos quebrem o prompt
+    for col in df_contexto.columns:
+        df_contexto[col] = df_contexto[col].fillna("Não informado")
+        
+    # Converte para JSON (O formato que LLMs processam com maior precisão estrutural)
+    return df_contexto.to_json(orient="records", force_ascii=False)
 
 def _pick_column(df, candidates):
     return next((col for col in candidates if col in df.columns), None)
@@ -211,6 +226,9 @@ def preparar_opcoes_busca(df):
         for pais in _split_semicolon_tokens(value)
     }) if col_paises else []
     opcoes_venue = sorted(df[col_venue].dropna().astype(str).str.strip().replace('', np.nan).dropna().unique().tolist()) if col_venue else []
+    
+    # NOVO: Opções de Temas da IA
+    opcoes_tema = sorted(df['TEMA_GEMINI'].dropna().unique().tolist()) if 'TEMA_GEMINI' in df.columns else []
 
     return {
         "col_titulos": col_titulos,
@@ -221,9 +239,9 @@ def preparar_opcoes_busca(df):
         "opcoes_doc": opcoes_doc,
         "opcoes_aut": opcoes_aut,
         "opcoes_pais": opcoes_pais,
-        "opcoes_venue": opcoes_venue
+        "opcoes_venue": opcoes_venue,
+        "opcoes_tema": opcoes_tema
     }
-
 
 @st.cache_data(show_spinner=False)
 def filtrar_por_entidade(df, termo_ativo, tipo_ativo):
@@ -244,9 +262,11 @@ def filtrar_por_entidade(df, termo_ativo, tipo_ativo):
         return df[df[col_paises].fillna('').str.contains(str(termo_ativo), regex=False)].copy()
     if tipo_ativo == "Local de Publicação (Venue)" and col_venue:
         return df[df[col_venue] == termo_ativo].copy()
+    # NOVO: Filtro por Tema
+    if tipo_ativo == "Tema" and 'TEMA_GEMINI' in df.columns:
+        return df[df['TEMA_GEMINI'] == termo_ativo].copy()
 
     return pd.DataFrame(columns=df.columns)
-
 
 @st.cache_resource(show_spinner=False)
 def obter_grafo_global_busca(df, col_titulos, col_autores, col_paises, col_venue):
@@ -326,22 +346,28 @@ def _get_top_doc(group):
 
 # --- MOTORES DE GERAÇÃO DE TABELAS ---
 
+# --- MOTORES DE GERAÇÃO DE TABELAS (ATUALIZADOS COM QL) ---
+
 @st.cache_data(show_spinner=False)
 def gerar_tabela_autores(df):
-    if 'AUTHORS' not in df.columns:
-        return pd.DataFrame()
+    if 'AUTHORS' not in df.columns: return pd.DataFrame()
 
     df_exp = df.copy()
     df_exp['AUTHOR'] = df_exp['AUTHORS'].astype(str).str.split(';')
     df_exp = df_exp.explode('AUTHOR')
     df_exp['AUTHOR'] = df_exp['AUTHOR'].str.strip().str.title()
     df_exp = df_exp[df_exp['AUTHOR'] != '']
+    
+    # Preparação para o QL
+    Q = df['TITLE'].nunique() if 'TITLE' in df.columns else len(df)
+    has_tema = 'TEMA_GEMINI' in df.columns
+    if has_tema:
+        Qi_series = df.drop_duplicates('TITLE')['TEMA_GEMINI'].value_counts() if 'TITLE' in df.columns else df['TEMA_GEMINI'].value_counts()
 
     res = []
     for autor, group in df_exp.groupby('AUTHOR'):
         cits = group['TOTAL CITATIONS'].fillna(0)
         
-        # Coautores
         coautores = set()
         for auth_list in group['AUTHORS'].dropna():
             coautores.update([a.strip().title() for a in str(auth_list).split(';') if a.strip().title() != autor])
@@ -351,9 +377,27 @@ def gerar_tabela_autores(df):
             for c_list in group['COUNTRY'].dropna():
                 paises.update([c.strip().title() for c in str(c_list).split(';') if c.strip()])
 
+        # Cálculo do QL para este autor
+        tema_principal = "Não Categorizado"
+        if has_tema and 'TEMA_GEMINI' in group.columns:
+            q_k = len(group)
+            qik_series = group['TEMA_GEMINI'].value_counts()
+            best_ql = -1
+            best_tema = ""
+            for tema, q_ik in qik_series.items():
+                q_i = Qi_series.get(tema, 0)
+                if q_i > 0 and q_k > 0:
+                    ql = (q_ik / q_k) / (q_i / Q)
+                    if ql > best_ql:
+                        best_ql = ql
+                        best_tema = tema
+            if best_ql >= 0:
+                tema_principal = f"{best_tema} (QL: {best_ql:.2f})"
+
         res.append({
             'Autor': autor,
             'País do Autor': ", ".join(paises),
+            'Especialização Principal (Maior QL)': tema_principal,
             'Documentos': " | ".join(group['TITLE'].dropna().astype(str)),
             'Qtd. de Documentos': len(group),
             'Qtd. de Citações': cits.sum(),
@@ -367,14 +411,18 @@ def gerar_tabela_autores(df):
 
 @st.cache_data(show_spinner=False)
 def gerar_tabela_paises(df):
-    if 'COUNTRY' not in df.columns:
-        return pd.DataFrame()
+    if 'COUNTRY' not in df.columns: return pd.DataFrame()
     
     df_exp = df.copy()
     df_exp['PAIS'] = df_exp['COUNTRY'].astype(str).str.split(';')
     df_exp = df_exp.explode('PAIS')
     df_exp['PAIS'] = df_exp['PAIS'].str.strip().str.title()
     df_exp = df_exp[(df_exp['PAIS'] != '') & (df_exp['PAIS'] != 'Nan')]
+
+    Q = df['TITLE'].nunique() if 'TITLE' in df.columns else len(df)
+    has_tema = 'TEMA_GEMINI' in df.columns
+    if has_tema:
+        Qi_series = df.drop_duplicates('TITLE')['TEMA_GEMINI'].value_counts() if 'TITLE' in df.columns else df['TEMA_GEMINI'].value_counts()
 
     res = []
     for pais, group in df_exp.groupby('PAIS'):
@@ -384,8 +432,25 @@ def gerar_tabela_paises(df):
         for auth_list in group['AUTHORS'].dropna():
             autores.update([a.strip().title() for a in str(auth_list).split(';') if a.strip()])
 
+        tema_principal = "Não Categorizado"
+        if has_tema and 'TEMA_GEMINI' in group.columns:
+            q_k = len(group)
+            qik_series = group['TEMA_GEMINI'].value_counts()
+            best_ql = -1
+            best_tema = ""
+            for tema, q_ik in qik_series.items():
+                q_i = Qi_series.get(tema, 0)
+                if q_i > 0 and q_k > 0:
+                    ql = (q_ik / q_k) / (q_i / Q)
+                    if ql > best_ql:
+                        best_ql = ql
+                        best_tema = tema
+            if best_ql >= 0:
+                tema_principal = f"{best_tema} (QL: {best_ql:.2f})"
+
         res.append({
             'País': pais,
+            'Especialização Principal (Maior QL)': tema_principal,
             'Autores': ", ".join(autores),
             'Qtd. de Autores': len(autores),
             'Qtd. de Citações': cits.sum(),
@@ -404,6 +469,11 @@ def gerar_tabela_venues(df):
 
     df_ven = df.dropna(subset=[col_venue]).copy()
     
+    Q = df['TITLE'].nunique() if 'TITLE' in df.columns else len(df)
+    has_tema = 'TEMA_GEMINI' in df.columns
+    if has_tema:
+        Qi_series = df.drop_duplicates('TITLE')['TEMA_GEMINI'].value_counts() if 'TITLE' in df.columns else df['TEMA_GEMINI'].value_counts()
+
     res = []
     for venue, group in df_ven.groupby(col_venue):
         cits = group['TOTAL CITATIONS'].fillna(0)
@@ -412,8 +482,25 @@ def gerar_tabela_venues(df):
         for auth_list in group['AUTHORS'].dropna():
             autores.update([a.strip().title() for a in str(auth_list).split(';') if a.strip()])
 
+        tema_principal = "Não Categorizado"
+        if has_tema and 'TEMA_GEMINI' in group.columns:
+            q_k = len(group)
+            qik_series = group['TEMA_GEMINI'].value_counts()
+            best_ql = -1
+            best_tema = ""
+            for tema, q_ik in qik_series.items():
+                q_i = Qi_series.get(tema, 0)
+                if q_i > 0 and q_k > 0:
+                    ql = (q_ik / q_k) / (q_i / Q)
+                    if ql > best_ql:
+                        best_ql = ql
+                        best_tema = tema
+            if best_ql >= 0:
+                tema_principal = f"{best_tema} (QL: {best_ql:.2f})"
+
         res.append({
             'Local de Publicação (Venue)': str(venue).upper(),
+            'Especialização Principal (Maior QL)': tema_principal,
             'Autores': ", ".join(autores),
             'Qtd. de Autores': len(autores),
             'Qtd. de Citações': cits.sum(),
@@ -424,6 +511,55 @@ def gerar_tabela_venues(df):
             'Documento com Mais Citações': _get_top_doc(group)
         })
     return pd.DataFrame(res).sort_values(by='Qtd. de Citações', ascending=False).reset_index(drop=True)
+
+@st.cache_data(show_spinner=False)
+def obter_top_ql_por_tema(df):
+    """Calcula os top QL para Autores, Países e Venues, retornando Dicionários (Tema -> Label)."""
+    import pandas as pd
+    if 'TEMA_GEMINI' not in df.columns: 
+        return pd.Series(dtype=str), pd.Series(dtype=str), pd.Series(dtype=str)
+        
+    def _calc_top(col):
+        if col not in df.columns: return pd.Series(dtype=str)
+        df_exp = df[['TITLE', col, 'TEMA_GEMINI']].copy()
+        df_exp[col] = df_exp[col].astype(str).str.split(';')
+        df_exp = df_exp.explode(col)
+        
+        if col == 'SECONDARY TITLE': df_exp[col] = df_exp[col].str.strip().str.upper()
+        else: df_exp[col] = df_exp[col].str.strip().str.title()
+            
+        df_exp = df_exp[(df_exp[col] != '') & (df_exp[col] != 'Nan') & (df_exp[col].notna())]
+        df_exp = df_exp.drop_duplicates(subset=['TITLE', col]) # Garante unicidade por documento
+        
+        Q = df['TITLE'].nunique() if 'TITLE' in df.columns else len(df)
+        if Q == 0: return pd.Series(dtype=str)
+        
+        Qi_s = df.drop_duplicates('TITLE')['TEMA_GEMINI'].value_counts() if 'TITLE' in df.columns else df['TEMA_GEMINI'].value_counts()
+        Qk_s = df_exp[col].value_counts()
+        Qik_s = df_exp.groupby([col, 'TEMA_GEMINI']).size()
+        
+        res = []
+        for (k, i), q_ik in Qik_s.items():
+            q_k = Qk_s.get(k, 0)
+            q_i = Qi_s.get(i, 0)
+            if q_k == 0 or q_i == 0: continue
+            ql = (q_ik / q_k) / (q_i / Q)
+            res.append({'Entidade': k, 'Tema': i, 'QL': ql, 'Qik': q_ik})
+            
+        if not res: return pd.Series(dtype=str)
+        
+        df_ql = pd.DataFrame(res)
+        # Desempate: Se houverem QLs altos e empatados, prioriza quem publicou MAIS documentos naquele tema (Qik)
+        df_ql = df_ql.sort_values(by=['QL', 'Qik'], ascending=[False, False])
+        top = df_ql.drop_duplicates('Tema').copy()
+        top['Label'] = top['Entidade'] + " (QL: " + top['QL'].round(2).astype(str) + ")"
+        return top.set_index('Tema')['Label']
+        
+    top_aut = _calc_top(next((c for c in ['AUTHORS', 'AU'] if c in df.columns), 'AUTHORS'))
+    top_pais = _calc_top('COUNTRY')
+    top_ven = _calc_top(next((c for c in ['SECONDARY TITLE', 'SO', 'JO'] if c in df.columns), 'SECONDARY TITLE'))
+    
+    return top_aut, top_pais, top_ven
 
 @st.cache_data(show_spinner=False)
 def gerar_tabela_keywords(df):
