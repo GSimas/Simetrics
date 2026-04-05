@@ -600,12 +600,13 @@ def categorizar_temas_por_cluster(df, api_key, max_clusters=10):
     from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.cluster import KMeans
     from sklearn.metrics import silhouette_score
-    import google.generativeai as genai
+    from google import genai
+    from google.genai import types
     import streamlit as st
     import time
 
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-2.5-flash-lite')
+    # --- INICIALIZAÇÃO DO CLIENTE (Onde o erro estava acontecendo) ---
+    client = genai.Client(api_key=api_key)
 
     # 1. Preparação: Consolida o texto rico de cada documento
     df_text = df.copy()
@@ -620,13 +621,25 @@ def categorizar_temas_por_cluster(df, api_key, max_clusters=10):
         df['TEMA_GEMINI'] = "Amostra Insuficiente"
         return df
 
-    with st.spinner("Vetorizando textos (TF-IDF)..."):
-        # 2. Vetorização: Transforma o texto em matriz matemática ignorando palavras comuns (stop words)
+    with st.spinner("Vetorizando textos e comprimindo semântica (LSA)..."):
+        # 1. Vetorização clássica TF-IDF
         vectorizer = TfidfVectorizer(stop_words='english', max_features=1500)
-        X = vectorizer.fit_transform(textos)
+        X_sparse = vectorizer.fit_transform(textos)
+
+        # 2. NOVO: LSA (Latent Semantic Analysis / TruncatedSVD)
+        # Comprime a matriz esparsa gigantesca em dimensões matemáticas densas.
+        # Isso quebra a "maldição da dimensionalidade" e permite que o Silhouette funcione.
+        from sklearn.decomposition import TruncatedSVD
+        
+        n_comps = min(50, X_sparse.shape[0] - 1, X_sparse.shape[1] - 1)
+        if n_comps >= 2:
+            svd = TruncatedSVD(n_components=n_comps, random_state=42)
+            X = svd.fit_transform(X_sparse)
+        else:
+            X = X_sparse.toarray()
 
     with st.spinner("Calculando o K ideal via Silhouette Score..."):
-        # 3. Otimização do K: Testa de 2 até max_clusters para achar a melhor divisão natural
+        # 3. Otimização do K: Testa de 2 até max_clusters para achar a melhor divisão
         best_k = 2
         best_score = -1
         limite_k = min(max_clusters, len(textos) - 1)
@@ -650,49 +663,65 @@ def categorizar_temas_por_cluster(df, api_key, max_clusters=10):
     progress_bar = st.progress(0)
     
     for cluster_id in range(best_k):
-        # Seleciona os 5 documentos mais relevantes do cluster (baseado no tamanho do texto)
+        # Seleciona os 5 documentos mais relevantes do cluster
         amostra = df_text[df_text['CLUSTER_ID'] == cluster_id].copy()
         amostra['TAM_TEXTO'] = amostra['TEXTO_COMBINADO'].str.len()
         amostra_top = amostra.sort_values(by='TAM_TEXTO', ascending=False).head(5)
         
         textos_amostra = ""
         for _, row in amostra_top.iterrows():
-            # Pegamos os primeiros 600 caracteres do abstract para economizar tokens
             resumo = str(row['ABSTRACT'])[:600] if pd.notna(row['ABSTRACT']) else "Sem resumo"
             textos_amostra += f"- Título: {row['TITLE']}\n  Resumo: {resumo}...\n\n"
             
         prompt = f"""
         Você é um cientista de dados especialista em revisão de literatura.
-        Abaixo estão amostras representativas de artigos científicos que um algoritmo agrupou no mesmo cluster temático:
+        Abaixo estão amostras representativas de artigos científicos agrupados:
         
         {textos_amostra}
         
         Sua tarefa: Sintetize o tema central unificador desta escola de pesquisa.
-        Responda APENAS com o nome do tema em Português, de forma acadêmica e concisa (máximo de 2 a 4 palavras). 
-        Nenhuma pontuação final, aspas ou texto adicional.
+        Responda APENAS com o nome do tema em Português, conciso (máximo 4 palavras). 
+        Nenhuma pontuação final ou aspas.
         """
         
         try:
-            # Pausa reduzida, pois agora faremos pouquíssimas requisições (ex: 4 ou 5)
-            time.sleep(2) 
-            response = model.generate_content(prompt)
-            tema_nome = response.text.strip().replace('\n', '').replace('"', '').replace('*', '').title()
-            cluster_names[cluster_id] = tema_nome
+            time.sleep(2.5) # Respiro para a cota da API
+            
+            # --- FILTROS DE SEGURANÇA DESATIVADOS PARA TEXTOS ACADÊMICOS ---
+            configuracao = types.GenerateContentConfig(
+                safety_settings=[
+                    types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HARASSMENT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
+                    types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold=types.HarmBlockThreshold.BLOCK_NONE),
+                    types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
+                    types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold=types.HarmBlockThreshold.BLOCK_NONE)
+                ]
+            )
+
+            # --- NOVA ESTRUTURA DE GERAÇÃO DA BIBLIOTECA GENAI ---
+            response = client.models.generate_content(
+                model='gemini-2.5-flash-lite', 
+                contents=prompt,
+                config=configuracao
+            )
+            
+            if response.text:
+                tema_nome = response.text.strip().replace('\n', '').replace('"', '').replace('*', '').title()
+                cluster_names[cluster_id] = tema_nome
+            else:
+                cluster_names[cluster_id] = f"Tema {cluster_id + 1} (Resposta Vazia)"
+                
         except Exception as e:
-            cluster_names[cluster_id] = f"Tema {cluster_id + 1} (Processamento Falhou)"
+            erro_msg = str(e)
+            cluster_names[cluster_id] = f"Tema {cluster_id + 1} (Erro API)"
+            st.toast(f"Cluster {cluster_id + 1} falhou: {erro_msg[:100]}", icon="🛑")
             
         progress_bar.progress((cluster_id + 1) / best_k)
 
     progress_bar.empty()
 
     # 6. Mapeamento Final: Atribui o nome gerado pela IA aos índices originais
-    # Criamos uma Series para garantir que o Pandas alinhe os dados pelo INDEX
     series_temas = df_text['CLUSTER_ID'].map(cluster_names)
-    
-    # Gravamos na coluna final usando o índice original do DataFrame passado
     df['TEMA_GEMINI'] = series_temas
-    
-    # Garantimos que não existam valores nulos residuais em strings
     df['TEMA_GEMINI'] = df['TEMA_GEMINI'].fillna("Outros/Não Categorizado")
     
     return df

@@ -8,7 +8,7 @@ import io
 import os
 from collections import Counter
 import networkx as nx
-import google.generativeai as genai
+from google import genai
 from utils import (
     analisar_completude_metadados,
     calcular_metricas_bibliometrix,
@@ -311,11 +311,23 @@ if st.session_state['df_geral'] is not None:
             
             elif api_key_valida:
                 st.info("⚡ O algoritmo Silhouette identificará os grupos e o Gemini nomeará cada escola.")
+                # --- NOVO: SLIDER DE CONTROLE DE GRANULARIDADE ---
+                st.write("")
+                max_temas = st.slider(
+                    "Teto Máximo de Temas (Granularidade):", 
+                    min_value=3, max_value=20, value=10, step=1, 
+                    help="O algoritmo tentará achar o número perfeito de clusters, mas nunca ultrapassará este limite. Use limites altos para nichos específicos ou baixos para macro-áreas."
+                )
+                
                 if st.button("Executar Mapeamento Temático", type="primary"):
                     from utils import categorizar_temas_por_cluster
                     
-                    # CORREÇÃO: Passando a base já deduplicada para a IA não analisar textos repetidos
-                    df_processado = categorizar_temas_por_cluster(st.session_state['df_geral'], api_key)
+                    # Passamos o limite escolhido pelo usuário para o motor do utils
+                    df_processado = categorizar_temas_por_cluster(
+                        st.session_state['df_geral'], 
+                        api_key, 
+                        max_clusters=max_temas
+                    )
                     st.session_state['df_geral'] = df_processado
                     
                     st.toast("Temas gerados com sucesso!", icon="🤖")
@@ -1616,8 +1628,11 @@ if st.session_state['df_geral'] is not None:
                     st.markdown(msg["content"])
 
             # 2. Inicialização Dinâmica do Motor da IA
-            import google.generativeai as genai
-            genai.configure(api_key=api_key)
+            from google import genai
+            from google.genai import types
+            
+            # --- NOVA INICIALIZAÇÃO DE CLIENTE ---
+            client = genai.Client(api_key=api_key)
             
             with st.spinner("Sincronizando sinapses com a base de dados..."):
                 from utils import preparar_contexto_llm
@@ -1630,33 +1645,39 @@ if st.session_state['df_geral'] is not None:
                 {dados_json}
                 
                 Suas tarefas:
-                - Saber responder perguntas sobre a base de dados.
+                - Responder perguntas sobre a base de dados.
                 - Recomendar artigos fundamentais para leitura baseando-se nos temas, resumos e total de citações.
-                - Recomendar venues (SECONDARY TITLE) ideais para submissão caso o usuário descreva a pesquisa que está fazendo.
+                - Recomendar revistas (SECONDARY TITLE) ideais para submissão caso o usuário descreva a pesquisa que está fazendo.
                 - Identificar os autores mais adequados para parceria ou citação.
                 
                 Regras Absolutas:
                 - Você SÓ PODE fazer recomendações usando os itens que existem no JSON acima. 
                 - Cite os títulos exatos dos documentos ou nomes dos autores como estão na base.
-                - Responda de forma acadêmica, analítica e direta.
+                - Responda em Português de forma acadêmica, analítica e direta.
                 """
-                
-                # Gemini 2.5 Flash é ideal pois suporta mais que 1 milhão de tokens de contexto
-                model = genai.GenerativeModel(
-                    model_name="gemini-2.5-flash-lite",
-                    system_instruction=instrucao_sistema
-                )
 
-                # Traduz o histórico do Streamlit para o formato que o Gemini exige
+                # --- NOVO FORMATO ESTRITO DE HISTÓRICO ---
                 gemini_history = []
                 for m in st.session_state.chat_messages[1:]: # Pula a mensagem inicial estática
                     role_map = "user" if m["role"] == "user" else "model"
-                    gemini_history.append({"role": role_map, "parts": [m["content"]]})
+                    gemini_history.append(
+                        types.Content(
+                            role=role_map, 
+                            parts=[types.Part.from_text(text=m["content"])]
+                        )
+                    )
                 
-                chat_session = model.start_chat(history=gemini_history)
+                # --- NOVA SINTAXE PARA CRIAR SESSÃO DE CHAT ---
+                chat_session = client.chats.create(
+                    model="gemini-1.5-flash",
+                    history=gemini_history,
+                    config=types.GenerateContentConfig(
+                        system_instruction=instrucao_sistema
+                    )
+                )
 
             # 3. Input do Usuário e Geração de Resposta
-            if prompt := st.chat_input("Ex: Estou escrevendo sobre Ecologia do Conhecimento. Quais os 3 documentos essenciais para ler e em qual revista devo publicar?"):
+            if prompt := st.chat_input("Ex: Estou escrevendo sobre Ecologia do Conhecimento. Quais os 3 documentos essenciais para ler?"):
                 
                 # Renderiza e salva a mensagem do usuário
                 st.session_state.chat_messages.append({"role": "user", "content": prompt})
@@ -1667,7 +1688,7 @@ if st.session_state['df_geral'] is not None:
                 with st.chat_message("assistant"):
                     with st.spinner("Analisando topologia do conhecimento..."):
                         try:
-                            # Executa a requisição
+                            # A execução do prompt em si continua igual
                             response = chat_session.send_message(prompt)
                             texto_resposta = response.text
                             
@@ -1675,6 +1696,6 @@ if st.session_state['df_geral'] is not None:
                             st.session_state.chat_messages.append({"role": "assistant", "content": texto_resposta})
                             
                         except Exception as e:
-                            erro = f"Ocorreu um erro de comunicação: {e}"
+                            erro = f"Ocorreu um erro de comunicação neurológica: {e}"
                             st.error(erro)
                             st.session_state.chat_messages.append({"role": "assistant", "content": erro})
