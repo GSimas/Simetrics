@@ -10,6 +10,8 @@ from collections import Counter
 import networkx as nx
 from google import genai
 from utils import (
+    processar_pubmed,
+    processar_cochrane,
     analisar_completude_metadados,
     calcular_metricas_bibliometrix,
     calcular_similares_biblio,
@@ -29,7 +31,7 @@ from utils import (
     process_multiple_ris,
     processar_csv_scopus,
     processar_excel_wos,
-    resumir_base_bibliometrica,
+    resumir_base_bibliometrica
 )
 
 
@@ -76,25 +78,25 @@ with st.sidebar:
 
     st.header("1. Envio de Arquivos")
     
-    # --- NOVO: GUIA DE FORMATOS SUPORTADOS ---
+    # --- GUIA DE FORMATOS SUPORTADOS ATUALIZADO ---
     with st.expander("ℹ️ Formatos e Bases Suportadas", expanded=False):
         st.markdown("""
-        | Extensão | Base de Dados Sugerida |
+        | Extensão | Base de Dados |
         | :--- | :--- |
-        | **.ris** | SciELO, WoS, Scopus, Mendeley |
-        | **.csv** | Scopus (Exportação Direta) |
+        | **.ris** | SciELO, WoS, Scopus, Mendeley, Cochrane |
+        | **.csv** | Scopus (Exportação Direta), Cochrane |
         | **.xls / .xlsx**| Web of Science (Full Record) |
+        | **.txt / .nbib**| PubMed (Formato Medline) |
         
-        **Dica:** Para Excel da WoS, certifique-se de exportar com todas as colunas (Full Record e Cited References).
-
-        ⚠️ O sistema pode apresentar lentidão e até trava em caso de arquivos com +10MB ou com +5000 linhas.
-
+        **Dicas Importantes:**
+        * **WoS:** Para Excel, certifique-se de exportar com 'Full Record and Cited References'.
+        * **PubMed:** Use a opção de exportação 'Format: PubMed' no site da NCBI.
         """)
     
-    # Adicionamos extensões de Excel
+    # Uploader configurado para aceitar todos os formatos do ecossistema Simetrics
     uploaded_files = st.file_uploader(
-        "Selecione arquivos RIS, CSV ou Excel", 
-        type=['ris', 'csv', 'xls', 'xlsx'], 
+        "Selecione arquivos RIS, CSV, Excel, TXT ou NBIB", 
+        type=['ris', 'csv', 'xls', 'xlsx', 'txt', 'nbib'], 
         accept_multiple_files=True
     )
     
@@ -103,14 +105,21 @@ with st.sidebar:
         st.header("2. Atribuição de Base")
         for f in uploaded_files:
             ext = f.name.lower()
-            # Sugestão inteligente baseada na extensão
-            if ext.endswith('.csv'): def_idx = 0 # Scopus
+            
+            # Sugestão inteligente baseada na extensão e nome do arquivo
+            if ext.endswith('.csv'):
+                if 'cochrane' in f.name.lower(): def_idx = 5
+                else: def_idx = 0 # Scopus
             elif ext.endswith(('.xls', '.xlsx')): def_idx = 1 # Web of Science
-            else: def_idx = 3 # Outra
+            elif ext.endswith(('.txt', '.nbib')): def_idx = 3 # PubMed
+            elif ext.endswith('.ris'):
+                if 'cochrane' in f.name.lower(): def_idx = 5
+                else: def_idx = 4 # Outra (Mendeley, SciELO)
+            else: def_idx = 4
             
             db_mapping[f.name] = st.selectbox(
                 f"{f.name}", 
-                options=["Scopus", "Web of Science", "SciELO", "Outra"], 
+                options=["Scopus", "Web of Science", "SciELO", "PubMed", "Cochrane", "Outra"], # "Cochrane" adicionada (Índice 5)
                 index=def_idx,
                 key=f"db_{f.name}"
             )
@@ -129,13 +138,21 @@ with st.sidebar:
                 pbar_load.progress(progresso_atual, text=f"Integrando {f.name} ({i+1}/{total_files})")
                 
                 ext = f.name.lower()
-                if ext.endswith('.csv'):
+                base_escolhida = db_mapping[f.name]
+                
+                # MOTOR DE ROTEAMENTO (Prioriza a escolha do usuário no Dropdown)
+                if base_escolhida == "Cochrane":
+                    df_temp = processar_cochrane(f, f.name)
+                elif base_escolhida == "PubMed" or ext.endswith(('.txt', '.nbib')):
+                    df_temp = processar_pubmed(f)
+                elif ext.endswith('.csv') and base_escolhida != "Cochrane":
+                    # Se for CSV e não for Cochrane, assumimos que é padrão Scopus
                     df_temp = processar_csv_scopus(f)
                 elif ext.endswith(('.xls', '.xlsx')):
                     df_temp = processar_excel_wos(f)
                 else:
-                    # Processamento RIS existente
-                    df_temp = process_multiple_ris([f], {f.name: db_mapping[f.name]})
+                    # Fallback padrão para RIS genéricos (WoS, Mendeley, SciELO)
+                    df_temp = process_multiple_ris([f], {f.name: base_escolhida})
                 
                 if df_temp is not None:
                     df_temp['BASE DE DADOS'] = db_mapping[f.name]

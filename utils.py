@@ -19,6 +19,206 @@ from wordcloud import STOPWORDS
 
 CURRENT_YEAR = date.today().year
 
+@st.cache_data(show_spinner=False)
+def processar_cochrane(file, nome_arquivo):
+    """Processa arquivos CSV ou RIS exportados da Cochrane Library."""
+    import pandas as pd
+    import rispy
+    import re
+    import io
+
+    ext = nome_arquivo.lower()
+    
+    if ext.endswith('.csv'):
+        file.seek(0)
+        df = pd.read_csv(file)
+        
+        # Mapeamento estrito das colunas do CSV da Cochrane
+        mapa_colunas = {
+            'Title': 'TITLE',
+            'Author(s)': 'AUTHORS',
+            'Source': 'SECONDARY TITLE',
+            'Year': 'YEAR CLEAN',
+            'Abstract': 'ABSTRACT',
+            'Keywords': 'KEYWORDS',
+            'DOI': 'DOI'
+        }
+        df = df.rename(columns={k: v for k, v in mapa_colunas.items() if k in df.columns})
+        
+    elif ext.endswith('.ris'):
+        file.seek(0)
+        text = file.getvalue().decode('utf-8', errors='ignore')
+        
+        # CORREÇÃO COCHRANE: Eles inserem espaços extras nas tags (ex: "A1  -  Autor").
+        # A expressão regular abaixo força o padrão estrito ("A1  - Autor") para o rispy não quebrar.
+        text = re.sub(r'^([A-Z0-9]{2})\s+-\s+', r'\1  - ', text, flags=re.MULTILINE)
+        
+        entries = rispy.loads(text)
+        df = pd.DataFrame(entries)
+        
+        # A tag 'A1' (Autor) na Cochrane costuma ser lida como 'first_authors' pelo rispy
+        if 'first_authors' in df.columns and 'authors' not in df.columns:
+            df['authors'] = df['first_authors']
+            
+        mapa_ris = {
+            'title': 'TITLE',
+            'primary_title': 'TITLE',
+            'authors': 'AUTHORS',
+            'journal_name': 'SECONDARY TITLE',
+            'year': 'YEAR CLEAN',
+            'abstract': 'ABSTRACT',
+            'keywords': 'KEYWORDS',
+            'doi': 'DOI'
+        }
+        df = df.rename(columns={k: v for k, v in mapa_ris.items() if k in df.columns})
+        
+        # Converte listas (Autores, Palavras-chave) para strings com ponto e vírgula
+        for col in ['AUTHORS', 'KEYWORDS']:
+            if col in df.columns:
+                df[col] = df[col].apply(lambda x: "; ".join(x) if isinstance(x, list) else str(x))
+
+    # --- Tratamentos Comuns (RIS e CSV) ---
+    if 'TOTAL CITATIONS' not in df.columns:
+        df['TOTAL CITATIONS'] = 0 # Cochrane não exporta métrica de citações recebidas
+        
+    if 'KEYWORDS' in df.columns:
+        # Remove asteriscos inseridos em termos MeSH
+        df['KEYWORDS'] = df['KEYWORDS'].astype(str).str.replace('*', '', regex=False)
+
+    # Passa pelo padronizador central (já com a proteção contra colunas duplicadas que criamos antes)
+    from utils import padronizar_base_bibliometrica
+    return padronizar_base_bibliometrica(df)
+
+@st.cache_data(show_spinner=False)
+def processar_pubmed(file):
+    """Processa arquivos .txt ou .nbib exportados do PubMed (Medline format)."""
+    import io
+    import re
+    import pandas as pd
+
+    # Lê as linhas decodificando de forma segura
+    file.seek(0)
+    linhas = file.getvalue().decode('utf-8', errors='ignore').splitlines()
+
+    entries = []
+    current_entry = {}
+    current_tag = None
+
+    # 1. Parsing Linha por Linha
+    for linha in linhas:
+        if not linha.strip():
+            continue
+
+        # Se a linha começa com espaços, é continuação da tag anterior (Ex: Abstract)
+        if re.match(r'^\s+', linha):
+            if current_tag and current_tag in current_entry:
+                if isinstance(current_entry[current_tag], list):
+                    current_entry[current_tag][-1] += " " + linha.strip()
+                else:
+                    current_entry[current_tag] += " " + linha.strip()
+            continue
+
+        # Nova tag detectada (Ex: "TI  - Autopsy findings...")
+        match = re.match(r'^([A-Z0-9]{2,4})\s*-\s(.*)', linha)
+        if match:
+            tag = match.group(1)
+            valor = match.group(2).strip()
+
+            if tag == 'PMID': # Inicio de um novo documento
+                if current_entry:
+                    entries.append(current_entry)
+                current_entry = {'PMID': valor}
+            else:
+                # Agrupa tags que podem aparecer múltiplas vezes em listas
+                if tag in ['FAU', 'AU', 'AD', 'OT', 'MH', 'PT', 'LID', 'AID']:
+                    if tag not in current_entry:
+                        current_entry[tag] = []
+                    current_entry[tag].append(valor)
+                else:
+                    current_entry[tag] = valor
+            current_tag = tag
+
+    if current_entry:
+        entries.append(current_entry)
+
+    if not entries:
+        return None
+
+    df = pd.DataFrame(entries)
+
+    # 2. Padronização de Colunas Simetrics
+    mapa_colunas = {
+        'TI': 'TITLE',
+        'AB': 'ABSTRACT',
+        'JT': 'SECONDARY TITLE',
+        'TA': 'SECONDARY TITLE', # Fallback caso não tenha JT
+    }
+    df = df.rename(columns={k: v for k, v in mapa_colunas.items() if k in df.columns})
+
+    # 3. Tratamento de Autores (FAU = Full Author)
+    if 'FAU' in df.columns:
+        df['AUTHORS'] = df['FAU'].apply(lambda x: "; ".join(x) if isinstance(x, list) else str(x))
+    elif 'AU' in df.columns:
+        df['AUTHORS'] = df['AU'].apply(lambda x: "; ".join(x) if isinstance(x, list) else str(x))
+
+    # 4. Tratamento de Palavras-Chave (OT = Other Term, MH = MeSH Term)
+    kw_cols = [c for c in ['OT', 'MH'] if c in df.columns]
+    if kw_cols:
+        def formatar_kw(row):
+            kws = []
+            for col in kw_cols:
+                if isinstance(row[col], list):
+                    # Remove asteriscos dos termos MeSH (Ex: *COVID-19)
+                    kws.extend([str(k).replace('*', '').strip() for k in row[col]])
+            return "; ".join(list(set(kws)))
+        df['KEYWORDS'] = df.apply(formatar_kw, axis=1)
+
+    # 5. Tratamento de Ano (DP = Date of Publication)
+    if 'DP' in df.columns:
+        df['YEAR CLEAN'] = pd.to_numeric(df['DP'].astype(str).str.extract(r'(\d{4})')[0], errors='coerce')
+
+    # 6. Extração de DOI
+    def extract_doi(row):
+        for col in ['LID', 'AID']:
+            if col in df.columns and isinstance(row[col], list):
+                for val in row[col]:
+                    if '[doi]' in val.lower():
+                        return val.replace('[doi]', '').replace('[DOI]', '').strip()
+            elif col in df.columns and isinstance(row[col], str):
+                if '[doi]' in row[col].lower():
+                    return row[col].replace('[doi]', '').replace('[DOI]', '').strip()
+        return None
+    
+    df['DOI'] = df.apply(extract_doi, axis=1)
+
+    # 7. Tipo de Documento
+    if 'PT' in df.columns:
+        df['DOCUMENT TYPE'] = df['PT'].apply(lambda x: ", ".join(x) if isinstance(x, list) else str(x))
+
+    # 8. Extração de Países via Afiliações (AD)
+    if 'AD' in df.columns:
+        # Usa o motor robusto de extração geográfica que já criamos para o RIS
+        PAISES = ["USA", "United States", "Canada", "Brazil", "China", "Taiwan", "United Kingdom", "England", "Scotland", "Wales", "North Ireland", "France", "Germany", "Italy", "Spain", "Portugal", "Netherlands", "Switzerland", "Sweden", "Norway", "Denmark", "Finland", "Belgium", "Austria", "Russia", "Australia", "New Zealand", "Japan", "South Korea", "India", "South Africa", "Mexico", "Argentina", "Chile", "Colombia", "Peru", "Israel", "Saudi Arabia", "Iran", "Turkey", "Egypt"]
+        MAPA_PAISES = {"usa": "USA", "united states": "USA", "uk": "United Kingdom", "england": "United Kingdom"}
+        paises_pattern = re.compile(r'\b(' + '|'.join(map(re.escape, PAISES)) + r')\b', re.IGNORECASE)
+
+        def extrair_paises(afiliacao_list):
+            if not isinstance(afiliacao_list, list): return None
+            texto_completo = " ".join(afiliacao_list)
+            found = set()
+            for match in paises_pattern.finditer(texto_completo):
+                pais_encontrado = match.group(1).lower()
+                found.add(MAPA_PAISES.get(pais_encontrado, pais_encontrado.title()))
+            return "; ".join(sorted(list(found))) if found else None
+
+        df['COUNTRY'] = df['AD'].apply(extrair_paises)
+
+    # Garantia de colunas numéricas
+    df['TOTAL CITATIONS'] = 0 # PubMed via txt/nbib não exporta Citações Recebidas por padrão
+
+    # Passa pelo padronizador central para garantir que a interface funcione
+    from utils import padronizar_base_bibliometrica
+    return padronizar_base_bibliometrica(df)
 
 @st.cache_data(show_spinner=False)
 def calcular_genetica_palavras(df):
@@ -237,6 +437,11 @@ def padronizar_base_bibliometrica(df):
 
     df_padrao = df.copy()
 
+    # --- CORREÇÃO DEFINITIVA (VACINA) ---
+    # Identifica colunas com nomes idênticos e mantém apenas a primeira.
+    # Isso impede que o erro "DataFrame object has no attribute 'str'" aconteça em qualquer parte do sistema.
+    df_padrao = df_padrao.loc[:, ~df_padrao.columns.duplicated()].copy()
+
     ref_candidates = ['REFERENCES_UNIFIED', 'REFERENCES', 'CITED REFERENCES', 'CR']
     if any(col in df_padrao.columns for col in ref_candidates):
         series_ref = None
@@ -294,6 +499,13 @@ def analisar_completude_metadados(df):
     for col_chave, descricao in campos_verificacao:
         if col_chave in df.columns:
             serie = df[col_chave]
+            
+            # --- CORREÇÃO: Proteção contra colunas duplicadas na base ---
+            # Se vierem duas colunas com o mesmo nome, usamos apenas a primeira para evitar o TypeError
+            if isinstance(serie, pd.DataFrame):
+                serie = serie.iloc[:, 0]
+            # ------------------------------------------------------------
+            
             faltantes = int(serie.isna().sum())
             if pd.api.types.is_object_dtype(serie) or pd.api.types.is_string_dtype(serie):
                 faltantes += int(serie.astype(str).str.strip().eq('').sum())
