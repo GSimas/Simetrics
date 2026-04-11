@@ -14,3 +14,4 @@ xlrd>=2.0.1
 openpyxl
 matplotlib
 google-genai
+st-gsheets-connection

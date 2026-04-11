@@ -9,6 +9,7 @@ import os
 from collections import Counter
 import networkx as nx
 from google import genai
+from streamlit_gsheets import GSheetsConnection
 from utils import (
     processar_pubmed,
     processar_cochrane,
@@ -340,7 +341,7 @@ with st.sidebar:
 if st.session_state['df_geral'] is not None:
     df = st.session_state['df_geral']
     
-    tab_main, tab_grafos, tab_search, tab_chat = st.tabs(["📊 Informações Principais", "🕸️ Redes e Grafos de Conhecimento","🔍 Motor de Busca","🤖 Assistente Científico"])
+    tab_main, tab_grafos, tab_search, tab_chat, tab_form = st.tabs(["📊 Informações Principais", "🕸️ Redes e Grafos de Conhecimento","🔍 Motor de Busca","🤖 Assistente Científico", "📝 Formulário de Feedback"])
     
     with tab_main:
         st.subheader("Resumo Estrutural da Amostra")
@@ -2116,9 +2117,6 @@ if st.session_state['df_geral'] is not None:
     # =========================================================
     # --- ABA 4: ASSISTENTE CIENTÍFICO (CHATBOT) ---
     # =========================================================
-    # =========================================================
-    # --- ABA 4: ASSISTENTE CIENTÍFICO (CHATBOT) ---
-    # =========================================================
     with tab_chat:
         st.header("🤖 Assistente Científico (Simetrics AI)")
         st.caption("Converse com a base de dados. Peça recomendações de leitura, indicação de especialistas ou sugestões de periódicos (venues) para submeter seu artigo com base no seu tema de pesquisa atual. \n ⚠️ Esteja ciente de que a qualidade das respostas depende da qualidade dos dados carregados. Este chatbot pode errar, sempre verifique as informações.")
@@ -2211,3 +2209,138 @@ if st.session_state['df_geral'] is not None:
                             erro = f"Ocorreu um erro na geração da resposta: {e}"
                             st.error(erro)
                             st.session_state.chat_messages.append({"role": "assistant", "content": erro})
+
+    with tab_form:
+        # =========================================================
+        # --- NOVA ABA: AVALIAÇÃO DE USABILIDADE (SUS) ---
+        # =========================================================
+        st.header("📝 Avaliação da Plataforma Simetrics")
+        st.markdown("""
+        Bem-vindo(a)! Este formulário tem como objetivo avaliar a sua experiência ao utilizar a plataforma **Simetrics**. 
+        Não existem respostas certas ou erradas; estamos avaliando o sistema, e não você. Suas respostas são anônimas 
+        e fundamentais para o aprimoramento desta ferramenta de gestão do conhecimento acadêmico.
+        """)
+
+        # 1. Tenta estabelecer a conexão com o Google Sheets
+        try:
+            # Ele tentará buscar a URL no secrets.toml (local) ou nas variáveis do Railway
+            url_planilha = st.secrets["spreadsheet"]
+            conn = st.connection("gsheets", type=GSheetsConnection)
+            conexao_ok = True
+        except Exception as e:
+            st.error(f"Erro de configuração: {e}")
+            conexao_ok = False
+
+        # =========================================================
+        # --- ABA AVALIAÇÃO: SOLUÇÃO DEFINITIVA (CHAVE DINÂMICA) ---
+        # =========================================================
+        
+        # 1. Controle de Memória
+        if "form_key" not in st.session_state:
+            st.session_state["form_key"] = 0  # Chave inicial do formulário
+        if "avaliacao_sucesso" not in st.session_state:
+            st.session_state["avaliacao_sucesso"] = False
+
+        # Mostra a mensagem de sucesso e balões (se o envio deu certo na rodada anterior)
+        if st.session_state["avaliacao_sucesso"]:
+            st.success("✅ Avaliação enviada com sucesso! A equipe de pesquisa agradece imensamente a sua contribuição.")
+            st.balloons()
+            st.session_state["avaliacao_sucesso"] = False  # Desliga a bandeira
+
+        # 2. Formulário com CHAVE DINÂMICA
+        # Toda vez que form_key mudar, o formulário renasce do zero!
+        chave_dinamica = f"form_avaliacao_{st.session_state['form_key']}"
+        
+        with st.form(key=chave_dinamica, clear_on_submit=False):
+            
+            # --- PARTE 1: PERFIL ---
+            st.subheader("Parte 1: Perfil do Participante")
+            col_p1, col_p2 = st.columns(2)
+            with col_p1:
+                titulacao = st.selectbox(
+                    "1. Nível de titulação acadêmica (concluído ou em andamento):",
+                    ["Graduação", "Especialização", "Mestrado", "Doutorado", "Pós-Doutorado"],
+                    index=None, placeholder="Selecione uma opção..."
+                )
+                area = st.selectbox(
+                    "2. Principal Grande Área de atuação:",
+                    ["Engenharias / Ciências Exatas e da Terra", "Ciências Sociais Aplicadas / Humanas", "Ciências da Saúde / Biológicas", "Outra"],
+                    index=None, placeholder="Selecione uma opção..."
+                )
+            with col_p2:
+                experiencia = st.radio(
+                    "3. Experiência prévia com softwares de análise bibliométrica:",
+                    ["Nenhuma experiência", "Iniciante (Já utilizei algumas vezes)", "Intermediário (Utilizo com certa regularidade)", "Avançado (Tenho domínio sobre as ferramentas)"],
+                    index=None
+                )
+
+            st.divider()
+            
+            # --- PARTE 2: SUS ---
+            st.subheader("Parte 2: Questionário Usabilidade")
+            st.caption("Selecione sua concordância (1 = Discordo Fortemente | 5 = Concordo Fortemente)")
+
+            opcoes_likert = [1, 2, 3, 4, 5]
+            sus_1 = st.radio("1. Eu acho que gostaria de usar a plataforma Simetrics frequentemente.", opcoes_likert, index=None, horizontal=True)
+            sus_2 = st.radio("2. Eu achei a plataforma desnecessariamente complexa.", opcoes_likert, index=None, horizontal=True)
+            sus_3 = st.radio("3. Eu achei a plataforma fácil de usar.", opcoes_likert, index=None, horizontal=True)
+            sus_4 = st.radio("4. Eu acho que precisaria de suporte técnico para usar a plataforma.", opcoes_likert, index=None, horizontal=True)
+            sus_5 = st.radio("5. Eu achei que as várias funções estavam muito bem integradas.", opcoes_likert, index=None, horizontal=True)
+            sus_6 = st.radio("6. Eu achei que havia muita inconsistência na plataforma.", opcoes_likert, index=None, horizontal=True)
+            sus_7 = st.radio("7. Eu imagino que a maioria aprenderia a usar essa plataforma rapidamente.", opcoes_likert, index=None, horizontal=True)
+            sus_8 = st.radio("8. Eu achei a plataforma muito difícil ou engessada de usar.", opcoes_likert, index=None, horizontal=True)
+            sus_9 = st.radio("9. Eu me senti muito confiante ao navegar na plataforma.", opcoes_likert, index=None, horizontal=True)
+            sus_10 = st.radio("10. Eu precisei aprender muitas coisas novas antes de lidar com a plataforma.", opcoes_likert, index=None, horizontal=True)
+
+            st.divider()
+            
+            # --- PARTE 3: UX ---
+            st.subheader("Parte 3: Avaliação de Interface e Experiência")
+            ux_nav = st.text_area("11. Navegação e Arquitetura da Informação:")
+            ux_vis = st.text_area("12. Visualização de Dados e Metáforas:")
+            ux_ia = st.text_area("13. Inteligência Artificial e Classificação Temática:")
+            ux_fric = st.text_area("14. Pontos de Fricção e Melhorias:")
+            ux_add = st.text_area("15. Comentários Adicionais (Opcional):")
+
+            submit_btn = st.form_submit_button("Enviar Avaliação", type="primary", use_container_width=True)
+
+        # 3. Lógica de Envio
+        if submit_btn:
+            respostas_sus = [sus_1, sus_2, sus_3, sus_4, sus_5, sus_6, sus_7, sus_8, sus_9, sus_10]
+            
+            if None in respostas_sus or titulacao is None or area is None or experiencia is None:
+                st.error("⚠️ Por favor, responda todas as questões de múltipla escolha antes de enviar.")
+            else:
+                try:
+                    url_planilha = st.secrets["connections"]["gsheets"]["spreadsheet"]
+                    conn = st.connection("gsheets", type=GSheetsConnection)
+                    
+                    with st.spinner("Registrando avaliação no banco de dados..."):
+                        nome_aba_planilha = "Respostas" 
+                        
+                        df_existente = conn.read(spreadsheet=url_planilha, worksheet=nome_aba_planilha, ttl=0)
+                        df_existente = df_existente.dropna(how="all")
+
+                        nova_resposta = pd.DataFrame([{
+                            "Titulação": titulacao, "Área": area, "Experiência_Prévia": experiencia,
+                            "SUS_01": sus_1, "SUS_02": sus_2, "SUS_03": sus_3, "SUS_04": sus_4, "SUS_05": sus_5,
+                            "SUS_06": sus_6, "SUS_07": sus_7, "SUS_08": sus_8, "SUS_09": sus_9, "SUS_10": sus_10,
+                            "UX_Navegação": ux_nav, "UX_Visualização": ux_vis, "UX_IA": ux_ia,
+                            "UX_Melhorias": ux_fric, "UX_Comentários": ux_add,
+                            "Data_Hora": pd.Timestamp.now(tz='America/Sao_Paulo').strftime('%Y-%m-%d %H:%M:%S')
+                        }])
+
+                        df_atualizado = pd.concat([df_existente, nova_resposta], ignore_index=True)
+                        df_atualizado = df_atualizado.fillna("").astype(str)
+                        conn.update(spreadsheet=url_planilha, worksheet=nome_aba_planilha, data=df_atualizado)
+                        
+                        # --- O PULO DO GATO ---
+                        # 1. Avisamos o sistema que deu sucesso
+                        st.session_state["avaliacao_sucesso"] = True
+                        # 2. Mudamos o ID do formulário (forçando ele a nascer em branco)
+                        st.session_state["form_key"] += 1
+                        # 3. Recarregamos a tela
+                        st.rerun()
+                        
+                except Exception as e:
+                    st.error(f"Erro ao processar envio: {e}")
