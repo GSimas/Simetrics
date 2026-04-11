@@ -697,7 +697,7 @@ if st.session_state['df_geral'] is not None:
                 try:
                     # O nlargest agora funcionará porque garantimos o tipo no utils.py
                     top_d = df.nlargest(20, 'TOTAL CITATIONS').copy()
-                    top_d['Título Curto'] = top_d[title_col].apply(lambda x: str(x)[:50] + "..." if len(str(x)) > 50 else x)
+                    top_d['Título Curto'] = top_d[title_col].apply(lambda x: str(x)[:35] + "..." if len(str(x)) > 35 else x)
                     
                     fig_d = px.bar(top_d, x='TOTAL CITATIONS', y='Título Curto', orientation='h', 
                                     color='TOTAL CITATIONS', color_continuous_scale='Reds')
@@ -780,7 +780,7 @@ if st.session_state['df_geral'] is not None:
                     res_venue['Média'] = (res_venue['Citações'] / res_venue['Documentos']).round(2)
                     
                     # Corta nomes muito longos de revistas/conferências para o gráfico ficar bonito
-                    res_venue['Venue Curta'] = res_venue['Venue'].apply(lambda x: str(x)[:40] + "..." if len(str(x)) > 40 else x)
+                    res_venue['Venue Curta'] = res_venue['Venue'].apply(lambda x: str(x)[:35] + "..." if len(str(x)) > 35 else x)
                     
                     if metric_venue == "Qtd. de Documentos":
                         top_v = res_venue.nlargest(20, 'Documentos')
@@ -1378,82 +1378,160 @@ if st.session_state['df_geral'] is not None:
                 st.warning(f"Coluna de {fonte_mapa} não encontrada na base de dados.")
 
         # =========================================================
-        # MÓDULO DE TABELAS E ESTATÍSTICAS DETALHADAS
+        # MÓDULO DE TABELAS, ESTATÍSTICAS E EXPORTAÇÕES
         # =========================================================            
-        st.markdown("### 📋 Tabelas Analíticas e Estatísticas")
-        st.caption("Navegue pelas abas abaixo para investigar os dados agregados por diferentes dimensões do ecossistema científico.")
+        st.markdown("### 📋 Tabelas Analíticas e Exportações")
+        st.caption("Investigue os dados nas abas abaixo ou baixe todo o dossiê consolidado e os gráficos gerados nesta página.")
         
-        # CORREÇÃO: Força as tabelas a usarem a base ativa (com filtros, IA e deduplicação aplicados)
         df = st.session_state['df_geral']
         
-        # Criação das Abas
+        with st.spinner("Compilando dados estatísticos para exportação..."):
+            from utils import gerar_tabela_autores, gerar_tabela_paises, gerar_tabela_venues, gerar_tabela_keywords
+            import io
+            import zipfile
+
+            # 1. Base Geral formatada
+            df_geral_export = df.copy()
+            cols_geral = [c for c in df_geral_export.columns if c != 'YEAR CLEAN']
+            for col_prioritaria in reversed(['TEMA_GEMINI', 'TOTAL CITATIONS', 'TITLE', 'AUTHORS']):
+                if col_prioritaria in cols_geral:
+                    cols_geral.insert(0, cols_geral.pop(cols_geral.index(col_prioritaria)))
+            df_geral_export = df_geral_export[cols_geral]
+
+            # 2. Sub-bases
+            df_autores = gerar_tabela_autores(df)
+            df_paises = gerar_tabela_paises(df)
+            df_venues = gerar_tabela_venues(df)
+            df_keywords = gerar_tabela_keywords(df)
+
+            # 3. Criando o Excel Multi-abas em memória
+            excel_buffer = io.BytesIO()
+            with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+                df_geral_export.to_excel(writer, index=False, sheet_name='Base Geral')
+                if not df_autores.empty: df_autores.to_excel(writer, index=False, sheet_name='Autores')
+                if not df_paises.empty: df_paises.to_excel(writer, index=False, sheet_name='Países')
+                if not df_venues.empty: df_venues.to_excel(writer, index=False, sheet_name='Venues')
+                if not df_keywords.empty: df_keywords.to_excel(writer, index=False, sheet_name='Palavras-chave')
+            excel_data = excel_buffer.getvalue()
+
+        # 4. Captura Automática dos Gráficos Gerados Acima (Varredura de Memória)
+        # 4. Captura Automática dos Gráficos Gerados Acima
+        graficos_gerados = {}
+        for nome_var, nome_arq in [
+            ('fig_year', '01_Dinamica_Tempo'), ('fig_db', '02_Distribuicao_Bases'),
+            ('fig_auth', '03_Top_Autores'), ('fig_d', '04_Top_Documentos'),
+            ('fig_c', '05_Top_Paises'), ('fig_v', '06_Top_Venues'),
+            ('fig_kw', '07_Top_Keywords'), ('fig_box', '08_Boxplot'),
+            ('fig_circ', '09_Colaboracao_Circular'), ('fig_map', '10_Colaboracao_Mapa'),
+            ('fig_sankey', '11_Sankey'), ('fig_mortalidade', '12_Fecundidade'),
+            ('fig_longevidade', '13_Longevidade'), ('fig_2d', '14_PCA_2D'),
+            ('fig_3d', '15_PCA_3D'), ('fig_lotka', '16_Lei_Lotka'),
+            ('fig_prod', '17_Producao_Autores'), ('fig_hist', '18_Historiograph'),
+            ('fig_mapa', '19_Mapa_Tematico')
+        ]:
+            if nome_var in locals() and locals()[nome_var] is not None:
+                graficos_gerados[nome_arq] = locals()[nome_var]
+
+        # --- FUNÇÃO DE ZIP COM AJUSTE DE MARGENS (FIX) ---
+        def gerar_zip_graficos():
+            zip_buffer = io.BytesIO()
+            sucessos = 0
+            erros_log = []
+            
+            with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
+                for nome, fig in graficos_gerados.items():
+                    try:
+                        if hasattr(fig, 'to_image'):
+                            # --- AJUSTE DE LAYOUT PARA EXPORTAÇÃO ---
+                            # Criamos uma cópia temporária para não estragar o visual da tela
+                            fig_export = go.Figure(fig)
+                            
+                            fig_export.update_layout(
+                                # 1. Força o cálculo automático de espaço para os nomes
+                                yaxis=dict(automargin=True),
+                                # 2. Adiciona um recuo extra na esquerda (l) para segurança
+                                margin=dict(l=150, r=50, t=80, b=50),
+                                # 3. Garante que o fundo seja branco para relatórios
+                                paper_bgcolor='white',
+                                plot_bgcolor='white'
+                            )
+                            
+                            # 4. Aumentamos a largura (width) para 1600 para dar mais "ar" aos textos
+                            img_bytes = fig_export.to_image(
+                                format="png", 
+                                width=1600, 
+                                height=1000, 
+                                scale=2
+                            )
+                            
+                            zip_file.writestr(f"{nome}.png", img_bytes)
+                            sucessos += 1
+                    except Exception as e:
+                        erros_log.append(f"{nome}: {str(e)}")
+                        
+            return zip_buffer.getvalue(), sucessos, erros_log
+
+        # 5. Painel de Exportação Master
+        st.write("")
+        col_exp_1, col_exp_2 = st.columns(2)
+
+        with col_exp_1:
+            st.download_button(
+                label="📥 Baixar Dossiê Completo (Excel Multi-abas)",
+                data=excel_data,
+                file_name="simetrics_dossie_completo.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+                type="primary"
+            )
+
+        with col_exp_2:
+            # --- NOVO BOTÃO DE IMAGENS COM TRATAMENTO DE ERROS ---
+            if "zip_graficos" not in st.session_state:
+                if st.button("🖼️ Compilar Imagens dos Gráficos (ZIP)", use_container_width=True):
+                    with st.spinner("Renderizando PNGs em alta resolução (Isso leva de 5 a 15 segundos)..."):
+                        zip_data, qtd_sucesso, lista_erros = gerar_zip_graficos()
+                        
+                        if qtd_sucesso > 0:
+                            st.session_state["zip_graficos"] = zip_data
+                            if len(lista_erros) > 0:
+                                st.warning(f"⚠️ {qtd_sucesso} imagens geradas. Algumas falharam: {lista_erros[0]}")
+                            st.rerun() # Atualiza a tela para mostrar o botão de download
+                        else:
+                            st.error("❌ Falha crítica ao gerar as imagens.")
+                            st.info(f"Detalhe do erro: {lista_erros[0] if lista_erros else 'Nenhum gráfico Plotly compatível encontrado na tela.'}")
+            else:
+                st.download_button(
+                    label="⬇️ Clique aqui para Baixar as Imagens (ZIP)",
+                    data=st.session_state["zip_graficos"],
+                    file_name="simetrics_graficos_imagens.zip",
+                    mime="application/zip",
+                    use_container_width=True,
+                    type="primary"
+                )
+
+        st.caption("ℹ️ *A Nuvem de Palavras e as Redes SNA Dinâmicas não são exportadas pelo botão ZIP pois rodam ativamente no navegador (JS). Você pode baixá-las clicando com o botão direito diretamente sobre elas.*")
+        st.write("")
+        
+        # 6. Renderização Limpa das Abas
         aba_geral, aba_autores, aba_paises, aba_venues, aba_keywords = st.tabs([
-            "📚 Tabela Geral", 
-            "✍️ Autores", 
-            "🌍 Países", 
-            "🏛️ Fontes (Venues)", 
-            "🔑 Palavras-chave"
+            "📚 Tabela Geral", "✍️ Autores", "🌍 Países", "🏛️ Fontes (Venues)", "🔑 Palavras-chave"
         ])
         
-        # --- ABA 1: TABELA GERAL ---
         with aba_geral:
-            cols = [c for c in df.columns if c != 'YEAR CLEAN']
-            prioridades = ['TEMA_GEMINI', 'TOTAL CITATIONS', 'TITLE', 'AUTHORS']
-            for col_prioritaria in reversed(prioridades):
-                if col_prioritaria in cols:
-                    cols.insert(0, cols.pop(cols.index(col_prioritaria)))
-            
-            st.dataframe(df[cols], width='stretch')
-            csv_geral = gerar_csv_bytes(df[cols])
-            st.download_button("Baixar Base Geral (CSV)", data=csv_geral, file_name='base_simetrics_geral.csv', key='dl_geral')
-
-        # --- ABA 2: AUTORES ---
+            st.dataframe(df_geral_export, width='stretch')
         with aba_autores:
-            with st.spinner("Compilando perfil estatístico dos autores..."):
-                from utils import gerar_tabela_autores
-                df_autores = gerar_tabela_autores(df)
-                if not df_autores.empty:
-                    st.dataframe(df_autores, width='stretch', hide_index=True)
-                    csv_autores = gerar_csv_bytes(df_autores)
-                    st.download_button("Baixar Tabela de Autores (CSV)", data=csv_autores, file_name='simetrics_autores.csv', key='dl_aut')
-                else:
-                    st.info("Não há dados de autores suficientes para gerar esta tabela.")
-
-        # --- ABA 3: PAÍSES ---
+            if not df_autores.empty: st.dataframe(df_autores, width='stretch', hide_index=True)
+            else: st.info("Não há dados suficientes de autores para gerar esta tabela.")
         with aba_paises:
-            with st.spinner("Compilando estatísticas geopolíticas..."):
-                from utils import gerar_tabela_paises
-                df_paises = gerar_tabela_paises(df)
-                if not df_paises.empty:
-                    st.dataframe(df_paises, width='stretch', hide_index=True)
-                    csv_paises = gerar_csv_bytes(df_paises)
-                    st.download_button("Baixar Tabela de Países (CSV)", data=csv_paises, file_name='simetrics_paises.csv', key='dl_pai')
-                else:
-                    st.info("Não há dados de países (COUNTRY) suficientes para gerar esta tabela.")
-
-        # --- ABA 4: FONTES / VENUES ---
+            if not df_paises.empty: st.dataframe(df_paises, width='stretch', hide_index=True)
+            else: st.info("Não há dados suficientes de países (COUNTRY) para gerar esta tabela.")
         with aba_venues:
-            with st.spinner("Agrupando periódicos e conferências..."):
-                from utils import gerar_tabela_venues
-                df_venues = gerar_tabela_venues(df)
-                if not df_venues.empty:
-                    st.dataframe(df_venues, width='stretch', hide_index=True)
-                    csv_venues = gerar_csv_bytes(df_venues)
-                    st.download_button("Baixar Tabela de Fontes/Venues (CSV)", data=csv_venues, file_name='simetrics_venues.csv', key='dl_ven')
-                else:
-                    st.info("Não há dados de fontes de publicação (SECONDARY TITLE) suficientes para gerar esta tabela.")
-
-        # --- ABA 5: PALAVRAS-CHAVE ---
+            if not df_venues.empty: st.dataframe(df_venues, width='stretch', hide_index=True)
+            else: st.info("Não há dados suficientes de fontes de publicação para gerar esta tabela.")
         with aba_keywords:
-            with st.spinner("Calculando impacto do léxico..."):
-                from utils import gerar_tabela_keywords
-                df_keywords = gerar_tabela_keywords(df)
-                if not df_keywords.empty:
-                    st.dataframe(df_keywords, width='stretch', hide_index=True)
-                    csv_keywords = gerar_csv_bytes(df_keywords)
-                    st.download_button("Baixar Tabela de Palavras-chave (CSV)", data=csv_keywords, file_name='simetrics_keywords.csv', key='dl_kw')
-                else:
-                    st.info("Não há palavras-chave (KEYWORDS) suficientes para gerar esta tabela.")
+            if not df_keywords.empty: st.dataframe(df_keywords, width='stretch', hide_index=True)
+            else: st.info("Não há palavras-chave (KEYWORDS) suficientes para gerar esta tabela.")
 
     # === ABA 2: REDES E GRAFOS ===
     with tab_grafos:
@@ -2300,11 +2378,11 @@ if st.session_state['df_geral'] is not None:
             
             # --- PARTE 3: UX ---
             st.subheader("Parte 3: Avaliação de Interface e Experiência")
-            ux_nav = st.text_area("11. Navegação e Arquitetura da Informação:")
-            ux_vis = st.text_area("12. Visualização de Dados e Metáforas:")
-            ux_ia = st.text_area("13. Inteligência Artificial e Classificação Temática:")
-            ux_fric = st.text_area("14. Pontos de Fricção e Melhorias:")
-            ux_add = st.text_area("15. Comentários Adicionais (Opcional):")
+            ux_nav = st.text_area("11. Navegação e Arquitetura da Informação (Durante a importação da base e navegação, você encontrou alguma barreira ou teve dúvidas sobre onde clicar?):")
+            ux_vis = st.text_area("12. Visualização de Dados e Metáforas (As visualizações (Boxplot, Sankey) foram claras e ajudaram na compreensão?):")
+            ux_ia = st.text_area("13. Inteligência Artificial e Classificação Temática (Como avalia o agrupamento e os nomes gerados pela IA na base de dados testada? E também na conversa com a IA, as respostas fizeram sentido?):")
+            ux_fric = st.text_area("14. Pontos de Fricção e Melhorias (Se você fosse o engenheiro responsável, qual seria a primeira alteração que faria na interface?):")
+            ux_add = st.text_area("15. Comentários Adicionais (Opcional) (Deixe qualquer observação, crítica ou sugestão que não tenha sido abordada):")
 
             submit_btn = st.form_submit_button("Enviar Avaliação", type="primary", use_container_width=True)
 

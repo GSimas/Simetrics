@@ -15,3 +15,5 @@ openpyxl
 matplotlib
 google-genai
 st-gsheets-connection
+openpyxl==3.1.2
+kaleido==0.2.1
