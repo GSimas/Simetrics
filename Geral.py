@@ -9,6 +9,10 @@ import os
 from collections import Counter
 import networkx as nx
 from google import genai
+if "SECRETS_TOML" in os.environ:
+    os.makedirs(".streamlit", exist_ok=True)
+    with open(".streamlit/secrets.toml", "w", encoding="utf-8") as f:
+        f.write(os.environ["SECRETS_TOML"])
 from streamlit_gsheets import GSheetsConnection
 from utils import (
     processar_pubmed,
@@ -2212,7 +2216,7 @@ if st.session_state['df_geral'] is not None:
 
     with tab_form:
         # =========================================================
-        # --- NOVA ABA: AVALIAÇÃO DE USABILIDADE (SUS) ---
+        # --- AVALIAÇÃO DE USABILIDADE (SUS) ---
         # =========================================================
         st.header("📝 Avaliação da Plataforma Simetrics")
         st.markdown("""
@@ -2232,7 +2236,7 @@ if st.session_state['df_geral'] is not None:
             conexao_ok = False
 
         # =========================================================
-        # --- ABA AVALIAÇÃO: SOLUÇÃO DEFINITIVA (CHAVE DINÂMICA) ---
+        # --- (CHAVE DINÂMICA) ---
         # =========================================================
         
         # 1. Controle de Memória
