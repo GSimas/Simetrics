@@ -6,6 +6,7 @@ from streamlit_agraph import agraph, Config
 from streamlit_echarts import st_echarts
 import io
 import os
+import zipfile
 from collections import Counter
 import networkx as nx
 from google import genai
@@ -15,6 +16,14 @@ if "SECRETS_TOML" in os.environ:
         f.write(os.environ["SECRETS_TOML"])
 from streamlit_gsheets import GSheetsConnection
 from utils import (
+    gerar_tabela_autores,
+    gerar_tabela_paises,
+    gerar_tabela_venues,
+    gerar_tabela_keywords,
+    gerar_mapas_conceituais,
+    plot_sankey_evolution,
+    categorizar_temas_por_cluster,
+    obter_top_ql_por_tema,
     processar_pubmed,
     processar_cochrane,
     analisar_completude_metadados,
@@ -76,6 +85,7 @@ st.session_state.setdefault('df_geral', None)
 st.session_state.setdefault('df_original', None)
 st.session_state.setdefault('df_duplicados', pd.DataFrame())
 st.session_state.setdefault('tabela_sna_completa', None)
+st.session_state.setdefault('metricas_globais_sna', None)
 st.session_state.setdefault('mostrar_descritivo', True)
 
 
@@ -449,7 +459,7 @@ if st.session_state['df_geral'] is not None:
                 df_resumo.columns = ['Escola Temática (IA)', 'Documentos']
                 
                 # --- NOVO: Integração do Quociente Locacional (QL) ---
-                from utils import obter_top_ql_por_tema
+                
                 top_a, top_p, top_v = obter_top_ql_por_tema(st.session_state['df_geral'])
                 
                 df_resumo['Autor Top QL'] = df_resumo['Escola Temática (IA)'].map(top_a).fillna("-")
@@ -477,9 +487,7 @@ if st.session_state['df_geral'] is not None:
                     help="O algoritmo tentará achar o número perfeito de clusters, mas nunca ultrapassará este limite. Use limites altos para nichos específicos ou baixos para macro-áreas."
                 )
                 
-                if st.button("Executar Mapeamento Temático", type="primary"):
-                    from utils import categorizar_temas_por_cluster
-                    
+                if st.button("Executar Mapeamento Temático", type="primary"):                    
                     # Passamos o limite escolhido pelo usuário para o motor do utils
                     df_processado = categorizar_temas_por_cluster(
                         st.session_state['df_geral'], 
@@ -676,7 +684,8 @@ if st.session_state['df_geral'] is not None:
             )
             
             if 'AUTHORS' in df.columns:
-                df_auth_temp = df[['AUTHORS', 'TOTAL CITATIONS', 'YEAR CLEAN']].copy()
+                cols_auth = [c for c in ['AUTHORS', 'TOTAL CITATIONS', 'YEAR CLEAN'] if c in df.columns]
+                df_auth_temp = df[cols_auth].copy()
                 df_auth_temp['TOTAL CITATIONS'] = pd.to_numeric(df_auth_temp['TOTAL CITATIONS'], errors='coerce').fillna(0).astype(int)
                 df_auth_temp['YEAR CLEAN'] = pd.to_numeric(df_auth_temp['YEAR CLEAN'], errors='coerce')
                 df_auth_temp['Autor'] = df_auth_temp['AUTHORS'].astype(str).str.split(';')
@@ -743,6 +752,8 @@ if st.session_state['df_geral'] is not None:
         # --- TOP 20 PAÍSES ---
         with col_pais:
             st.markdown("##### 🌍 Top 20 Países Mais Produtivos")
+            
+            # Selectbox com todas as métricas perfeitamente alinhadas
             metric_country = st.selectbox(
                 "Métrica de Países:", 
                 ["Qtd. de Documentos", "Total de Citações", "Média de Citações", "Índice h", "Índice g", "Índice i10", "Índice m"], 
@@ -750,7 +761,8 @@ if st.session_state['df_geral'] is not None:
             )
             
             if 'COUNTRY' in df.columns:
-                df_country_temp = df[['COUNTRY', 'TOTAL CITATIONS', 'YEAR CLEAN']].copy()
+                cols_country = [c for c in ['COUNTRY', 'TOTAL CITATIONS', 'YEAR CLEAN'] if c in df.columns]
+                df_country_temp = df[cols_country].copy()
                 df_country_temp['TOTAL CITATIONS'] = pd.to_numeric(df_country_temp['TOTAL CITATIONS'], errors='coerce').fillna(0).astype(int)
                 df_country_temp['YEAR CLEAN'] = pd.to_numeric(df_country_temp['YEAR CLEAN'], errors='coerce')
                 df_country_temp['País'] = df_country_temp['COUNTRY'].astype(str).str.split(';')
@@ -765,6 +777,7 @@ if st.session_state['df_geral'] is not None:
                     docs = len(cits)
                     total_cits = sum(cits)
                     
+                    # Cálculo Cientométrico
                     h_idx = sum(c >= i + 1 for i, c in enumerate(cits))
                     g_idx = 0
                     soma = 0
@@ -776,18 +789,27 @@ if st.session_state['df_geral'] is not None:
                     anos = group['YEAR CLEAN'].dropna().tolist()
                     m_idx = round(h_idx / ((2026 - min(anos)) + 1), 3) if anos else 0.0
                         
+                    # CRIAÇÃO DA TABELA: Os nomes das chaves aqui agora são EXATAMENTE iguais aos do selectbox
                     res_list.append({
-                        'País': pais, 'Qtd. de Documentos': docs, 'Total de Citações': total_cits, 
+                        'País': pais, 
+                        'Qtd. de Documentos': docs, 
+                        'Total de Citações': total_cits, 
                         'Média de Citações': round(total_cits / docs, 2) if docs > 0 else 0, 
-                        'Índice h': h_idx, 'Índice g': g_idx, 'Índice i10': sum(1 for c in cits if c >= 10), 'Índice m': m_idx
+                        'Índice h': h_idx, 
+                        'Índice g': g_idx, 
+                        'Índice i10': sum(1 for c in cits if c >= 10), 
+                        'Índice m': m_idx
                     })
                 
                 res_country = pd.DataFrame(res_list)
+                
+                # Agora o erro KeyError não vai mais acontecer, pois os nomes batem!
                 top_c = res_country.nlargest(20, metric_country)
                 
                 fig_c = px.bar(top_c, x=metric_country, y='País', orientation='h', color=metric_country, color_continuous_scale='Viridis')
                 fig_c.update_layout(yaxis={'categoryorder':'total ascending'})
                 st.plotly_chart(fig_c, width='stretch')
+
 
         # --- TOP 20 VENUES ---
         with col_venue:
@@ -802,7 +824,8 @@ if st.session_state['df_geral'] is not None:
             col_venue_name = next((c for c in ['SECONDARY TITLE', 'SO', 'JO'] if c in df.columns), None)
             
             if col_venue_name:
-                df_with_venue = df[[col_venue_name, 'TOTAL CITATIONS', 'YEAR CLEAN']].copy()
+                cols_venue = [c for c in [col_venue_name, 'TOTAL CITATIONS', 'YEAR CLEAN'] if c in df.columns]
+                df_with_venue = df[cols_venue].copy()
                 df_with_venue['Venue'] = df_with_venue[col_venue_name].astype(str).str.strip()
                 df_with_venue['TOTAL CITATIONS'] = pd.to_numeric(df_with_venue['TOTAL CITATIONS'], errors='coerce').fillna(0).astype(int)
                 df_with_venue['YEAR CLEAN'] = pd.to_numeric(df_with_venue['YEAR CLEAN'], errors='coerce')
@@ -1176,7 +1199,7 @@ if st.session_state['df_geral'] is not None:
                 top_n_sankey = st.slider("Qtd. Palavras-chave Principais por Período:", min_value=3, max_value=25, value=10, step=1, key="sankey_kw_slider")
 
                 with st.spinner("Calculando fluxos e conectando nós temporais..."):
-                    from utils import plot_sankey_evolution
+                    
                     fig_sankey = plot_sankey_evolution(df, p1_range, p2_range, p3_range, top_n=top_n_sankey)
 
                     if fig_sankey:
@@ -1299,7 +1322,8 @@ if st.session_state['df_geral'] is not None:
             
         with col_mapas_graf:
             with st.spinner("Extraindo matriz semântica e calculando dimensionalidade..."):
-                from utils import gerar_mapas_conceituais
+                
+                
                 fig_2d, fig_3d = gerar_mapas_conceituais(df, top_n_words=top_termos_mapa, n_clusters=num_clusters)
                 
                 if fig_2d and fig_3d:
@@ -1431,9 +1455,7 @@ if st.session_state['df_geral'] is not None:
         df = st.session_state['df_geral']
         
         with st.spinner("Compilando dados estatísticos para exportação..."):
-            from utils import gerar_tabela_autores, gerar_tabela_paises, gerar_tabela_venues, gerar_tabela_keywords
-            import io
-            import zipfile
+          
 
             # 1. Base Geral formatada
             df_geral_export = df.copy()

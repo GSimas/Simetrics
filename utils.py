@@ -19,6 +19,44 @@ from wordcloud import STOPWORDS
 
 CURRENT_YEAR = date.today().year
 
+def extrair_indices_cientometricos(cits_raw, anos_raw=None, ano_base=2026):
+    """
+    Função centralizada para calcular os Índices h, g, i10 e m.
+    Garante consistência matemática (single source of truth) em toda a plataforma.
+    """
+    import pandas as pd
+    
+    # 1. Trata e ordena as citações
+    cits_raw = pd.to_numeric(cits_raw, errors='coerce').fillna(0).astype(int)
+    cits_sorted = cits_raw.sort_values(ascending=False).tolist()
+    
+    # 2. Índice h
+    h_idx = sum(c >= i + 1 for i, c in enumerate(cits_sorted))
+    
+    # 3. Índice g (Lógica oficial: encerra ao primeiro valor que falha no limiar)
+    g_idx = 0
+    soma = 0
+    for i, c in enumerate(cits_sorted):
+        soma += c
+        if soma >= (i + 1)**2: 
+            g_idx = i + 1
+        else: 
+            break
+            
+    # 4. Índice i10
+    i10_idx = sum(1 for c in cits_sorted if c >= 10)
+    
+    # 5. Índice m
+    m_idx = 0.0
+    if anos_raw is not None:
+        anos_validos = pd.to_numeric(anos_raw, errors='coerce').dropna().astype(int).tolist()
+        if anos_validos:
+            primeiro_ano = min(anos_validos)
+            anos_atuacao = (ano_base - primeiro_ano) + 1
+            if anos_atuacao > 0:
+                m_idx = round(h_idx / anos_atuacao, 3)
+                
+    return h_idx, g_idx, i10_idx, m_idx
 
 def calcular_indices_cientometricos(df, coluna_entidade, ano_base=CURRENT_YEAR):
     """
@@ -166,7 +204,6 @@ def processar_cochrane(file, nome_arquivo):
         df['KEYWORDS'] = df['KEYWORDS'].astype(str).str.replace('*', '', regex=False)
 
     # Passa pelo padronizador central (já com a proteção contra colunas duplicadas que criamos antes)
-    from utils import padronizar_base_bibliometrica
     return padronizar_base_bibliometrica(df)
 
 
@@ -743,7 +780,7 @@ def filtrar_por_entidade(df, termo_ativo, tipo_ativo):
 
     return pd.DataFrame(columns=df.columns)
 
-@st.cache_resource(show_spinner=False)
+@st.cache_data(show_spinner=False)
 def obter_grafo_global_busca(df, col_titulos, col_autores, col_paises, col_venue):
     G = nx.Graph()
     colunas_necessarias = [c for c in [col_titulos, col_autores, col_paises, col_venue] if c is not None]
@@ -840,32 +877,12 @@ def gerar_tabela_autores(df):
     res = []
     for autor, group in df_exp.groupby('AUTHOR'):
         cits_raw = group['TOTAL CITATIONS'].fillna(0)
-        cits_sorted = cits_raw.astype(int).sort_values(ascending=False).tolist()
         
-        # --- CÁLCULO DOS ÍNDICES CIENTOMÉTRICOS ---
-        h_index = 0
-        for i, c in enumerate(cits_sorted):
-            if c >= i + 1: h_index = i + 1
-            else: break
-
-        g_index = 0
-        soma_acumulada = 0
-        for i, c in enumerate(cits_sorted):
-            soma_acumulada += c
-            if soma_acumulada >= (i + 1) ** 2: g_index = i + 1
-            else: break
-
-        i10_index = sum(1 for c in cits_sorted if c >= 10)
-
-        m_index = 0.0
-        if 'YEAR CLEAN' in group.columns:
-            anos_validos = pd.to_numeric(group['YEAR CLEAN'], errors='coerce').dropna().astype(int).tolist()
-            if anos_validos:
-                primeiro_ano = min(anos_validos)
-                anos_atuacao = (2026 - primeiro_ano) + 1
-                if anos_atuacao > 0:
-                    m_index = round(h_index / anos_atuacao, 3)
-        # ------------------------------------------
+        # 1. Define a variável de anos ANTES de chamar a função
+        anos_col = group['YEAR CLEAN'] if 'YEAR CLEAN' in group.columns else None
+        
+        # 2. Chama o motor centralizado
+        h_index, g_index, i10_index, m_index = extrair_indices_cientometricos(cits_raw, anos_col)
         
         coautores = set()
         for auth_list in group['AUTHORS'].dropna():
@@ -931,32 +948,11 @@ def gerar_tabela_paises(df):
     res = []
     for pais, group in df_exp.groupby('PAIS'):
         cits_raw = group['TOTAL CITATIONS'].fillna(0)
-        cits_sorted = cits_raw.astype(int).sort_values(ascending=False).tolist()
         
-        # --- CÁLCULO DOS ÍNDICES CIENTOMÉTRICOS ---
-        h_index = 0
-        for i, c in enumerate(cits_sorted):
-            if c >= i + 1: h_index = i + 1
-            else: break
-
-        g_index = 0
-        soma_acumulada = 0
-        for i, c in enumerate(cits_sorted):
-            soma_acumulada += c
-            if soma_acumulada >= (i + 1) ** 2: g_index = i + 1
-            else: break
-
-        i10_index = sum(1 for c in cits_sorted if c >= 10)
-
-        m_index = 0.0
-        if 'YEAR CLEAN' in group.columns:
-            anos_validos = pd.to_numeric(group['YEAR CLEAN'], errors='coerce').dropna().astype(int).tolist()
-            if anos_validos:
-                primeiro_ano = min(anos_validos)
-                anos_atuacao = (2026 - primeiro_ano) + 1
-                if anos_atuacao > 0:
-                    m_index = round(h_index / anos_atuacao, 3)
-        # ------------------------------------------
+        # 1. Define a variável
+        anos_col = group['YEAR CLEAN'] if 'YEAR CLEAN' in group.columns else None
+        # 2. Extrai os índices
+        h_index, g_index, i10_index, m_index = extrair_indices_cientometricos(cits_raw, anos_col)
         
         autores = set()
         for auth_list in group['AUTHORS'].dropna():
@@ -1012,32 +1008,11 @@ def gerar_tabela_venues(df):
     res = []
     for venue, group in df_ven.groupby(col_venue):
         cits_raw = group['TOTAL CITATIONS'].fillna(0)
-        cits_sorted = cits_raw.astype(int).sort_values(ascending=False).tolist()
         
-        # --- CÁLCULO DOS ÍNDICES CIENTOMÉTRICOS ---
-        h_index = 0
-        for i, c in enumerate(cits_sorted):
-            if c >= i + 1: h_index = i + 1
-            else: break
-
-        g_index = 0
-        soma_acumulada = 0
-        for i, c in enumerate(cits_sorted):
-            soma_acumulada += c
-            if soma_acumulada >= (i + 1) ** 2: g_index = i + 1
-            else: break
-
-        i10_index = sum(1 for c in cits_sorted if c >= 10)
-
-        m_index = 0.0
-        if 'YEAR CLEAN' in group.columns:
-            anos_validos = pd.to_numeric(group['YEAR CLEAN'], errors='coerce').dropna().astype(int).tolist()
-            if anos_validos:
-                primeiro_ano = min(anos_validos)
-                anos_atuacao = (2026 - primeiro_ano) + 1
-                if anos_atuacao > 0:
-                    m_index = round(h_index / anos_atuacao, 3)
-        # ------------------------------------------
+        # 1. Define a variável
+        anos_col = group['YEAR CLEAN'] if 'YEAR CLEAN' in group.columns else None
+        # 2. Extrai os índices
+        h_index, g_index, i10_index, m_index = extrair_indices_cientometricos(cits_raw, anos_col)
         
         autores = set()
         for auth_list in group['AUTHORS'].dropna():
@@ -1093,32 +1068,11 @@ def gerar_tabela_keywords(df):
     res = []
     for kw, group in df_exp.groupby('KW'):
         cits_raw = group['TOTAL CITATIONS'].fillna(0)
-        cits_sorted = cits_raw.astype(int).sort_values(ascending=False).tolist()
         
-        # --- CÁLCULO DOS ÍNDICES CIENTOMÉTRICOS ---
-        h_index = 0
-        for i, c in enumerate(cits_sorted):
-            if c >= i + 1: h_index = i + 1
-            else: break
-
-        g_index = 0
-        soma_acumulada = 0
-        for i, c in enumerate(cits_sorted):
-            soma_acumulada += c
-            if soma_acumulada >= (i + 1) ** 2: g_index = i + 1
-            else: break
-
-        i10_index = sum(1 for c in cits_sorted if c >= 10)
-
-        m_index = 0.0
-        if 'YEAR CLEAN' in group.columns:
-            anos_validos = pd.to_numeric(group['YEAR CLEAN'], errors='coerce').dropna().astype(int).tolist()
-            if anos_validos:
-                primeiro_ano = min(anos_validos)
-                anos_atuacao = (2026 - primeiro_ano) + 1
-                if anos_atuacao > 0:
-                    m_index = round(h_index / anos_atuacao, 3)
-        # ------------------------------------------
+        # 1. Define a variável
+        anos_col = group['YEAR CLEAN'] if 'YEAR CLEAN' in group.columns else None
+        # 2. Extrai os índices
+        h_index, g_index, i10_index, m_index = extrair_indices_cientometricos(cits_raw, anos_col)
         
         autores = set()
         for auth_list in group['AUTHORS'].dropna():
@@ -1219,7 +1173,7 @@ def categorizar_temas_por_cluster(df, api_key, max_clusters=10):
 
     with st.spinner("Vetorizando textos e comprimindo semântica (LSA)..."):
         # 1. Vetorização clássica TF-IDF
-        vectorizer = TfidfVectorizer(stop_words='english', max_features=1500)
+        vectorizer = TfidfVectorizer(stop_words='english', token_pattern=None, max_features=1500)
         X_sparse = vectorizer.fit_transform(textos)
 
         # 2. NOVO: LSA (Latent Semantic Analysis / TruncatedSVD)
@@ -1285,11 +1239,11 @@ def categorizar_temas_por_cluster(df, api_key, max_clusters=10):
             
             # --- FILTROS DE SEGURANÇA DESATIVADOS PARA TEXTOS ACADÊMICOS ---
             configuracao = types.GenerateContentConfig(
-                safety_settings=[
-                    types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HARASSMENT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
-                    types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold=types.HarmBlockThreshold.BLOCK_NONE),
-                    types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
-                    types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold=types.HarmBlockThreshold.BLOCK_NONE)
+                safety_settings = [
+                    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
                 ]
             )
 
@@ -1343,7 +1297,7 @@ def gerar_mapas_conceituais(df, top_n_words=50, n_clusters=4):
         return None, None
 
     # 2. Matriz de Coocorrência (Term-Document Matrix)
-    vectorizer = CountVectorizer(tokenizer=custom_tokenizer, max_features=top_n_words)
+    vectorizer = CountVectorizer(tokenizer=custom_tokenizer, token_pattern=None, max_features=top_n_words)
     try:
         X = vectorizer.fit_transform(textos_originais)
     except:
@@ -2301,7 +2255,6 @@ def criar_grafo_e_metricas(df, coluna, top_n, metric_for_size="Tamanho Fixo"):
     net_metrics = {}
     if len(G) > 0:
         net_metrics['densidade'] = nx.density(G)
-        # ... (seu código de métricas continua o mesmo aqui, o importante é o final)
     
     # Retornamos o objeto G para usar no gráfico estático
     return nodes_agraph, edges_agraph, df_nodes, net_metrics, G
@@ -2376,7 +2329,8 @@ def processar_csv_scopus(file):
     """Lê um CSV (Scopus) e padroniza as colunas para o ecossistema Bibliomat."""
     
     # Tenta ler o CSV. O Scopus pode usar vírgula e aspas específicas.
-    df = pd.read_csv(file, sep=',', encoding='utf-8')
+    df = pd.read_csv(file, sep=',', encoding='utf-8-sig', on_bad_lines='skip')
+
     
     # 1. Mapeamento Direto de Colunas
     mapa_colunas = {
@@ -2979,7 +2933,7 @@ def deduplicar_por_similaridade(df, threshold=0.90):
     try:
         remaining = valid_titles.loc[~valid_titles.index.isin(indices_para_excluir), '_TITLE_NORMALIZADO']
         if len(remaining) > 1:
-            vectorizer = TfidfVectorizer(stop_words='english', ngram_range=(1, 2), min_df=1)
+            vectorizer = TfidfVectorizer(stop_words='english', token_pattern=None, ngram_range=(1, 2), min_df=1)
             tfidf_matrix = vectorizer.fit_transform(remaining)
             cosine_sparse = cosine_similarity(tfidf_matrix, dense_output=False).tocoo()
             remaining_indices = remaining.index.to_numpy()
