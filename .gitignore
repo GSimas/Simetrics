@@ -1,1 +1,15 @@
 .streamlit/
+# --- Migração TS/Vite ---
+web/node_modules/
+web/dist/
+web/.env
+web/.env.*.local
+.netlify/
+__pycache__/
+
+web/*.tsbuildinfo
+
+# Symlinks de skills criados pelo Streamlit, apontando para dentro do .venv.
+# Versioná-los produziria links quebrados em qualquer outra máquina.
+.agents/
+.claude/skills/

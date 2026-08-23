@@ -1,0 +1,109 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --radius: 0.5rem;
+
+  --background: hsl(0 0% 100%);
+  --foreground: hsl(222 47% 11%);
+
+  --card: hsl(0 0% 100%);
+  --card-foreground: hsl(222 47% 11%);
+
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(222 47% 11%);
+
+  /* Azul herdado do grafo do Streamlit (#1273B9), mantendo a identidade visual. */
+  --primary: hsl(205 82% 40%);
+  --primary-foreground: hsl(210 40% 98%);
+
+  --secondary: hsl(210 40% 96%);
+  --secondary-foreground: hsl(222 47% 11%);
+
+  --muted: hsl(210 40% 96%);
+  --muted-foreground: hsl(215 16% 47%);
+
+  --accent: hsl(210 40% 96%);
+  --accent-foreground: hsl(222 47% 11%);
+
+  --destructive: hsl(0 84% 60%);
+  --destructive-foreground: hsl(210 40% 98%);
+
+  --border: hsl(214 32% 91%);
+  --input: hsl(214 32% 91%);
+  --ring: hsl(205 82% 40%);
+}
+
+.dark {
+  --background: hsl(222 47% 11%);
+  --foreground: hsl(210 40% 98%);
+
+  --card: hsl(222 47% 13%);
+  --card-foreground: hsl(210 40% 98%);
+
+  --popover: hsl(222 47% 13%);
+  --popover-foreground: hsl(210 40% 98%);
+
+  --primary: hsl(205 82% 55%);
+  --primary-foreground: hsl(222 47% 11%);
+
+  --secondary: hsl(217 33% 18%);
+  --secondary-foreground: hsl(210 40% 98%);
+
+  --muted: hsl(217 33% 18%);
+  --muted-foreground: hsl(215 20% 65%);
+
+  --accent: hsl(217 33% 18%);
+  --accent-foreground: hsl(210 40% 98%);
+
+  --destructive: hsl(0 63% 45%);
+  --destructive-foreground: hsl(210 40% 98%);
+
+  --border: hsl(217 33% 20%);
+  --input: hsl(217 33% 20%);
+  --ring: hsl(205 82% 55%);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+/* Tailwind 4 removeu o utilitário `container` configurável do v3. */
+@utility container {
+  margin-inline: auto;
+  padding-inline: 1.5rem;
+  max-width: 1600px;
+}
