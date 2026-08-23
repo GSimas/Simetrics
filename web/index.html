@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/simetrics-logo.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Simetrics — plataforma de análise bibliométrica e cientométrica. Redes de conhecimento, índices cientométricos e mapeamento temático por IA."
+    />
+    <title>Simetrics — Análise Bibliométrica e Cientométrica</title>
+  </head>
+  <body>
+    <!--
+      Formulário estático para o Netlify Forms.
+
+      O Netlify descobre formulários varrendo o HTML publicado no momento do deploy — ele
+      não executa o JavaScript, então o formulário renderizado pelo React é invisível para
+      ele. Esta cópia oculta declara o nome e todos os campos; o envio real acontece via
+      fetch a partir do componente React, e o Netlify casa os dois pelo campo `form-name`.
+
+      Manter os nomes de campo em sincronia com FeedbackTab.tsx é obrigatório: campos
+      ausentes aqui são descartados na submissão, sem erro.
+    -->
+    <form name="simetrics-sus" data-netlify="true" hidden>
+      <input type="hidden" name="form-name" value="simetrics-sus" />
+      <input type="text" name="titulacao" />
+      <input type="text" name="area" />
+      <input type="text" name="experiencia" />
+        <input type="radio" name="sus_01" value="1" />
+        <input type="radio" name="sus_02" value="1" />
+        <input type="radio" name="sus_03" value="1" />
+        <input type="radio" name="sus_04" value="1" />
+        <input type="radio" name="sus_05" value="1" />
+        <input type="radio" name="sus_06" value="1" />
+        <input type="radio" name="sus_07" value="1" />
+        <input type="radio" name="sus_08" value="1" />
+        <input type="radio" name="sus_09" value="1" />
+        <input type="radio" name="sus_10" value="1" />
+        <textarea name="ux_navegacao"></textarea>
+        <textarea name="ux_visualizacao"></textarea>
+        <textarea name="ux_ia"></textarea>
+        <textarea name="ux_melhorias"></textarea>
+        <textarea name="ux_comentarios"></textarea>
+    </form>
+
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
