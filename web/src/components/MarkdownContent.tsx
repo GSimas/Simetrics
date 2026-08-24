@@ -10,12 +10,13 @@ export interface MarkdownContentProps {
 
 /**
  * Renderizador de Markdown leve, seguro e reativo para mensagens de IA.
- * Suporta cabeçalhos, listas, negrito, itálico, blocos de código e links.
+ * Suporta cabeçalhos, listas, tabelas estruturadas, negrito, itálico, blocos de código e links.
  */
 export function MarkdownContent({ content, className }: MarkdownContentProps) {
   if (!content) return null;
 
-  const blocks = parseMarkdownBlocks(content);
+  const normalized = normalizeMarkdownText(content);
+  const blocks = parseMarkdownBlocks(normalized);
 
   return (
     <div className={cn('space-y-2 text-xs leading-relaxed break-words', className)}>
@@ -30,9 +31,50 @@ type Block =
   | { type: 'heading'; level: number; text: string }
   | { type: 'code'; language?: string | undefined; code: string }
   | { type: 'list'; ordered: boolean; items: string[] }
+  | {
+      type: 'table';
+      headers: string[];
+      alignments: ('left' | 'center' | 'right')[];
+      rows: string[][];
+    }
   | { type: 'quote'; text: string }
   | { type: 'paragraph'; text: string }
   | { type: 'divider' };
+
+/** Normaliza quebras de linha e tabelas colapsadas (ex: '| |' -> '|\n|') */
+function normalizeMarkdownText(raw: string): string {
+  return raw
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .replace(/\|\s*\|\s*(?=[^|])/g, '|\n|');
+}
+
+function isTableDelimiter(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed.includes('|') || !trimmed.includes('-')) return false;
+  // A linha de delimitação contém apenas |, -, :, espaços
+  const withoutTableChars = trimmed.replace(/[|:\s-]/g, '');
+  return withoutTableChars === '';
+}
+
+function splitTableCells(line: string): string[] {
+  let trimmed = line.trim();
+  if (trimmed.startsWith('|')) trimmed = trimmed.slice(1);
+  if (trimmed.endsWith('|')) trimmed = trimmed.slice(0, -1);
+  return trimmed.split('|').map((cell) => cell.trim());
+}
+
+function parseTableAlignments(delimiterLine: string): ('left' | 'center' | 'right')[] {
+  const cells = splitTableCells(delimiterLine);
+  return cells.map((cell) => {
+    const trimmed = cell.trim();
+    const starts = trimmed.startsWith(':');
+    const ends = trimmed.endsWith(':');
+    if (starts && ends) return 'center';
+    if (ends) return 'right';
+    return 'left';
+  });
+}
 
 function parseMarkdownBlocks(raw: string): Block[] {
   const lines = raw.split('\n');
@@ -85,6 +127,39 @@ function parseMarkdownBlocks(raw: string): Block[] {
       continue;
     }
 
+    // Tabela Markdown (Linha com | seguida de linha delimitadora |:---|)
+    if (line.includes('|') && i + 1 < lines.length && isTableDelimiter(lines[i + 1] ?? '')) {
+      const headerLine = line;
+      const delimiterLine = lines[i + 1] ?? '';
+      const headers = splitTableCells(headerLine);
+      const alignments = parseTableAlignments(delimiterLine);
+      const rows: string[][] = [];
+
+      i += 2; // pula cabeçalho e delimitador
+
+      while (i < lines.length) {
+        const rowLine = lines[i]?.trim() ?? '';
+        if (!rowLine || !rowLine.includes('|') || isTableDelimiter(rowLine)) {
+          break;
+        }
+        const cells = splitTableCells(rowLine);
+        // Garante que o número de células não seja menor que os headers
+        while (cells.length < headers.length) {
+          cells.push('');
+        }
+        rows.push(cells);
+        i++;
+      }
+
+      blocks.push({
+        type: 'table',
+        headers,
+        alignments,
+        rows,
+      });
+      continue;
+    }
+
     // Blockquote (> ...)
     if (line.trim().startsWith('>')) {
       const quoteLines: string[] = [];
@@ -109,7 +184,6 @@ function parseMarkdownBlocks(raw: string): Block[] {
           items.push(itemMatch[3]);
           i++;
         } else if (lines[i]?.trim().startsWith(' ') && items.length > 0) {
-          // Continuação do item anterior
           items[items.length - 1] += ' ' + lines[i]?.trim();
           i++;
         } else {
@@ -156,7 +230,8 @@ function parseMarkdownBlocks(raw: string): Block[] {
       !lines[i]?.trim().startsWith('```') &&
       !lines[i]?.trim().startsWith('#') &&
       !lines[i]?.trim().startsWith('>') &&
-      !lines[i]?.match(/^(\s*)([-*•]|\d+\.)\s+/)
+      !lines[i]?.match(/^(\s*)([-*•]|\d+\.)\s+/) &&
+      !(lines[i]?.includes('|') && i + 1 < lines.length && isTableDelimiter(lines[i + 1] ?? ''))
     ) {
       paragraphLines.push(lines[i] ?? '');
       i++;
@@ -196,6 +271,57 @@ function renderBlock(block: Block): ReactNode {
         </h5>
       );
     }
+
+    case 'table':
+      return (
+        <div className="my-2.5 overflow-x-auto rounded-xl border border-border/80 bg-card/90 shadow-2xs">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead className="bg-slate-100/90 text-muted-foreground dark:bg-slate-800/80 border-b border-border font-semibold">
+              <tr>
+                {block.headers.map((header, hIdx) => {
+                  const align = block.alignments[hIdx] ?? 'left';
+                  return (
+                    <th
+                      key={hIdx}
+                      className={cn(
+                        'px-3 py-2 text-[11px] font-bold text-foreground tracking-tight whitespace-nowrap',
+                        align === 'center' && 'text-center',
+                        align === 'right' && 'text-right',
+                      )}
+                    >
+                      {renderInline(header)}
+                    </th>
+                  );
+                })}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/60">
+              {block.rows.map((row, rIdx) => (
+                <tr
+                  key={rIdx}
+                  className="transition-colors hover:bg-slate-50/80 dark:hover:bg-slate-800/40"
+                >
+                  {row.map((cell, cIdx) => {
+                    const align = block.alignments[cIdx] ?? 'left';
+                    return (
+                      <td
+                        key={cIdx}
+                        className={cn(
+                          'px-3 py-2 text-[11px] text-foreground/90 leading-snug',
+                          align === 'center' && 'text-center',
+                          align === 'right' && 'text-right font-mono',
+                        )}
+                      >
+                        {renderInline(cell)}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
 
     case 'code':
       return (

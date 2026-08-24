@@ -9,16 +9,17 @@ import {
   type RetrievalIndex,
 } from '@/core/retrieval';
 import { summarize } from '@/core/summary';
-import { authorsTable, keywordsTable, venuesTable } from '@/core/tables';
+import { authorsTable, countriesTable, keywordsTable, venuesTable } from '@/core/tables';
 import { FIELD, FIELD_CANDIDATES } from '@/lib/schema';
 import type { Dataset, WorkerProgress } from '@/lib/types';
 import { collectColumns, pickColumn, toNumeric } from '@/core/text';
+import { executeAnalyticalTool, type ToolExecutionResponse } from '@/core/tools';
 
 /**
- * Worker de IA: agrupamento temático e seleção de contexto para o assistente.
+ * Worker de IA: agrupamento temático, seleção de contexto e execução de ferramentas analíticas.
  *
- * Ambas as tarefas ficam aqui porque compartilham o custo pesado — vetorização TF-IDF
- * sobre a base inteira — e porque nenhuma delas pode bloquear a interface.
+ * As tarefas ficam aqui porque compartilham o custo pesado — vetorização TF-IDF
+ * e tabelas cienciométricas sobre a base inteira — sem bloquear a interface.
  */
 
 export type ProgressCallback = (progress: WorkerProgress) => void;
@@ -39,23 +40,24 @@ function getIndex(dataset: Dataset): RetrievalIndex {
 /**
  * Panorama agregado da base, enviado ao modelo junto com os documentos recuperados.
  *
- * Sem ele o assistente responderia bem sobre documentos específicos, mas erraria em
- * perguntas globais — "quem mais publica nesta área?" não se responde a partir de
- * quarenta documentos. O agregado dá essa visão a um custo de poucos kilobytes.
+ * Dá visão macro a um custo mínimo de tokens.
  */
 export interface AggregateSummary {
   totalDocuments: number;
   timespan: string;
   totalAuthors: number;
   totalVenues: number;
+  totalCountries: number;
   topAuthors: { name: string; documents: number; citations: number; h: number }[];
   topVenues: { name: string; documents: number; citations: number }[];
+  topCountries: { name: string; documents: number; citations: number }[];
   topKeywords: { name: string; documents: number }[];
   mostCited: { title: string; year: number | null; citations: number }[];
   themes: { name: string; documents: number }[];
+  productionPerYear: { year: number; documents: number }[];
 }
 
-const TOP_N = 15;
+const TOP_N = 25;
 
 function buildAggregate(dataset: Dataset): AggregateSummary {
   const summary = summarize(dataset);
@@ -83,11 +85,25 @@ function buildAggregate(dataset: Dataset): AggregateSummary {
     }
   }
 
+  // Anos de produção
+  const yearCounts = new Map<number, number>();
+  for (const doc of dataset) {
+    const y = toNumeric(doc[FIELD.YEAR_CLEAN]);
+    if (y !== null) {
+      const year = Math.trunc(y);
+      yearCounts.set(year, (yearCounts.get(year) ?? 0) + 1);
+    }
+  }
+  const productionPerYear = [...yearCounts.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([year, documents]) => ({ year, documents }));
+
   return {
     totalDocuments: summary.totalDocs,
     timespan: summary.timespan,
     totalAuthors: summary.authorsCount,
     totalVenues: summary.venuesCount,
+    totalCountries: summary.countriesCount,
     topAuthors: authorsTable(dataset)
       .slice(0, TOP_N)
       .map((row) => ({
@@ -99,6 +115,9 @@ function buildAggregate(dataset: Dataset): AggregateSummary {
     topVenues: venuesTable(dataset)
       .slice(0, TOP_N)
       .map((row) => ({ name: row.entity, documents: row.docCount, citations: row.citations })),
+    topCountries: countriesTable(dataset)
+      .slice(0, TOP_N)
+      .map((row) => ({ name: row.entity, documents: row.docCount, citations: row.citations })),
     topKeywords: keywordsTable(dataset)
       .slice(0, TOP_N)
       .map((row) => ({ name: row.entity, documents: row.docCount })),
@@ -106,6 +125,7 @@ function buildAggregate(dataset: Dataset): AggregateSummary {
     themes: [...themeCounts.entries()]
       .sort((left, right) => right[1] - left[1])
       .map(([name, documents]) => ({ name, documents })),
+    productionPerYear,
   };
 }
 
@@ -134,6 +154,15 @@ const api = {
       documents: toContextDocuments(dataset, hits),
       aggregate: cachedAggregate.summary,
     };
+  },
+
+  /** Executa uma ferramenta analítica de forma isolada no worker */
+  executeTool(
+    toolName: string,
+    args: Record<string, unknown>,
+    dataset: Dataset,
+  ): ToolExecutionResponse {
+    return executeAnalyticalTool(toolName, args, dataset);
   },
 
   /** Agrupa a base por similaridade textual, devolvendo amostras para nomeação. */

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, KeyRound, MessageSquare, Send, Sparkles, Square, Trash2, User, X } from 'lucide-react';
+import { Bot, Database, KeyRound, MessageSquare, Send, Sparkles, Square, Trash2, User, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { streamChat, type ChatTurn } from '@/lib/ai-client';
+import { streamChat, type ChatTurn, type ChatStatusUpdate } from '@/lib/ai-client';
 import { useAiConfig } from '@/state/ai-config.store';
 import { useDataset } from '@/state/dataset.store';
 import { useLocale } from '@/state/locale.store';
@@ -27,6 +27,7 @@ export function ChatWidget() {
   const [messages, setMessages] = useState<ChatTurn[]>([]);
   const [draft, setDraft] = useState('');
   const [streaming, setStreaming] = useState(false);
+  const [currentStatus, setCurrentStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
@@ -43,7 +44,7 @@ export function ChatWidget() {
       if (container) container.scrollTop = container.scrollHeight;
       setTimeout(() => inputRef.current?.focus(), 100);
     }
-  }, [isOpen, displayedMessages]);
+  }, [isOpen, displayedMessages, currentStatus]);
 
   const suggestions = [
     t('chat_sugg_1'),
@@ -60,14 +61,16 @@ export function ChatWidget() {
       setMessages((current) => [
         ...current,
         { role: 'user', content: question },
-        { role: 'assistant', content: '' },
+        { role: 'assistant', content: '', toolsExecuted: [] },
       ]);
       setDraft('');
       setError(null);
       setStreaming(true);
+      setCurrentStatus(null);
 
       const controller = new AbortController();
       abortRef.current = controller;
+      const executedTools: string[] = [];
 
       try {
         const context = await getAiWorker().buildChatContext(active, question, CONTEXT_SIZE);
@@ -76,13 +79,29 @@ export function ChatWidget() {
           question,
           history,
           context,
+          dataset: active,
           signal: controller.signal,
+          onStatus: (status: ChatStatusUpdate) => {
+            if (status.type === 'tool_call') {
+              setCurrentStatus(status.message);
+              if (status.toolName && !executedTools.includes(status.toolName)) {
+                executedTools.push(status.toolName);
+              }
+            } else if (status.type === 'tool_result') {
+              setCurrentStatus(null);
+            }
+          },
           onChunk: (text) =>
             setMessages((current) => {
               const next = [...current];
               const last = next[next.length - 1];
               if (last?.role === 'assistant') {
-                next[next.length - 1] = { role: 'assistant', content: last.content + text };
+                const updatedTools = executedTools.length > 0 ? [...executedTools] : last.toolsExecuted;
+                next[next.length - 1] = {
+                  role: 'assistant',
+                  content: last.content + text,
+                  ...(updatedTools ? { toolsExecuted: updatedTools } : {}),
+                };
               }
               return next;
             }),
@@ -98,6 +117,7 @@ export function ChatWidget() {
         });
       } finally {
         setStreaming(false);
+        setCurrentStatus(null);
         abortRef.current = null;
       }
     },
@@ -273,6 +293,18 @@ export function ChatWidget() {
                           : 'border border-border/80 bg-card text-foreground',
                       )}
                     >
+                      {/* Badge de Consulta Local */}
+                      {message.role === 'assistant' && message.toolsExecuted && message.toolsExecuted.length > 0 && (
+                        <div className="mb-2 flex items-center gap-1.5 rounded-md border border-emerald-200/80 bg-emerald-50/70 px-2 py-0.5 text-[10px] font-medium text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300">
+                          <Database className="size-2.5 text-emerald-600 dark:text-emerald-400" />
+                          <span>
+                            {message.toolsExecuted.length === 1
+                              ? t('chat_tool_executed')
+                              : `${message.toolsExecuted.length} ${t('chat_tools_executed_count')}`}
+                          </span>
+                        </div>
+                      )}
+
                       {message.role === 'user' ? (
                         <p className="whitespace-pre-wrap">{message.content}</p>
                       ) : message.content ? (
@@ -280,7 +312,7 @@ export function ChatWidget() {
                       ) : streaming && index === displayedMessages.length - 1 ? (
                         <span className="flex items-center gap-1.5 text-muted-foreground text-[11px]">
                           <span className="size-1.5 animate-bounce rounded-full bg-emerald-500" />
-                          {t('chat_analyzing')}
+                          {currentStatus || t('chat_analyzing')}
                         </span>
                       ) : null}
                     </div>
