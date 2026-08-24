@@ -20,14 +20,7 @@ import {
 import { suggestDatabase, type UploadedFile } from '@/core/parsers';
 import { DATABASES, MAX_DOCUMENTS, type DatabaseName } from '@/lib/schema';
 import { useDataset } from '@/state/dataset.store';
-
-/**
- * Envio de arquivos e modo de demonstração — ⇄ a barra lateral (Geral.py:209-355).
- *
- * A atribuição de base por arquivo é mantida porque continua importando: o mesmo `.ris`
- * sai da Scopus e da Cochrane com convenções incompatíveis, e a extensão sozinha não
- * distingue.
- */
+import { useLocale } from '@/state/locale.store';
 
 const ACCEPTED = '.ris,.csv,.xls,.xlsx,.txt,.nbib';
 
@@ -46,6 +39,7 @@ export function UploadPanel() {
   const progress = useDataset((state) => state.progress);
   const error = useDataset((state) => state.error);
   const active = useDataset((state) => state.active);
+  const t = useLocale((state) => state.t);
 
   const busy = progress !== null;
 
@@ -71,18 +65,16 @@ export function UploadPanel() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Base de dados</CardTitle>
+    <Card className="border-t-4 border-t-primary shadow-xs">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base font-bold text-foreground">{t('upload_title')}</CardTitle>
         <CardDescription>
-          Formatos aceitos: RIS (SciELO, WoS, Scopus, Mendeley, Cochrane), CSV (Scopus,
-          Cochrane), Excel (WoS) e TXT/NBIB (PubMed). Limite de{' '}
-          {MAX_DOCUMENTS.toLocaleString('pt-BR')} documentos.
+          {t('upload_description').replace('10.000', MAX_DOCUMENTS.toLocaleString('pt-BR'))}
         </CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2.5">
           <input
             ref={inputRef}
             type="file"
@@ -93,67 +85,86 @@ export function UploadPanel() {
             id="simetrics-upload"
           />
 
-          <Button asChild variant="outline" disabled={busy}>
-            <label htmlFor="simetrics-upload" className="cursor-pointer">
-              <FileUp aria-hidden />
-              Selecionar arquivos
+          <Button asChild variant="gradient" disabled={busy} className="cursor-pointer font-medium">
+            <label htmlFor="simetrics-upload">
+              <FileUp className="size-4" aria-hidden />
+              {t('upload_select_files')}
             </label>
           </Button>
 
-          <Button variant="secondary" onClick={() => void loadDemo()} disabled={busy}>
-            <Rocket aria-hidden />
-            Carregar exemplo
+          <Button variant="success" onClick={() => void loadDemo()} disabled={busy} className="font-medium">
+            <Rocket className="size-4" aria-hidden />
+            {t('upload_load_demo')}
           </Button>
 
           {active && (
             <>
-              <span className="text-sm text-muted-foreground">
-                {active.length.toLocaleString('pt-BR')} documentos carregados
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 shadow-2xs dark:border-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300">
+                <span className="size-1.5 rounded-full bg-emerald-500" />
+                {active.length.toLocaleString('pt-BR')} {t('upload_loaded_count')}
               </span>
-              <Button variant="ghost" size="sm" onClick={reset} disabled={busy}>
-                <Trash2 aria-hidden />
-                Limpar
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={reset}
+                disabled={busy}
+                className="text-muted-foreground hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950 dark:hover:text-red-300"
+              >
+                <Trash2 className="size-4" aria-hidden />
+                {t('upload_clear')}
               </Button>
             </>
           )}
         </div>
 
         {pending.length > 0 && (
-          <div className="space-y-2 rounded-md border p-3">
-            <p className="text-sm font-medium">Confirme a base de origem de cada arquivo</p>
+          <div className="space-y-3 rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50/60 to-indigo-50/30 p-4 dark:border-blue-900/60 dark:from-blue-950/40 dark:to-indigo-950/20">
+            <p className="text-sm font-semibold text-foreground">
+              {t('upload_confirm_sources')} ({pending.length})
+            </p>
 
-            {pending.map((entry, index) => (
-              <div key={entry.file.name} className="flex items-center gap-2">
-                <span className="min-w-0 flex-1 truncate text-sm" title={entry.file.name}>
-                  {entry.file.name}
-                </span>
-
-                <Select
-                  value={entry.database}
-                  onValueChange={(value) =>
-                    setPending((current) =>
-                      current.map((item, position) =>
-                        position === index ? { ...item, database: value as DatabaseName } : item,
-                      ),
-                    )
-                  }
+            <div className="space-y-2">
+              {pending.map((entry, index) => (
+                <div
+                  key={entry.file.name}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/80 bg-card p-2.5 shadow-2xs"
                 >
-                  <SelectTrigger className="h-8 w-48">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DATABASES.map((database) => (
-                      <SelectItem key={database} value={database}>
-                        {database}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ))}
+                  <span className="min-w-0 flex-1 truncate text-xs sm:text-sm font-medium" title={entry.file.name}>
+                    📄 {entry.file.name}
+                  </span>
 
-            <Button onClick={() => void handleProcess()} disabled={busy} className="w-full">
-              Processar e integrar
+                  <Select
+                    value={entry.database}
+                    onValueChange={(value) =>
+                      setPending((current) =>
+                        current.map((item, position) =>
+                          position === index ? { ...item, database: value as DatabaseName } : item,
+                        ),
+                      )
+                    }
+                  >
+                    <SelectTrigger className="h-8 w-48">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DATABASES.map((database) => (
+                        <SelectItem key={database} value={database}>
+                          {database}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
+            </div>
+
+            <Button
+              variant="gradient"
+              onClick={() => void handleProcess()}
+              disabled={busy}
+              className="w-full font-semibold shadow-xs"
+            >
+              {t('upload_process_btn')}
             </Button>
           </div>
         )}

@@ -1,0 +1,416 @@
+export type Locale = 'pt' | 'en';
+
+export const TRANSLATIONS = {
+  pt: {
+    // Header & Brand
+    app_title: 'Simetrics',
+    app_subtitle: 'Plataforma de Inteligência Bibliométrica & Mapeamento Científico',
+    app_version: 'v1.0',
+    active_docs: 'documentos ativos',
+    tutorial_btn: 'Como Usar / Tutorial',
+    ai_settings_btn: 'Chave de IA (BYOK)',
+    ai_configured: 'IA Configurada',
+    ai_not_configured: 'Configurar IA',
+    developed_by: 'Desenvolvido por',
+    theme_dark: 'Alternar para Modo Claro',
+    theme_light: 'Alternar para Modo Escuro',
+    lang_toggle: 'Mudar para Inglês',
+
+    // Tabs
+    tab_overview: 'Informações Principais',
+    tab_networks: 'Redes',
+    tab_search: 'Motor de Busca',
+    tab_chat: 'Assistente Científico',
+    tab_report: 'Relatório',
+    tab_feedback: 'Feedback',
+
+    // Upload Panel
+    upload_title: 'Base de dados',
+    upload_description:
+      'Formatos aceitos: RIS (SciELO, WoS, Scopus, Mendeley, Cochrane), CSV (Scopus, Cochrane), Excel (WoS) e TXT/NBIB (PubMed). Limite de 10.000 documentos.',
+    upload_select_files: 'Selecionar arquivos',
+    upload_load_demo: 'Carregar exemplo',
+    upload_loaded_count: 'documentos carregados',
+    upload_clear: 'Limpar base',
+    upload_confirm_sources: 'Confirme a base de origem de cada arquivo',
+    upload_process_btn: 'Processar e integrar',
+    upload_processing: 'Processando...',
+
+    // Overview KPIs
+    kpi_docs: 'Documentos',
+    kpi_docs_sub: 'Período',
+    kpi_authors: 'Autores',
+    kpi_authors_sub: 'Produtores de conhecimento',
+    kpi_countries: 'Países',
+    kpi_countries_sub: 'Alcance geográfico',
+    kpi_venues: 'Venues',
+    kpi_venues_sub: 'Periódicos e eventos',
+    kpi_growth: 'Crescimento anual',
+    kpi_growth_sub: 'Taxa composta no período',
+    kpi_citations_year: 'Citações por ano',
+    kpi_citations_year_sub: 'Média por documento',
+    kpi_collab: 'Colaboração internacional',
+    kpi_collab_sub: 'de país único',
+    kpi_authors_doc: 'Autores por documento',
+    kpi_authors_doc_sub: 'com autor único',
+
+    // Deduplication
+    dedup_title: 'Deduplicação',
+    dedup_description:
+      'Bases diferentes indexam os mesmos artigos. O DOI é a evidência mais forte de identidade; a similaridade de título alcança os registros sem DOI, ao custo de algum risco de falso positivo.',
+    dedup_none: 'Base completa',
+    dedup_doi: 'Deduplicar por DOI',
+    dedup_similarity: 'Deduplicar por similaridade',
+    dedup_removed: 'documentos removidos',
+
+    // Theme Panel (AI)
+    theme_title: 'Mapeamento temático por IA',
+    theme_description:
+      'Os documentos são agrupados por similaridade textual no seu navegador (TF-IDF → LSA → K-Means, com o número de temas escolhido pelo Silhouette). Só as amostras de cada grupo vão ao modelo configurado em BYOK, que sintetiza o nome do tema.',
+    theme_btn_identify: 'Identificar temas',
+    theme_btn_recalc: 'Recategorizar temas',
+    theme_clusters_found: 'temas identificados',
+    theme_table_theme: 'Tema',
+    theme_table_docs: 'Documentos',
+    theme_table_top_author: 'Autor de maior QL',
+    theme_table_top_country: 'País de maior QL',
+    theme_table_top_venue: 'Venue de maior QL',
+    theme_ql_explanation:
+      'O Quociente Locacional acima de 1 indica especialização: a entidade publica naquele tema mais do que a média da base. O desempate entre QLs iguais é pelo volume, para que uma entidade com um único documento no tema não lidere.',
+    theme_no_key_warning:
+      'Chave de IA não configurada. Configure sua chave própria (Gemini, OpenAI, Claude, OpenRouter) para rotular os temas com IA ou use os rótulos automáticos.',
+
+    // Visual Analyses
+    visual_title: 'Análises visuais avançadas',
+    visual_description:
+      'Cada aba é calculada sob demanda, no seu navegador. Todos os gráficos exportam PNG pela barra de ferramentas.',
+    visual_tab_boxplot: 'Distribuição',
+    visual_tab_sankey: 'Evolução temática',
+    visual_tab_genetics: 'Genética das ideias',
+    visual_tab_concept: 'Mapa conceitual',
+    visual_tab_thematic: 'Mapa temático',
+    visual_tab_historiograph: 'Historiograph',
+
+    // Production & Lotka
+    prod_title: 'Produção ao longo do tempo',
+    prod_description: 'Documentos publicados por ano.',
+    lotka_title: 'Lei de Lotka',
+    lotka_description:
+      'Produtividade observada contra a distribuição teórica c/x². O afastamento da curva indica concentração atípica da autoria.',
+    meta_quality_title: 'Qualidade e completude dos metadados',
+    meta_quality_description:
+      'Campos ausentes limitam o que a análise consegue enxergar — sem afiliação não há mapa de colaboração, sem referências não há rede de cocitação.',
+
+    // Deep-dive Entity Tables
+    tables_title: 'Tabelas analíticas',
+    tables_description:
+      'Índices h, g, i10 e m por entidade. Clique nos cabeçalhos para ordenar; exporte em CSV o recorte filtrado.',
+    table_tab_authors: 'Autores',
+    table_tab_countries: 'Países',
+    table_tab_venues: 'Venues',
+    table_tab_keywords: 'Palavras-chave',
+    table_filter_placeholder: 'Filtrar...',
+    table_export_csv: 'Exportar CSV',
+
+    // Networks Tab
+    network_deep_title: 'Ecologia profunda da rede',
+    network_deep_desc: 'Grafo heterogêneo ligando documentos a autores, países e venues:',
+    network_nodes: 'nós',
+    network_edges: 'arestas',
+    network_components: 'componentes',
+    network_cooccurrence_title: 'Rede de coocorrência',
+    network_cooccurrence_desc:
+      'Entidades conectadas por aparecerem no mesmo documento. A espessura da aresta reflete a frequência da coocorrência; a cor, a comunidade detectada pelo Louvain.',
+    network_kind_label: 'Tipo de rede',
+    network_top_label: 'Entidades exibidas',
+    network_size_label: 'Tamanho dos nós',
+    network_collab_title: 'Colaboração internacional',
+    network_collab_desc:
+      'Dois países colaboram quando assinam o mesmo documento. A espessura da linha é o número de trabalhos em conjunto.',
+    network_map_tab: 'Mapa-múndi',
+    network_circular_tab: 'Grafo circular',
+    network_nodes_metrics_title: 'Métricas por nó',
+    network_nodes_metrics_desc: 'Todos os nós do grafo heterogêneo, ordenados por grau.',
+
+    // Search Tab
+    search_title: 'Motor de busca',
+    search_desc:
+      'Escolha uma entidade para montar seu dossiê: produção, impacto, documentos e perfis semelhantes.',
+    search_type_label: 'Tipo',
+    search_query_label: 'Buscar',
+    search_placeholder: 'Digite para filtrar...',
+    search_dossier_title: 'Dossiê Científico',
+    search_similar_title: 'Entidades semelhantes',
+    search_similar_desc:
+      'Similaridade de Jaccard sobre o "DNA acadêmico": palavras-chave, coautores e veículos em comum.',
+    search_lexico_title: 'Lexicometria',
+    search_lexico_desc: 'Palavras-chave mais frequentes nos documentos desta entidade.',
+    search_docs_title: 'Documentos',
+    search_docs_desc: 'Ordenados por citações, do mais citado ao menos citado.',
+
+    // Chat Tab
+    chat_title: 'Assistente Científico',
+    chat_desc:
+      'Conversando com seus documentos. A cada pergunta, os documentos mais relevantes são selecionados no seu navegador via BM25 e enviados com segurança ao modelo configurado.',
+    chat_greeting:
+      'Olá! Sou o Assistente do Simetrics. Respondo com base nos documentos da sua base carregada. Posso recomendar leituras fundamentais, identificar especialistas ou sugerir periódicos para submissão. O que você gostaria de investigar?',
+    chat_suggestions_label: 'Sugestões de perguntas:',
+    chat_sugg_1: 'Quais são os documentos fundamentais desta base?',
+    chat_sugg_2: 'Quem são os autores mais influentes e em que eles trabalham?',
+    chat_sugg_3: 'Em quais periódicos eu deveria submeter um artigo sobre este tema?',
+    chat_sugg_4: 'Que lacunas de pesquisa aparecem nesta literatura?',
+    chat_placeholder: 'Ex.: quais são os documentos fundamentais sobre este tema?',
+    chat_btn_send: 'Enviar',
+    chat_btn_stop: 'Parar',
+    chat_analyzing: 'Analisando a base bibliométrica...',
+    chat_no_key_warning:
+      'Para conversar com o Assistente Científico, configure sua chave de API própria (BYOK) no botão acima.',
+
+    // Feedback Tab
+    feedback_title: 'Avaliação da Plataforma (SUS)',
+    feedback_desc:
+      'Este questionário avalia a sua experiência com o Simetrics. Não há respostas certas ou erradas — estamos avaliando o sistema. As respostas são anônimas.',
+    feedback_part1: 'Parte 1 · Perfil do participante',
+    feedback_titulacao: 'Titulação',
+    feedback_area: 'Área de atuação',
+    feedback_experiencia: 'Experiência prévia',
+    feedback_part2: 'Parte 2 · Questionário de usabilidade',
+    feedback_part2_desc: 'Para cada afirmação, marque de 1 (discordo totalmente) a 5 (concordo totalmente).',
+    feedback_part3: 'Parte 3 · Interface e experiência',
+    feedback_submit_btn: 'Enviar avaliação',
+    feedback_success_title: 'Avaliação registrada',
+    feedback_success_desc: 'Obrigado por dedicar seu tempo. Suas respostas orientam as próximas melhorias.',
+
+    // Empty States
+    empty_start_title: 'Comece por aqui',
+    empty_start_desc:
+      'O Simetrics transforma exports de bases bibliográficas em indicadores cientométricos, redes de conhecimento e mapeamento temático. Envie seus arquivos acima ou carregue a base de exemplo para explorar.',
+    empty_client_note:
+      'Todo o processamento acontece no seu navegador — os documentos não são enviados para nenhum servidor.',
+    empty_generic_desc:
+      'Carregue uma base de dados na aba Informações Principais para liberar esta análise.',
+
+    // AI Settings Modal (BYOK)
+    ai_modal_title: 'Configurações de IA (Bring Your Own Key)',
+    ai_modal_subtitle: 'Utilize sua própria chave de API para habilitar os recursos generativos',
+    ai_provider_label: 'Provedor de IA',
+    ai_api_key_label: 'Chave de API (API Key)',
+    ai_api_key_placeholder: 'Insira sua chave de API (ex: AIzaSy... / sk-...)',
+    ai_model_label: 'Modelo',
+    ai_base_url_label: 'URL Base do Endpoint (Opcional)',
+    ai_test_btn: 'Testar Conexão',
+    ai_save_btn: 'Salvar Configuração',
+    ai_clear_btn: 'Remover Chave',
+    ai_privacy_note:
+      'Privacidade garantida: Sua chave de API é salva exclusivamente no armazenamento local do seu navegador (localStorage) e enviada diretamente para a API do provedor escolhido. Nossos servidores não têm acesso à sua chave.',
+    ai_test_success: 'Conexão testada com sucesso!',
+    ai_test_failed: 'Falha no teste de conexão:',
+  },
+  en: {
+    // Header & Brand
+    app_title: 'Simetrics',
+    app_subtitle: 'Bibliometric Intelligence & Scientific Mapping Platform',
+    app_version: 'v1.0',
+    active_docs: 'active documents',
+    tutorial_btn: 'How to Use / Tutorial',
+    ai_settings_btn: 'AI API Key (BYOK)',
+    ai_configured: 'AI Configured',
+    ai_not_configured: 'Setup AI Key',
+    developed_by: 'Developed by',
+    theme_dark: 'Switch to Light Mode',
+    theme_light: 'Switch to Dark Mode',
+    lang_toggle: 'Mudar para Português',
+
+    // Tabs
+    tab_overview: 'Overview & Metrics',
+    tab_networks: 'Networks',
+    tab_search: 'Search Engine',
+    tab_chat: 'Scientific Assistant',
+    tab_report: 'Report',
+    tab_feedback: 'Feedback',
+
+    // Upload Panel
+    upload_title: 'Bibliographic Database',
+    upload_description:
+      'Accepted formats: RIS (SciELO, WoS, Scopus, Mendeley, Cochrane), CSV (Scopus, Cochrane), Excel (WoS), and TXT/NBIB (PubMed). Up to 10,000 documents limit.',
+    upload_select_files: 'Select files',
+    upload_load_demo: 'Load demo dataset',
+    upload_loaded_count: 'documents loaded',
+    upload_clear: 'Clear dataset',
+    upload_confirm_sources: 'Confirm source database for each file',
+    upload_process_btn: 'Process and integrate',
+    upload_processing: 'Processing...',
+
+    // Overview KPIs
+    kpi_docs: 'Documents',
+    kpi_docs_sub: 'Timespan',
+    kpi_authors: 'Authors',
+    kpi_authors_sub: 'Knowledge producers',
+    kpi_countries: 'Countries',
+    kpi_countries_sub: 'Geographic coverage',
+    kpi_venues: 'Venues',
+    kpi_venues_sub: 'Journals and events',
+    kpi_growth: 'Annual growth',
+    kpi_growth_sub: 'Compound rate in timespan',
+    kpi_citations_year: 'Citations per year',
+    kpi_citations_year_sub: 'Average per document',
+    kpi_collab: 'International collab',
+    kpi_collab_sub: 'single country',
+    kpi_authors_doc: 'Authors per doc',
+    kpi_authors_doc_sub: 'single authored',
+
+    // Deduplication
+    dedup_title: 'Deduplication',
+    dedup_description:
+      'Different databases index the same papers. DOI is the strongest identity evidence; title similarity catches records without DOI at some risk of false positives.',
+    dedup_none: 'Full dataset',
+    dedup_doi: 'Deduplicate by DOI',
+    dedup_similarity: 'Deduplicate by similarity',
+    dedup_removed: 'documents removed',
+
+    // Theme Panel (AI)
+    theme_title: 'AI Topic Mapping',
+    theme_description:
+      'Documents are clustered by textual similarity in your browser (TF-IDF → LSA → K-Means, with cluster count chosen by Silhouette). Only samples are sent to your configured BYOK model to synthesize the theme label.',
+    theme_btn_identify: 'Identify themes',
+    theme_btn_recalc: 'Re-categorize themes',
+    theme_clusters_found: 'themes identified',
+    theme_table_theme: 'Theme',
+    theme_table_docs: 'Documents',
+    theme_table_top_author: 'Top LQ Author',
+    theme_table_top_country: 'Top LQ Country',
+    theme_table_top_venue: 'Top LQ Venue',
+    theme_ql_explanation:
+      'A Locational Quotient (LQ) above 1 indicates specialization: the entity publishes in that theme more than the dataset average. Tiebreaks are resolved by volume.',
+    theme_no_key_warning:
+      'AI API Key not configured. Configure your own key (Gemini, OpenAI, Claude, OpenRouter) to label themes with AI or use automatic labels.',
+
+    // Visual Analyses
+    visual_title: 'Advanced Visual Analyses',
+    visual_description:
+      'Each panel is computed on demand in your browser. All charts support PNG export from the toolbar.',
+    visual_tab_boxplot: 'Distribution',
+    visual_tab_sankey: 'Thematic Evolution',
+    visual_tab_genetics: 'Genetics of Ideas',
+    visual_tab_concept: 'Concept Map',
+    visual_tab_thematic: 'Thematic Map',
+    visual_tab_historiograph: 'Historiograph',
+
+    // Production & Lotka
+    prod_title: 'Production Over Time',
+    prod_description: 'Published documents per year.',
+    lotka_title: "Lotka's Law",
+    lotka_description:
+      'Observed productivity against theoretical c/x² distribution. Curve divergence indicates atypical author concentration.',
+    meta_quality_title: 'Metadata Quality & Completeness',
+    meta_quality_description:
+      'Missing fields limit analysis scope — without affiliation there is no collaboration map, without references there is no co-citation network.',
+
+    // Deep-dive Entity Tables
+    tables_title: 'Analytical Tables',
+    tables_description:
+      'Indices h, g, i10, and m per entity. Click headers to sort; export the filtered selection to CSV.',
+    table_tab_authors: 'Authors',
+    table_tab_countries: 'Countries',
+    table_tab_venues: 'Venues',
+    table_tab_keywords: 'Keywords',
+    table_filter_placeholder: 'Filter...',
+    table_export_csv: 'Export CSV',
+
+    // Networks Tab
+    network_deep_title: 'Deep Network Ecology',
+    network_deep_desc: 'Heterogeneous graph connecting documents to authors, countries, and venues:',
+    network_nodes: 'nodes',
+    network_edges: 'edges',
+    network_components: 'components',
+    network_cooccurrence_title: 'Co-occurrence Network',
+    network_cooccurrence_desc:
+      'Entities connected by appearing in the same document. Edge thickness reflects co-occurrence frequency; color indicates Louvain detected communities.',
+    network_kind_label: 'Network type',
+    network_top_label: 'Displayed entities',
+    network_size_label: 'Node sizing',
+    network_collab_title: 'International Collaboration',
+    network_collab_desc:
+      'Two countries collaborate when they co-author a paper. Line thickness indicates joint papers.',
+    network_map_tab: 'World Map',
+    network_circular_tab: 'Chordal Graph',
+    network_nodes_metrics_title: 'Node Metrics',
+    network_nodes_metrics_desc: 'All nodes from the heterogeneous graph sorted by degree.',
+
+    // Search Tab
+    search_title: 'Search Engine',
+    search_desc:
+      'Pick an entity to generate its dossier: scientific output, citation impact, documents, and similar profiles.',
+    search_type_label: 'Type',
+    search_query_label: 'Search',
+    search_placeholder: 'Type to filter...',
+    search_dossier_title: 'Scientific Dossier',
+    search_similar_title: 'Similar Entities',
+    search_similar_desc:
+      'Jaccard similarity over "Academic DNA": shared keywords, co-authors, and publishing venues.',
+    search_lexico_title: 'Lexicometrics',
+    search_lexico_desc: 'Most frequent keywords in documents associated with this entity.',
+    search_docs_title: 'Documents',
+    search_docs_desc: 'Sorted by citations from most to least cited.',
+
+    // Chat Tab
+    chat_title: 'Scientific Assistant',
+    chat_desc:
+      'Chatting with your dataset. For each query, the most relevant documents are selected in your browser via BM25 and safely sent to your configured AI model.',
+    chat_greeting:
+      "Hello! I'm the Simetrics Assistant. I answer based on the documents in your loaded dataset. I can recommend foundational readings, identify research leaders, or suggest journals for submission. What would you like to explore?",
+    chat_suggestions_label: 'Suggested questions:',
+    chat_sugg_1: 'What are the foundational papers in this dataset?',
+    chat_sugg_2: 'Who are the most influential authors and what are they working on?',
+    chat_sugg_3: 'Which journals should I consider submitting an article on this topic to?',
+    chat_sugg_4: 'What research gaps appear in this literature?',
+    chat_placeholder: 'E.g., what are the foundational papers on this topic?',
+    chat_btn_send: 'Send',
+    chat_btn_stop: 'Stop',
+    chat_analyzing: 'Analyzing bibliometric database...',
+    chat_no_key_warning:
+      'To chat with the Scientific Assistant, please configure your own API key (BYOK) using the button above.',
+
+    // Feedback Tab
+    feedback_title: 'Platform Usability Scale (SUS)',
+    feedback_desc:
+      'This questionnaire assesses your experience with Simetrics. There are no right or wrong answers. Responses are anonymous.',
+    feedback_part1: 'Part 1 · Participant Profile',
+    feedback_titulacao: 'Academic Level',
+    feedback_area: 'Research Field',
+    feedback_experiencia: 'Prior Experience',
+    feedback_part2: 'Part 2 · Usability Questionnaire',
+    feedback_part2_desc: 'For each statement, rate from 1 (Strongly disagree) to 5 (Strongly agree).',
+    feedback_part3: 'Part 3 · Interface & User Experience',
+    feedback_submit_btn: 'Submit feedback',
+    feedback_success_title: 'Feedback Registered',
+    feedback_success_desc: 'Thank you for your time. Your feedback directly guides upcoming improvements.',
+
+    // Empty States
+    empty_start_title: 'Start Here',
+    empty_start_desc:
+      'Simetrics transforms exports from bibliographic databases into scientometric indicators, knowledge graphs, and AI-driven thematic mapping. Upload your files above or load the demo dataset to explore.',
+    empty_client_note:
+      'All processing runs entirely inside your browser — documents are never uploaded to any remote server.',
+    empty_generic_desc:
+      'Load a dataset in the Overview tab to unlock this analysis.',
+
+    // AI Settings Modal (BYOK)
+    ai_modal_title: 'AI Settings (Bring Your Own Key)',
+    ai_modal_subtitle: 'Use your own API key to enable generative AI features',
+    ai_provider_label: 'AI Provider',
+    ai_api_key_label: 'API Key',
+    ai_api_key_placeholder: 'Enter your API key (e.g. AIzaSy... / sk-...)',
+    ai_model_label: 'Model Name',
+    ai_base_url_label: 'Custom Base URL (Optional)',
+    ai_test_btn: 'Test Connection',
+    ai_save_btn: 'Save Settings',
+    ai_clear_btn: 'Remove Key',
+    ai_privacy_note:
+      'Privacy guaranteed: Your API key is stored exclusively in your browser local storage (localStorage) and sent directly to the selected provider API endpoint. Our servers never see or touch your key.',
+    ai_test_success: 'Connection tested successfully!',
+    ai_test_failed: 'Connection test failed:',
+  },
+} as const;
+
+export type TranslationKey = keyof typeof TRANSLATIONS.pt;

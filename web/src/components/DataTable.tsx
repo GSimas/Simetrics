@@ -92,10 +92,10 @@ export function DataTable<T extends Record<string, unknown>>({
           className="h-8 max-w-xs"
         />
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground tabular-nums">
+        <div className="flex items-center gap-2.5">
+          <span className="inline-flex items-center rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 text-xs font-medium text-muted-foreground tabular-nums">
             {filteredCount.toLocaleString('pt-BR')}{' '}
-            {filteredCount === 1 ? 'linha' : 'linhas'}
+            {filteredCount === 1 ? 'registro' : 'registros'}
             {filteredCount !== data.length && ` de ${data.length.toLocaleString('pt-BR')}`}
           </span>
 
@@ -103,12 +103,13 @@ export function DataTable<T extends Record<string, unknown>>({
             <Button
               variant="outline"
               size="sm"
+              className="h-8 gap-1.5 font-medium hover:border-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-400"
               onClick={() =>
                 downloadCsv(timestampedFilename(exportName, 'csv'), toCsv(exportRows))
               }
             >
-              <Download aria-hidden />
-              CSV
+              <Download className="size-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden />
+              Exportar CSV
             </Button>
           )}
         </div>

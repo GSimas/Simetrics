@@ -19,19 +19,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { circularPositions, type CollaborationNetwork } from '@/core/viz/collaboration';
 import type { Dataset } from '@/lib/types';
 import { useAsyncResult } from '@/lib/use-async-result';
+import { useLocale } from '@/state/locale.store';
 import { getAnalyticsWorker } from '@/workers/client';
 import { PALETTE, chartMessage } from '@/features/overview/viz-shared';
 
 const PlotlyChart = lazy(() => import('@/components/charts/PlotlyChart'));
-
-/**
- * Colaboração internacional — ⇄ `plot_map_collaboration` e `plot_circular_collaboration`.
- *
- * Duas leituras da mesma rede. O mapa mostra a geografia da produção: onde ela se
- * concentra e quais eixos ligam os continentes. O grafo circular remove a geografia e
- * mostra só a estrutura das parcerias, o que torna visíveis blocos de colaboração que o
- * mapa esconde por distância física.
- */
 
 const MIN_EDGE_WIDTH = 1;
 const MAX_EDGE_WIDTH = 6;
@@ -43,25 +35,25 @@ export interface CollaborationPanelProps {
 export function CollaborationPanel({ dataset }: CollaborationPanelProps) {
   const [topN, setTopN] = useState(30);
   const [view, setView] = useState<'mapa' | 'circular'>('mapa');
+  const t = useLocale((state) => state.t);
 
   const { data: network } = useAsyncResult<CollaborationNetwork>(`collab ${topN}`, () =>
     getAnalyticsWorker().collaboration(dataset, topN),
   );
 
   return (
-    <Card>
+    <Card className="border-t-4 border-t-indigo-500 shadow-xs">
       <CardHeader>
-        <CardTitle className="text-base">Colaboração internacional</CardTitle>
+        <CardTitle className="text-base font-bold text-foreground">{t('network_collab_title')}</CardTitle>
         <CardDescription>
-          Dois países colaboram quando assinam o mesmo documento. A espessura da linha é o
-          número de trabalhos em conjunto.
+          {t('network_collab_desc')}
         </CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label htmlFor="collab-top">Países exibidos</Label>
+            <Label htmlFor="collab-top">{t('network_top_label')}</Label>
             <Select value={String(topN)} onValueChange={(value) => setTopN(Number(value))}>
               <SelectTrigger id="collab-top">
                 <SelectValue />
@@ -86,9 +78,9 @@ export function CollaborationPanel({ dataset }: CollaborationPanelProps) {
           )
         ) : (
           <Tabs value={view} onValueChange={(value) => setView(value as 'mapa' | 'circular')}>
-            <TabsList>
-              <TabsTrigger value="mapa">Mapa-múndi</TabsTrigger>
-              <TabsTrigger value="circular">Grafo circular</TabsTrigger>
+            <TabsList className="bg-slate-100 dark:bg-slate-800/80 p-1">
+              <TabsTrigger value="mapa">{t('network_map_tab')}</TabsTrigger>
+              <TabsTrigger value="circular">{t('network_circular_tab')}</TabsTrigger>
             </TabsList>
 
             <TabsContent value="mapa">

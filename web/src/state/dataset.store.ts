@@ -6,7 +6,7 @@ import type { UploadedFile } from '@/core/parsers';
 import type { RisSource } from '@/core/parsers/pipeline-ris';
 import { applyThemes, fallbackThemeName, type ClusteringResult } from '@/core/clustering';
 import { buildSearchOptions, type SearchOptions } from '@/core/search';
-import { labelCluster } from '@/lib/gemini-client';
+import { labelCluster } from '@/lib/ai-client';
 import { DEMO_FILES } from '@/lib/demo';
 import type { Dataset, DuplicateRecord, WorkerProgress } from '@/lib/types';
 import {
