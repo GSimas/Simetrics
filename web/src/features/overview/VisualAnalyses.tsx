@@ -32,6 +32,7 @@ import type { SankeyData } from '@/core/viz/sankey';
 import type { ThematicMap } from '@/core/viz/thematic-map';
 import type { Dataset } from '@/lib/types';
 import { useAsyncResult } from '@/lib/use-async-result';
+import { useLocale } from '@/state/locale.store';
 import { getAnalyticsWorker } from '@/workers/client';
 import { PALETTE, QUADRANT_NOTE, chartMessage } from './viz-shared';
 
@@ -62,26 +63,26 @@ export interface VisualAnalysesProps {
 
 export function VisualAnalyses({ dataset }: VisualAnalysesProps) {
   const [panel, setPanel] = useState<PanelKey>('boxplot');
+  const t = useLocale((state) => state.t);
 
   return (
-    <Card>
+    <Card className="border-t-4 border-t-blue-500 shadow-xs">
       <CardHeader>
-        <CardTitle className="text-base">Análises visuais</CardTitle>
+        <CardTitle className="text-base font-bold text-foreground">{t('visual_title')}</CardTitle>
         <CardDescription>
-          Cada aba é calculada sob demanda, no seu navegador. Todos os gráficos exportam PNG
-          pela barra de ferramentas.
+          {t('visual_description')}
         </CardDescription>
       </CardHeader>
 
       <CardContent>
         <Tabs value={panel} onValueChange={(value) => setPanel(value as PanelKey)}>
-          <TabsList className="h-auto flex-wrap">
-            <TabsTrigger value="boxplot">Distribuição</TabsTrigger>
-            <TabsTrigger value="sankey">Evolução temática</TabsTrigger>
-            <TabsTrigger value="genetics">Genética das ideias</TabsTrigger>
-            <TabsTrigger value="concept">Mapa conceitual</TabsTrigger>
-            <TabsTrigger value="thematic">Mapa temático</TabsTrigger>
-            <TabsTrigger value="historiograph">Historiograph</TabsTrigger>
+          <TabsList className="h-auto flex-wrap gap-1 bg-slate-100 dark:bg-slate-800/80 p-1.5">
+            <TabsTrigger value="boxplot">{t('visual_tab_boxplot')}</TabsTrigger>
+            <TabsTrigger value="sankey">{t('visual_tab_sankey')}</TabsTrigger>
+            <TabsTrigger value="genetics">{t('visual_tab_genetics')}</TabsTrigger>
+            <TabsTrigger value="concept">{t('visual_tab_concept')}</TabsTrigger>
+            <TabsTrigger value="thematic">{t('visual_tab_thematic')}</TabsTrigger>
+            <TabsTrigger value="historiograph">{t('visual_tab_historiograph')}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="boxplot">

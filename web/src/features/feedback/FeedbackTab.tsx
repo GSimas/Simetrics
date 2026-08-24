@@ -20,20 +20,11 @@ import {
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
-
-/**
- * Avaliação de usabilidade (SUS) — ⇄ o formulário de Geral.py:2292.
- *
- * As respostas vão para o Netlify Forms, no lugar do Google Sheets. O envio é um POST
- * `application/x-www-form-urlencoded` para a própria página; o Netlify intercepta pelo
- * campo `form-name`, então o formulário precisa existir no HTML estático do build para
- * ser detectado — daí o formulário oculto em `index.html`.
- */
+import { useLocale } from '@/state/locale.store';
 
 const FORM_NAME = 'simetrics-sus';
 
-/** As 10 afirmações do System Usability Scale, na ordem canônica. */
-const SUS_STATEMENTS = [
+const SUS_STATEMENTS_PT = [
   'Acho que gostaria de usar o Simetrics com frequência.',
   'Considerei o Simetrics desnecessariamente complexo.',
   'Achei o Simetrics fácil de usar.',
@@ -46,9 +37,23 @@ const SUS_STATEMENTS = [
   'Precisei aprender muita coisa antes de conseguir usar o Simetrics.',
 ] as const;
 
-const SCALE_LABELS = ['Discordo totalmente', '', '', '', 'Concordo totalmente'] as const;
+const SUS_STATEMENTS_EN = [
+  'I think that I would like to use Simetrics frequently.',
+  'I found Simetrics unnecessarily complex.',
+  'I thought Simetrics was easy to use.',
+  'I think that I would need the support of a technical person to be able to use Simetrics.',
+  'I found the various functions in Simetrics were well integrated.',
+  'I thought there was too much inconsistency in Simetrics.',
+  'I would imagine that most people would learn to use Simetrics very quickly.',
+  'I found Simetrics very cumbersome to use.',
+  'I felt very confident using Simetrics.',
+  'I needed to learn a lot of things before I could get going with Simetrics.',
+] as const;
 
-const TITULACAO = [
+const SCALE_LABELS_PT = ['Discordo totalmente', '', '', '', 'Concordo totalmente'] as const;
+const SCALE_LABELS_EN = ['Strongly disagree', '', '', '', 'Strongly agree'] as const;
+
+const TITULACAO_PT = [
   'Graduando(a)',
   'Graduado(a)',
   'Especialista',
@@ -59,7 +64,18 @@ const TITULACAO = [
   'Pós-doutor(a)',
 ] as const;
 
-const AREAS = [
+const TITULACAO_EN = [
+  'Undergraduate Student',
+  'Bachelor Degree',
+  'Specialist',
+  "Master's Student",
+  "Master's Degree",
+  'Ph.D. Student',
+  'Ph.D. / Doctorate',
+  'Post-Doctorate',
+] as const;
+
+const AREAS_PT = [
   'Ciências Exatas e da Terra',
   'Ciências Biológicas',
   'Engenharias',
@@ -71,14 +87,33 @@ const AREAS = [
   'Multidisciplinar',
 ] as const;
 
-const EXPERIENCIA = [
+const AREAS_EN = [
+  'Exact and Earth Sciences',
+  'Biological Sciences',
+  'Engineering',
+  'Health Sciences',
+  'Agricultural Sciences',
+  'Applied Social Sciences',
+  'Humanities',
+  'Linguistics, Literature & Arts',
+  'Multidisciplinary',
+] as const;
+
+const EXPERIENCIA_PT = [
   'Nunca usei ferramentas bibliométricas',
   'Já usei uma ou duas vezes',
   'Uso ocasionalmente',
   'Uso com frequência',
 ] as const;
 
-const OPEN_QUESTIONS = [
+const EXPERIENCIA_EN = [
+  'Never used bibliometric tools before',
+  'Used once or twice',
+  'Use occasionally',
+  'Use frequently',
+] as const;
+
+const OPEN_QUESTIONS_PT = [
   { name: 'ux_navegacao', label: '11. Navegação e organização das abas' },
   { name: 'ux_visualizacao', label: '12. Clareza dos gráficos e visualizações' },
   { name: 'ux_ia', label: '13. Categorização temática e respostas da IA' },
@@ -89,10 +124,31 @@ const OPEN_QUESTIONS = [
   { name: 'ux_comentarios', label: '15. Comentários adicionais (opcional)' },
 ] as const;
 
+const OPEN_QUESTIONS_EN = [
+  { name: 'ux_navegacao', label: '11. Tab navigation and organization' },
+  { name: 'ux_visualizacao', label: '12. Clarity of charts and visualizations' },
+  { name: 'ux_ia', label: '13. Thematic categorization and AI responses' },
+  {
+    name: 'ux_melhorias',
+    label: '14. If you were the lead engineer, what is the first change you would make?',
+  },
+  { name: 'ux_comentarios', label: '15. Additional comments (optional)' },
+] as const;
+
 export default function FeedbackTab() {
+  const { locale, t } = useLocale();
+  const isEn = locale === 'en';
+
   const [submitted, setSubmitted] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const susStatements = isEn ? SUS_STATEMENTS_EN : SUS_STATEMENTS_PT;
+  const scaleLabels = isEn ? SCALE_LABELS_EN : SCALE_LABELS_PT;
+  const titulacoes = isEn ? TITULACAO_EN : TITULACAO_PT;
+  const areas = isEn ? AREAS_EN : AREAS_PT;
+  const experiencias = isEn ? EXPERIENCIA_EN : EXPERIENCIA_PT;
+  const openQuestions = isEn ? OPEN_QUESTIONS_EN : OPEN_QUESTIONS_PT;
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
@@ -110,12 +166,12 @@ export default function FeedbackTab() {
         body: new URLSearchParams(data as unknown as Record<string, string>).toString(),
       });
 
-      if (!response.ok) throw new Error(`O envio falhou (HTTP ${response.status}).`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       setSubmitted(true);
     } catch (cause) {
       setError(
         cause instanceof Error
-          ? `${cause.message} Em ambiente de desenvolvimento local isso é esperado: o Netlify Forms só responde no site publicado.`
+          ? `${cause.message}. Local dev notice: Netlify Forms only registers on live production deploys.`
           : String(cause),
       );
     } finally {
@@ -129,11 +185,10 @@ export default function FeedbackTab() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <CheckCircle2 className="size-5 text-emerald-600" aria-hidden />
-            Avaliação registrada
+            {t('feedback_success_title')}
           </CardTitle>
           <CardDescription>
-            Obrigado por dedicar seu tempo. Suas respostas orientam diretamente as
-            próximas melhorias da plataforma.
+            {t('feedback_success_desc')}
           </CardDescription>
         </CardHeader>
       </Card>
@@ -141,13 +196,11 @@ export default function FeedbackTab() {
   }
 
   return (
-    <Card>
+    <Card className="border-t-4 border-t-amber-500 shadow-xs">
       <CardHeader>
-        <CardTitle>Avaliação da Plataforma</CardTitle>
+        <CardTitle className="text-base font-bold text-foreground">{t('feedback_title')}</CardTitle>
         <CardDescription>
-          Este questionário avalia a sua experiência com o Simetrics. Não há respostas
-          certas ou erradas — estamos avaliando o sistema, não você. As respostas são
-          anônimas.
+          {t('feedback_desc')}
         </CardDescription>
       </CardHeader>
 
@@ -162,17 +215,17 @@ export default function FeedbackTab() {
           <input type="hidden" name="form-name" value={FORM_NAME} />
 
           <section className="space-y-4">
-            <h3 className="text-sm font-semibold">Parte 1 · Perfil do participante</h3>
+            <h3 className="text-sm font-semibold">{t('feedback_part1')}</h3>
 
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="space-y-1.5">
-                <Label htmlFor="titulacao">Titulação</Label>
+                <Label htmlFor="titulacao">{t('feedback_titulacao')}</Label>
                 <Select name="titulacao" required>
                   <SelectTrigger id="titulacao">
-                    <SelectValue placeholder="Selecione" />
+                    <SelectValue placeholder={isEn ? 'Select...' : 'Selecione...'} />
                   </SelectTrigger>
                   <SelectContent>
-                    {TITULACAO.map((option) => (
+                    {titulacoes.map((option) => (
                       <SelectItem key={option} value={option}>
                         {option}
                       </SelectItem>
@@ -182,13 +235,13 @@ export default function FeedbackTab() {
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="area">Área de atuação</Label>
+                <Label htmlFor="area">{t('feedback_area')}</Label>
                 <Select name="area" required>
                   <SelectTrigger id="area">
-                    <SelectValue placeholder="Selecione" />
+                    <SelectValue placeholder={isEn ? 'Select...' : 'Selecione...'} />
                   </SelectTrigger>
                   <SelectContent>
-                    {AREAS.map((option) => (
+                    {areas.map((option) => (
                       <SelectItem key={option} value={option}>
                         {option}
                       </SelectItem>
@@ -198,13 +251,13 @@ export default function FeedbackTab() {
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="experiencia">Experiência prévia</Label>
+                <Label htmlFor="experiencia">{t('feedback_experiencia')}</Label>
                 <Select name="experiencia" required>
                   <SelectTrigger id="experiencia">
-                    <SelectValue placeholder="Selecione" />
+                    <SelectValue placeholder={isEn ? 'Select...' : 'Selecione...'} />
                   </SelectTrigger>
                   <SelectContent>
-                    {EXPERIENCIA.map((option) => (
+                    {experiencias.map((option) => (
                       <SelectItem key={option} value={option}>
                         {option}
                       </SelectItem>
@@ -219,14 +272,13 @@ export default function FeedbackTab() {
 
           <section className="space-y-4">
             <div>
-              <h3 className="text-sm font-semibold">Parte 2 · Questionário de usabilidade</h3>
+              <h3 className="text-sm font-semibold">{t('feedback_part2')}</h3>
               <p className="text-sm text-muted-foreground">
-                Para cada afirmação, marque de 1 (discordo totalmente) a 5 (concordo
-                totalmente).
+                {t('feedback_part2_desc')}
               </p>
             </div>
 
-            {SUS_STATEMENTS.map((statement, index) => {
+            {susStatements.map((statement, index) => {
               const name = `sus_${String(index + 1).padStart(2, '0')}`;
               return (
                 <fieldset key={name} className="space-y-2">
@@ -239,9 +291,9 @@ export default function FeedbackTab() {
                         <RadioGroupItem value={String(score)} id={`${name}-${score}`} />
                         <Label htmlFor={`${name}-${score}`} className="text-xs font-normal">
                           {score}
-                          {SCALE_LABELS[score - 1] && (
+                          {scaleLabels[score - 1] && (
                             <span className="ml-1 text-muted-foreground">
-                              {SCALE_LABELS[score - 1]}
+                              {scaleLabels[score - 1]}
                             </span>
                           )}
                         </Label>
@@ -256,9 +308,9 @@ export default function FeedbackTab() {
           <Separator />
 
           <section className="space-y-4">
-            <h3 className="text-sm font-semibold">Parte 3 · Interface e experiência</h3>
+            <h3 className="text-sm font-semibold">{t('feedback_part3')}</h3>
 
-            {OPEN_QUESTIONS.map((question) => (
+            {openQuestions.map((question) => (
               <div key={question.name} className="space-y-1.5">
                 <Label htmlFor={question.name}>{question.label}</Label>
                 <Textarea id={question.name} name={question.name} rows={3} />
@@ -272,8 +324,13 @@ export default function FeedbackTab() {
             </p>
           )}
 
-          <Button type="submit" disabled={sending} className="w-full">
-            {sending ? 'Enviando…' : 'Enviar avaliação'}
+          <Button
+            type="submit"
+            variant="gradient"
+            disabled={sending}
+            className="w-full font-semibold shadow-xs"
+          >
+            {sending ? (isEn ? 'Submitting...' : 'Enviando…') : t('feedback_submit_btn')}
           </Button>
         </form>
       </CardContent>

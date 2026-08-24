@@ -1,9 +1,8 @@
-import { lazy, Suspense, useDeferredValue, useMemo, useState } from 'react';
-import { Search } from 'lucide-react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 
 import { KpiCard } from '@/components/KpiCard';
+import { SearchableSelect } from '@/components/SearchableSelect';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
@@ -11,7 +10,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -37,66 +35,51 @@ import { FIELD, FIELD_CANDIDATES } from '@/lib/schema';
 import type { SearchEntityType } from '@/lib/types';
 import { collectColumns, pickColumn, toNumeric } from '@/core/text';
 import { useDataset } from '@/state/dataset.store';
+import { useLocale } from '@/state/locale.store';
 import { EmptyState } from '@/features/EmptyState';
 
 const WordCloud = lazy(() => import('@/components/charts/WordCloud'));
 
-/** Quantas opções o seletor lista antes de exigir refinamento do filtro. */
-const MAX_LISTED_OPTIONS = 200;
-
 export default function SearchTab() {
   const active = useDataset((state) => state.active);
   const searchOptions = useDataset((state) => state.searchOptions);
+  const { t, locale } = useLocale();
 
   const [type, setType] = useState<SearchEntityType>('Autor');
-  const [query, setQuery] = useState('');
   const [term, setTerm] = useState<string | null>(null);
-
-  // O filtro digitado percorre milhares de opções; adiar a lista mantém a digitação
-  // fluida enquanto a filtragem acompanha em segundo plano.
-  const deferredQuery = useDeferredValue(query);
 
   const types = useMemo(
     () => (searchOptions ? availableTypes(searchOptions) : []),
     [searchOptions],
   );
 
-  const options = useMemo(() => {
-    if (!searchOptions) return [];
-    const all = optionsForType(searchOptions, type);
-    if (!deferredQuery.trim()) return all.slice(0, MAX_LISTED_OPTIONS);
-
-    const needle = deferredQuery.toLowerCase();
-    return all.filter((option) => option.toLowerCase().includes(needle)).slice(0, MAX_LISTED_OPTIONS);
-  }, [searchOptions, type, deferredQuery]);
-
-  // Perfis de similaridade custam uma varredura completa da base, então são construídos
-  // uma vez por dataset e reaproveitados a cada consulta.
-  const profiles = useMemo(() => (active ? buildProfiles(active) : null), [active]);
+  const rawOptions = useMemo(
+    () => (searchOptions ? optionsForType(searchOptions, type) : []),
+    [searchOptions, type],
+  );
 
   const documents = useMemo(
     () => (active && term ? filterByEntity(active, term, type) : []),
     [active, term, type],
   );
 
+  const profiles = useMemo(() => (active ? buildProfiles(active) : null), [active]);
+
   const dossier = useMemo(() => {
     if (documents.length === 0) return null;
 
     const citations = documents.map((doc) => toNumeric(doc[FIELD.TOTAL_CITATIONS]) ?? 0);
-    const years = documents.map((doc) => doc[FIELD.YEAR_CLEAN]);
-    const indices = computeIndices(citations, years);
-
-    const validYears = years
-      .map((year) => toNumeric(year))
-      .filter((year): year is number => year !== null);
+    const years = documents
+      .map((doc) => toNumeric(doc[FIELD.YEAR_CLEAN]))
+      .filter((year): year is number => year !== null && Number.isFinite(year));
 
     return {
-      indices,
       totalCitations: sum(citations),
       meanCitations: mean(citations),
+      indices: computeIndices(citations, years),
       timespan:
-        validYears.length > 0
-          ? `${Math.min(...validYears)}–${Math.max(...validYears)}`
+        years.length > 0
+          ? `${Math.min(...years)}–${Math.max(...years)}`
           : 'N/S',
     };
   }, [documents]);
@@ -113,35 +96,33 @@ export default function SearchTab() {
   }, [active, documents]);
 
   if (!active || !searchOptions) {
-    return <EmptyState title="Motor de Busca e Dossiê Científico" />;
+    return <EmptyState title={t('tab_search')} />;
   }
 
   const titleColumn = pickColumn(collectColumns(active), FIELD_CANDIDATES.title);
 
   return (
     <div className="space-y-4">
-      <Card>
+      <Card className="border-t-4 border-t-cyan-500 shadow-xs">
         <CardHeader>
-          <CardTitle className="text-base">Motor de busca</CardTitle>
+          <CardTitle className="text-base font-bold text-foreground">{t('search_title')}</CardTitle>
           <CardDescription>
-            Escolha uma entidade para montar seu dossiê: produção, impacto, documentos e
-            perfis semelhantes.
+            {t('search_desc')}
           </CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-3">
-          <div className="grid gap-3 sm:grid-cols-[220px_1fr]">
+          <div className="grid gap-3 sm:grid-cols-[200px_1fr]">
             <div className="space-y-1.5">
-              <Label htmlFor="search-type">Tipo</Label>
+              <Label htmlFor="search-type">{t('search_type_label')}</Label>
               <Select
                 value={type}
                 onValueChange={(value) => {
                   setType(value as SearchEntityType);
                   setTerm(null);
-                  setQuery('');
                 }}
               >
-                <SelectTrigger id="search-type">
+                <SelectTrigger id="search-type" className="h-10 rounded-xl">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -155,73 +136,101 @@ export default function SearchTab() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="search-query">Buscar</Label>
-              <div className="relative">
-                <Search
-                  className="pointer-events-none absolute left-2.5 top-2.5 size-4 text-muted-foreground"
-                  aria-hidden
-                />
-                <Input
-                  id="search-query"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder={`Digite para filtrar ${type.toLowerCase()}…`}
-                  className="pl-8"
-                />
-              </div>
+              <Label>{locale === 'en' ? `Select ${type}` : `Selecionar ${type}`}</Label>
+              <SearchableSelect
+                options={rawOptions}
+                value={term}
+                onChange={setTerm}
+                placeholder={
+                  locale === 'en'
+                    ? `Click to select ${type.toLowerCase()}...`
+                    : `Clique para selecionar ${type.toLowerCase()}...`
+                }
+                searchPlaceholder={
+                  locale === 'en'
+                    ? `Type to filter ${type.toLowerCase()}...`
+                    : `Digite para filtrar ${type.toLowerCase()}...`
+                }
+                emptyText={
+                  locale === 'en'
+                    ? 'No matching entity found.'
+                    : 'Nenhuma entidade encontrada.'
+                }
+              />
             </div>
           </div>
-
-          <div className="flex flex-wrap gap-1.5">
-            {options.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Nenhuma opção encontrada.</p>
-            ) : (
-              options.map((option) => (
-                <Button
-                  key={option}
-                  size="sm"
-                  variant={term === option ? 'default' : 'outline'}
-                  className="h-7 max-w-96 justify-start truncate text-xs font-normal"
-                  title={option}
-                  onClick={() => setTerm(option)}
-                >
-                  {option}
-                </Button>
-              ))
-            )}
-          </div>
-
-          {options.length === MAX_LISTED_OPTIONS && (
-            <p className="text-xs text-muted-foreground">
-              Exibindo as primeiras {MAX_LISTED_OPTIONS} opções — refine o filtro para ver
-              outras.
-            </p>
-          )}
         </CardContent>
       </Card>
 
       {term && dossier && (
         <>
-          <Card>
+          <Card className="border-t-4 border-t-primary shadow-xs">
             <CardHeader>
-              <CardTitle className="text-base">{term}</CardTitle>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <CardTitle className="text-lg font-bold text-foreground">{term}</CardTitle>
+                <Badge variant="blue" className="text-xs">
+                  {type}
+                </Badge>
+              </div>
               <CardDescription>
-                {documents.length.toLocaleString('pt-BR')} documentos · {dossier.timespan}
+                {documents.length.toLocaleString('pt-BR')}{' '}
+                {locale === 'en' ? 'documents' : 'documentos'} · {dossier.timespan}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                <KpiCard title="Documentos" value={documents.length} tone="accent" />
-                <KpiCard title="Citações" value={dossier.totalCitations} />
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+                <KpiCard title={t('kpi_docs')} value={documents.length} tone="blue" />
                 <KpiCard
-                  title="Média de citações"
-                  value={Number(dossier.meanCitations.toFixed(2))}
+                  title={locale === 'en' ? 'Total Citations' : 'Citações'}
+                  value={dossier.totalCitations}
+                  tone="amber"
                 />
-                <KpiCard title="Índice h" value={dossier.indices.h} />
-                <KpiCard title="Índice g" value={dossier.indices.g} />
-                <KpiCard title="Índice i10" value={dossier.indices.i10} />
-                <KpiCard title="Índice m" value={dossier.indices.m} />
-                <KpiCard title="Período" value={dossier.timespan} />
+                <KpiCard
+                  title={locale === 'en' ? 'Mean Citations' : 'Média de citações'}
+                  value={Number(dossier.meanCitations.toFixed(2))}
+                  tone="amber"
+                />
+                <KpiCard
+                  title="Índice h"
+                  value={dossier.indices.h}
+                  tone="purple"
+                  info={
+                    locale === 'en'
+                      ? 'h-index: Number h of papers with at least h citations each. Simultaneously measures productivity and citation impact.'
+                      : 'Índice h: Número h de publicações que receberam pelo menos h citações cada. Mede simultaneamente produtividade e impacto.'
+                  }
+                />
+                <KpiCard
+                  title="Índice g"
+                  value={dossier.indices.g}
+                  tone="purple"
+                  info={
+                    locale === 'en'
+                      ? 'g-index: Highest rank g where the top g papers have together at least g² citations. Gives higher weight to highly-cited papers.'
+                      : 'Índice g: Maior número g tal que os g artigos mais citados receberam juntos pelo menos g² citações. Dá mais peso a artigos de alto impacto.'
+                  }
+                />
+                <KpiCard
+                  title="Índice i10"
+                  value={dossier.indices.i10}
+                  tone="indigo"
+                  info={
+                    locale === 'en'
+                      ? 'i10-index: Number of publications with at least 10 citations each (Google Scholar benchmark).'
+                      : 'Índice i10: Número de publicações com pelo menos 10 citações cada (padrão Google Scholar).'
+                  }
+                />
+                <KpiCard
+                  title="Índice m"
+                  value={dossier.indices.m}
+                  tone="indigo"
+                  info={
+                    locale === 'en'
+                      ? 'm-quotient: h-index divided by academic career length in years (h / Δt). Enables career-stage comparisons.'
+                      : 'Índice m: Índice h dividido pelos anos de atividade acadêmica (h / Δt). Permite comparar pesquisadores em diferentes momentos da carreira.'
+                  }
+                />
+                <KpiCard title={t('kpi_docs_sub')} value={dossier.timespan} tone="cyan" />
               </div>
             </CardContent>
           </Card>
@@ -229,26 +238,26 @@ export default function SearchTab() {
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Entidades semelhantes</CardTitle>
+                <CardTitle className="text-base font-bold">{t('search_similar_title')}</CardTitle>
                 <CardDescription>
-                  Similaridade de Jaccard sobre o &ldquo;DNA acadêmico&rdquo;: palavras-chave,
-                  coautores e veículos em comum.
+                  {t('search_similar_desc')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {similar.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
-                    Nenhuma entidade com traços em comum — ou o tipo selecionado não tem
-                    perfil comparável.
+                    {locale === 'en'
+                      ? 'No entities with shared traits found.'
+                      : 'Nenhuma entidade com traços em comum — ou o tipo selecionado não tem perfil comparável.'}
                   </p>
                 ) : (
-                  <div className="max-h-96 overflow-auto rounded-md border">
+                  <div className="max-h-96 overflow-auto rounded-xl border">
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Entidade</TableHead>
-                          <TableHead>Similaridade</TableHead>
-                          <TableHead>Traços em comum</TableHead>
+                          <TableHead>{locale === 'en' ? 'Entity' : 'Entidade'}</TableHead>
+                          <TableHead>{locale === 'en' ? 'Similarity' : 'Similaridade'}</TableHead>
+                          <TableHead>{locale === 'en' ? 'Shared Traits' : 'Traços em comum'}</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -257,7 +266,7 @@ export default function SearchTab() {
                             <TableCell>
                               <button
                                 type="button"
-                                className="max-w-56 truncate text-left font-medium hover:underline"
+                                className="max-w-56 truncate text-left font-medium hover:underline text-primary"
                                 title={hit.item}
                                 onClick={() => setTerm(hit.item)}
                               >
@@ -265,7 +274,7 @@ export default function SearchTab() {
                               </button>
                             </TableCell>
                             <TableCell>
-                              <Badge variant="secondary" className="tabular-nums">
+                              <Badge variant="blue" className="tabular-nums font-semibold">
                                 {hit.similarity}%
                               </Badge>
                             </TableCell>
@@ -286,21 +295,23 @@ export default function SearchTab() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Lexicometria</CardTitle>
+                <CardTitle className="text-base font-bold">{t('search_lexico_title')}</CardTitle>
                 <CardDescription>
-                  Palavras-chave mais frequentes nos documentos desta entidade.
+                  {t('search_lexico_desc')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {cloudWords.length === 0 ? (
                   <p className="text-sm text-muted-foreground">
-                    Os documentos desta entidade não trazem palavras-chave.
+                    {locale === 'en'
+                      ? 'No keywords associated with this entity.'
+                      : 'Os documentos desta entidade não trazem palavras-chave.'}
                   </p>
                 ) : (
                   <Suspense
                     fallback={
                       <div className="grid h-72 place-items-center text-sm text-muted-foreground">
-                        Montando nuvem…
+                        {locale === 'en' ? 'Rendering cloud...' : 'Montando nuvem…'}
                       </div>
                     }
                   >
@@ -313,19 +324,19 @@ export default function SearchTab() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Documentos</CardTitle>
+              <CardTitle className="text-base font-bold">{t('search_docs_title')}</CardTitle>
               <CardDescription>
-                Ordenados por citações, do mais citado ao menos citado.
+                {t('search_docs_desc')}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="max-h-[32rem] overflow-auto rounded-md border">
+              <div className="max-h-[32rem] overflow-auto rounded-xl border">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Título</TableHead>
-                      <TableHead>Ano</TableHead>
-                      <TableHead>Citações</TableHead>
+                      <TableHead>{locale === 'en' ? 'Title' : 'Título'}</TableHead>
+                      <TableHead>{locale === 'en' ? 'Year' : 'Ano'}</TableHead>
+                      <TableHead>{locale === 'en' ? 'Citations' : 'Citações'}</TableHead>
                       <TableHead>Venue</TableHead>
                     </TableRow>
                   </TableHeader>

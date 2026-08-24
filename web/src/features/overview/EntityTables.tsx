@@ -5,16 +5,8 @@ import { DataTable } from '@/components/DataTable';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { EntityRow } from '@/core/tables';
 import type { EntityTables as Tables } from '@/workers/analytics.worker';
+import { useLocale } from '@/state/locale.store';
 
-/**
- * As quatro tabelas analíticas — ⇄ as abas de deep-dive de Geral.py:1584.
- *
- * Todas compartilham o mesmo conjunto de índices; muda apenas o rótulo da entidade e
- * quais colunas de contexto fazem sentido. Autores mostram coautores; países e venues
- * mostram o documento mais citado; palavras-chave, nenhum dos dois.
- */
-
-/** Número com separador de milhar, alinhado à direita para leitura em coluna. */
 function numeric(value: number, digits = 0): ReactElement {
   return (
     <span className="tabular-nums">
@@ -23,7 +15,6 @@ function numeric(value: number, digits = 0): ReactElement {
   );
 }
 
-/** Texto longo truncado, com o conteúdo completo no title. */
 function truncated(value: string): ReactElement {
   return (
     <span className="block max-w-80 truncate" title={value}>
@@ -32,7 +23,6 @@ function truncated(value: string): ReactElement {
   );
 }
 
-/** Colunas de índices, comuns às quatro tabelas. */
 function indexColumns(): ColumnDef<EntityRow, unknown>[] {
   return [
     {
@@ -101,6 +91,7 @@ function buildColumns(entityLabel: string, extra: Extra): ColumnDef<EntityRow, u
     });
   } else if (extra === 'topDocument') {
     columns.push({
+      id: 'topDocument',
       accessorKey: 'topDocument',
       header: 'Documento mais citado',
       cell: ({ row }) => truncated(row.original.topDocument),
@@ -115,6 +106,8 @@ export interface EntityTablesProps {
 }
 
 export function EntityTables({ tables }: EntityTablesProps) {
+  const t = useLocale((state) => state.t);
+
   const columns = useMemo(
     () => ({
       authors: buildColumns('Autor', 'coauthors'),
@@ -126,19 +119,19 @@ export function EntityTables({ tables }: EntityTablesProps) {
   );
 
   const panels = [
-    { value: 'authors', label: 'Autores', rows: tables.authors, export: 'autores' },
-    { value: 'countries', label: 'Países', rows: tables.countries, export: 'paises' },
-    { value: 'venues', label: 'Venues', rows: tables.venues, export: 'venues' },
-    { value: 'keywords', label: 'Palavras-chave', rows: tables.keywords, export: 'keywords' },
+    { value: 'authors', label: t('table_tab_authors'), rows: tables.authors, export: 'autores' },
+    { value: 'countries', label: t('table_tab_countries'), rows: tables.countries, export: 'paises' },
+    { value: 'venues', label: t('table_tab_venues'), rows: tables.venues, export: 'venues' },
+    { value: 'keywords', label: t('table_tab_keywords'), rows: tables.keywords, export: 'keywords' },
   ] as const;
 
   return (
     <Tabs defaultValue="authors">
-      <TabsList>
+      <TabsList className="bg-slate-100 dark:bg-slate-800/80 p-1">
         {panels.map((panel) => (
-          <TabsTrigger key={panel.value} value={panel.value}>
-            {panel.label}
-            <span className="ml-1.5 text-xs text-muted-foreground tabular-nums">
+          <TabsTrigger key={panel.value} value={panel.value} className="gap-1.5">
+            <span>{panel.label}</span>
+            <span className="rounded-full bg-card px-2 py-0.2 text-[11px] font-semibold text-primary shadow-2xs tabular-nums">
               {panel.rows.length.toLocaleString('pt-BR')}
             </span>
           </TabsTrigger>
@@ -151,7 +144,7 @@ export function EntityTables({ tables }: EntityTablesProps) {
             data={panel.rows as unknown as Record<string, unknown>[]}
             columns={columns[panel.value] as unknown as ColumnDef<Record<string, unknown>, unknown>[]}
             exportName={panel.export}
-            filterPlaceholder={`Filtrar ${panel.label.toLowerCase()}…`}
+            filterPlaceholder={`${t('table_filter_placeholder')} (${panel.label.toLowerCase()})`}
           />
         </TabsContent>
       ))}

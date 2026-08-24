@@ -31,12 +31,11 @@ import {
 } from '@/components/ui/table';
 import type { MetadataCompleteness } from '@/lib/types';
 import { useDataset, type DedupStrategy } from '@/state/dataset.store';
+import { useLocale } from '@/state/locale.store';
 import { EntityTables } from './EntityTables';
 import { ThemePanel } from './ThemePanel';
 import { VisualAnalyses } from './VisualAnalyses';
 
-// Plotly pesa mais de 1 MB. Carregar sob demanda mantém a abertura do app leve para quem
-// ainda nem subiu uma base.
 const PlotlyChart = lazy(() => import('@/components/charts/PlotlyChart'));
 
 const STATUS_VARIANT: Record<MetadataCompleteness['status'], 'success' | 'default' | 'warning' | 'destructive'> = {
@@ -44,12 +43,6 @@ const STATUS_VARIANT: Record<MetadataCompleteness['status'], 'success' | 'defaul
   Bom: 'default',
   Aceitável: 'warning',
   Ruim: 'destructive',
-};
-
-const DEDUP_LABELS: Record<DedupStrategy, string> = {
-  none: 'Base completa',
-  doi: 'Deduplicar por DOI',
-  similarity: 'Deduplicar por similaridade',
 };
 
 export default function OverviewTab() {
@@ -62,9 +55,14 @@ export default function OverviewTab() {
   const computeTables = useDataset((state) => state.computeTables);
   const applyDedup = useDataset((state) => state.applyDedup);
   const busy = useDataset((state) => state.progress !== null);
+  const t = useLocale((state) => state.t);
 
-  // As derivações são disparadas ao entrar na aba, e o store ignora o pedido se já tiver
-  // o resultado — trocar de aba não recalcula.
+  const dedupLabels: Record<DedupStrategy, string> = {
+    none: t('dedup_none'),
+    doi: t('dedup_doi'),
+    similarity: t('dedup_similarity'),
+  };
+
   useEffect(() => {
     if (!active) return;
     void computeOverview();
@@ -77,16 +75,11 @@ export default function OverviewTab() {
         <UploadPanel />
         <Card>
           <CardHeader>
-            <CardTitle>Comece por aqui</CardTitle>
-            <CardDescription>
-              O Simetrics transforma exports de bases bibliográficas em indicadores
-              cientométricos, redes de conhecimento e mapeamento temático. Envie seus
-              arquivos acima ou carregue a base de exemplo para explorar.
-            </CardDescription>
+            <CardTitle>{t('empty_start_title')}</CardTitle>
+            <CardDescription>{t('empty_start_desc')}</CardDescription>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
-            Todo o processamento acontece no seu navegador — os documentos não são
-            enviados para nenhum servidor.
+            {t('empty_client_note')}
           </CardContent>
         </Card>
       </div>
@@ -101,56 +94,74 @@ export default function OverviewTab() {
       <UploadPanel />
 
       {summary && metrics && (
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
           <KpiCard
-            title="Documentos"
+            title={t('kpi_docs')}
             value={summary.totalDocs}
-            subtitle={`Período ${summary.timespan}`}
+            subtitle={`${t('kpi_docs_sub')} ${summary.timespan}`}
             Icon={BookOpen}
-            tone="accent"
-          />
-          <KpiCard title="Autores" value={summary.authorsCount} Icon={Users} />
-          <KpiCard title="Países" value={summary.countriesCount} Icon={Globe2} />
-          <KpiCard title="Venues" value={summary.venuesCount} Icon={Building2} />
-          <KpiCard
-            title="Crescimento anual"
-            value={`${metrics.growthRate.toLocaleString('pt-BR')}%`}
-            subtitle="Taxa composta no período"
-            Icon={TrendingUp}
+            tone="blue"
           />
           <KpiCard
-            title="Citações por ano"
-            value={metrics.avgCitPerYear}
-            subtitle="Média por documento"
-            Icon={Quote}
+            title={t('kpi_authors')}
+            value={summary.authorsCount}
+            subtitle={t('kpi_authors_sub')}
+            Icon={Users}
+            tone="purple"
           />
           <KpiCard
-            title="Colaboração internacional"
-            value={metrics.mcp}
-            subtitle={`${metrics.scp.toLocaleString('pt-BR')} de país único`}
+            title={t('kpi_countries')}
+            value={summary.countriesCount}
+            subtitle={t('kpi_countries_sub')}
             Icon={Globe2}
+            tone="indigo"
           />
           <KpiCard
-            title="Autores por documento"
+            title={t('kpi_venues')}
+            value={summary.venuesCount}
+            subtitle={t('kpi_venues_sub')}
+            Icon={Building2}
+            tone="cyan"
+          />
+          <KpiCard
+            title={t('kpi_growth')}
+            value={`${metrics.growthRate.toLocaleString('pt-BR')}%`}
+            subtitle={t('kpi_growth_sub')}
+            Icon={TrendingUp}
+            tone="emerald"
+          />
+          <KpiCard
+            title={t('kpi_citations_year')}
+            value={metrics.avgCitPerYear}
+            subtitle={t('kpi_citations_year_sub')}
+            Icon={Quote}
+            tone="amber"
+          />
+          <KpiCard
+            title={t('kpi_collab')}
+            value={metrics.mcp}
+            subtitle={`${metrics.scp.toLocaleString('pt-BR')} ${t('kpi_collab_sub')}`}
+            Icon={Globe2}
+            tone="indigo"
+          />
+          <KpiCard
+            title={t('kpi_authors_doc')}
             value={metrics.coauthIndex}
-            subtitle={`${metrics.singleAuthorDocs.toLocaleString('pt-BR')} com autor único`}
+            subtitle={`${metrics.singleAuthorDocs.toLocaleString('pt-BR')} ${t('kpi_authors_doc_sub')}`}
             Icon={CalendarRange}
+            tone="purple"
           />
         </div>
       )}
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Deduplicação</CardTitle>
-          <CardDescription>
-            Bases diferentes indexam os mesmos artigos. O DOI é a evidência mais forte de
-            identidade; a similaridade de título alcança os registros sem DOI, ao custo de
-            algum risco de falso positivo.
-          </CardDescription>
+          <CardTitle className="text-base">{t('dedup_title')}</CardTitle>
+          <CardDescription>{t('dedup_description')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            {(Object.keys(DEDUP_LABELS) as DedupStrategy[]).map((strategy) => (
+            {(Object.keys(dedupLabels) as DedupStrategy[]).map((strategy) => (
               <Button
                 key={strategy}
                 size="sm"
@@ -158,13 +169,13 @@ export default function OverviewTab() {
                 disabled={busy}
                 onClick={() => void applyDedup(strategy)}
               >
-                {DEDUP_LABELS[strategy]}
+                {dedupLabels[strategy]}
               </Button>
             ))}
 
             {duplicates.length > 0 && (
               <Badge variant="warning">
-                {duplicates.length.toLocaleString('pt-BR')} documentos removidos
+                {duplicates.length.toLocaleString('pt-BR')} {t('dedup_removed')}
               </Badge>
             )}
           </div>
@@ -177,8 +188,8 @@ export default function OverviewTab() {
         <div className="grid gap-4 lg:grid-cols-2">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Produção ao longo do tempo</CardTitle>
-              <CardDescription>Documentos publicados por ano.</CardDescription>
+              <CardTitle className="text-base">{t('prod_title')}</CardTitle>
+              <CardDescription>{t('prod_description')}</CardDescription>
             </CardHeader>
             <CardContent>
               <Suspense fallback={<ChartSkeleton />}>
@@ -205,11 +216,8 @@ export default function OverviewTab() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Lei de Lotka</CardTitle>
-              <CardDescription>
-                Produtividade observada contra a distribuição teórica c/x². O afastamento
-                da curva indica concentração atípica da autoria.
-              </CardDescription>
+              <CardTitle className="text-base">{t('lotka_title')}</CardTitle>
+              <CardDescription>{t('lotka_description')}</CardDescription>
             </CardHeader>
             <CardContent>
               <Suspense fallback={<ChartSkeleton />}>
@@ -251,11 +259,8 @@ export default function OverviewTab() {
       {overview && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Qualidade e completude dos metadados</CardTitle>
-            <CardDescription>
-              Campos ausentes limitam o que a análise consegue enxergar — sem afiliação não
-              há mapa de colaboração, sem referências não há rede de cocitação.
-            </CardDescription>
+            <CardTitle className="text-base">{t('meta_quality_title')}</CardTitle>
+            <CardDescription>{t('meta_quality_description')}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto rounded-md border">
@@ -345,11 +350,8 @@ export default function OverviewTab() {
       {tables && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Tabelas analíticas</CardTitle>
-            <CardDescription>
-              Índices h, g, i10 e m por entidade. Clique nos cabeçalhos para ordenar;
-              exporte em CSV o recorte filtrado.
-            </CardDescription>
+            <CardTitle className="text-base">{t('tables_title')}</CardTitle>
+            <CardDescription>{t('tables_description')}</CardDescription>
           </CardHeader>
           <CardContent>
             <EntityTables tables={tables} />

@@ -4,9 +4,10 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --radius: 0.5rem;
+  --radius: 0.625rem;
 
-  --background: hsl(0 0% 100%);
+  /* Fundo suave em tom neutro-frio para dar contraste e profundidade aos cards */
+  --background: hsl(215 28% 97%);
   --foreground: hsl(222 47% 11%);
 
   --card: hsl(0 0% 100%);
@@ -15,38 +16,38 @@
   --popover: hsl(0 0% 100%);
   --popover-foreground: hsl(222 47% 11%);
 
-  /* Azul herdado do grafo do Streamlit (#1273B9), mantendo a identidade visual. */
-  --primary: hsl(205 82% 40%);
+  /* Azul vibrante moderno (#1273B9 / hsl 205 85% 44%) para identidade visual marcante */
+  --primary: hsl(205 85% 44%);
   --primary-foreground: hsl(210 40% 98%);
 
-  --secondary: hsl(210 40% 96%);
-  --secondary-foreground: hsl(222 47% 11%);
+  --secondary: hsl(215 30% 94%);
+  --secondary-foreground: hsl(222 47% 15%);
 
-  --muted: hsl(210 40% 96%);
-  --muted-foreground: hsl(215 16% 47%);
+  --muted: hsl(215 30% 94%);
+  --muted-foreground: hsl(215 18% 46%);
 
-  --accent: hsl(210 40% 96%);
+  --accent: hsl(215 35% 92%);
   --accent-foreground: hsl(222 47% 11%);
 
   --destructive: hsl(0 84% 60%);
   --destructive-foreground: hsl(210 40% 98%);
 
-  --border: hsl(214 32% 91%);
-  --input: hsl(214 32% 91%);
-  --ring: hsl(205 82% 40%);
+  --border: hsl(216 28% 90%);
+  --input: hsl(216 28% 88%);
+  --ring: hsl(205 85% 44%);
 }
 
 .dark {
-  --background: hsl(222 47% 11%);
+  --background: hsl(224 45% 9%);
   --foreground: hsl(210 40% 98%);
 
-  --card: hsl(222 47% 13%);
+  --card: hsl(224 45% 12%);
   --card-foreground: hsl(210 40% 98%);
 
-  --popover: hsl(222 47% 13%);
+  --popover: hsl(224 45% 12%);
   --popover-foreground: hsl(210 40% 98%);
 
-  --primary: hsl(205 82% 55%);
+  --primary: hsl(205 85% 58%);
   --primary-foreground: hsl(222 47% 11%);
 
   --secondary: hsl(217 33% 18%);
@@ -55,7 +56,7 @@
   --muted: hsl(217 33% 18%);
   --muted-foreground: hsl(215 20% 65%);
 
-  --accent: hsl(217 33% 18%);
+  --accent: hsl(217 33% 20%);
   --accent-foreground: hsl(210 40% 98%);
 
   --destructive: hsl(0 63% 45%);
@@ -63,7 +64,7 @@
 
   --border: hsl(217 33% 20%);
   --input: hsl(217 33% 20%);
-  --ring: hsl(205 82% 55%);
+  --ring: hsl(205 85% 58%);
 }
 
 @theme inline {

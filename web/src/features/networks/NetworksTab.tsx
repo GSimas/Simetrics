@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
+import { Info } from 'lucide-react';
 
 import { DataTable } from '@/components/DataTable';
 import { Badge } from '@/components/ui/badge';
@@ -23,10 +24,10 @@ import type { CooccurrenceKind, SizeMetric } from '@/core/graph';
 import type { GlobalMetrics } from '@/core/graph/metrics';
 import type { SnaNodeMetrics } from '@/lib/types';
 import { useDataset } from '@/state/dataset.store';
+import { useLocale } from '@/state/locale.store';
 import { EmptyState } from '@/features/EmptyState';
 import { CollaborationPanel } from './CollaborationPanel';
 
-// Sigma e Graphology somam ~170 kB; só quem abre esta aba paga por eles.
 const SigmaGraph = lazy(() => import('@/components/charts/SigmaGraph'));
 
 const NETWORK_KINDS: CooccurrenceKind[] = ['Coautoria', 'Palavras-chave', 'Países'];
@@ -39,22 +40,89 @@ const SIZE_METRICS: SizeMetric[] = [
   'Closeness',
 ];
 
-/** Métricas globais com o rótulo e a leitura que cada uma pede. */
-const METRIC_LABELS: { key: keyof GlobalMetrics; label: string; hint: string }[] = [
-  { key: 'density', label: 'Densidade', hint: 'Arestas existentes sobre as possíveis' },
-  { key: 'clustering', label: 'Clustering médio', hint: 'Tendência a formar triângulos' },
-  { key: 'entropy', label: 'Entropia de Shannon', hint: 'Desordem na distribuição de graus' },
-  { key: 'efficiency', label: 'Eficiência global', hint: 'Média do inverso das distâncias' },
-  { key: 'meanDegree', label: 'Grau médio', hint: 'Conexões por nó' },
-  { key: 'stdDegree', label: 'Desvio do grau', hint: 'Dispersão da conectividade' },
-  { key: 'meanPageRank', label: 'PageRank médio', hint: 'Influência média' },
-  { key: 'meanEigenvector', label: 'Autovetor médio', hint: 'Proximidade média aos hubs' },
-  { key: 'assortativity', label: 'Assortatividade', hint: 'Negativa: hubs cercados de periféricos' },
-  { key: 'powerLawExponent', label: 'Lei de potência', hint: 'Entre 2 e 3 indica rede livre de escala' },
+const METRIC_LABELS: {
+  key: keyof GlobalMetrics;
+  label: string;
+  labelEn: string;
+  hint: string;
+  hintEn: string;
+}[] = [
+  {
+    key: 'density',
+    label: 'Densidade',
+    labelEn: 'Density',
+    hint: 'Proporção de arestas existentes sobre todas as possíveis (0 a 1). Mede o quão integrada e coesa é a rede.',
+    hintEn: 'Ratio of actual edges to all possible edges (0 to 1). Measures overall network cohesion.',
+  },
+  {
+    key: 'clustering',
+    label: 'Clustering médio',
+    labelEn: 'Avg Clustering',
+    hint: 'Tendência dos vizinhos de um nó também estarem conectados entre si (formação de triângulos). Indica densidade de grupos locais.',
+    hintEn: 'Tendency of nodes to cluster together into tightly-knit groups or triangles.',
+  },
+  {
+    key: 'entropy',
+    label: 'Entropia de Shannon',
+    labelEn: 'Shannon Entropy',
+    hint: 'Mede o grau de incerteza ou desordem na distribuição de conexões. Valores altos indicam conectividade homogênea e distribuída.',
+    hintEn: 'Degree distribution uncertainty. High values indicate distributed, decentralized connectivity.',
+  },
+  {
+    key: 'efficiency',
+    label: 'Eficiência global',
+    labelEn: 'Global Efficiency',
+    hint: 'Média do inverso dos caminhos mais curtos. Mede a rapidez e facilidade de tráfego de informação entre os nós da rede.',
+    hintEn: 'Average inverse shortest path length. Quantifies how efficiently information traverses the network.',
+  },
+  {
+    key: 'meanDegree',
+    label: 'Grau médio',
+    labelEn: 'Mean Degree',
+    hint: 'Número médio de colaborações, citações ou relações diretas que cada nó possui.',
+    hintEn: 'Average number of direct connections per node.',
+  },
+  {
+    key: 'stdDegree',
+    label: 'Desvio do grau',
+    labelEn: 'Degree Std Dev',
+    hint: 'Dispersão da conectividade. Valores altos revelam disparidades entre super-hubs e nós periféricos.',
+    hintEn: 'Degree dispersion. High values indicate large gaps between central hubs and peripheral nodes.',
+  },
+  {
+    key: 'meanPageRank',
+    label: 'PageRank médio',
+    labelEn: 'Mean PageRank',
+    hint: 'Prestígio acadêmico médio. Nós conectados a outros nós influentes recebem maior pontuação.',
+    hintEn: 'Average prestige centrality across nodes in the network.',
+  },
+  {
+    key: 'meanEigenvector',
+    label: 'Autovetor médio',
+    labelEn: 'Mean Eigenvector',
+    hint: 'Proximidade média aos principais centros (hubs) da rede.',
+    hintEn: 'Average closeness and influence relative to primary network hubs.',
+  },
+  {
+    key: 'assortativity',
+    label: 'Assortatividade',
+    labelEn: 'Assortativity',
+    hint: 'Correlação entre graus de nós conectados. Negativa indica que grandes hubs se conectam predominantemente a nós menores.',
+    hintEn: 'Degree correlation of linked nodes. Negative values mean hubs connect mostly to peripheral nodes.',
+  },
+  {
+    key: 'powerLawExponent',
+    label: 'Lei de potência',
+    labelEn: 'Power Law Exponent',
+    hint: 'Expoente da cauda longa. Valores entre 2 e 3 indicam uma rede livre de escala (Scale-Free) dominada por poucos super-hubs.',
+    hintEn: 'Scale-free exponent. Values between 2 and 3 characterize heavy-tailed scale-free networks.',
+  },
   {
     key: 'spearmanDegreeBetweenness',
     label: 'Spearman grau×ponte',
-    hint: 'Alta: quem tem muitos links também é ponte',
+    labelEn: 'Degree-Betweenness Corr',
+    hint: 'Correlação entre grau e intermediação. Alta correlação indica que os autores mais conectados também são as principais pontes entre grupos.',
+    hintEn: 'Correlation between node degree and bridge centrality (betweenness).',
   },
 ];
 
@@ -65,6 +133,55 @@ function formatMetric(value: number | string): string {
   return Math.abs(value) < 0.001 ? value.toExponential(2) : value.toFixed(Math.abs(value) < 1 ? 4 : 2);
 }
 
+function NetworkMetricCard({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: number | string;
+  hint: string;
+}) {
+  const [showTooltip, setShowTooltip] = useState(false);
+
+  return (
+    <div className="relative rounded-xl border border-border/80 bg-gradient-to-br from-purple-500/[0.04] via-card to-card p-3 shadow-2xs transition-all hover:border-purple-300">
+      <div className="flex items-center justify-between gap-1.5">
+        <dt className="text-xs font-semibold text-muted-foreground truncate" title={hint}>
+          {label}
+        </dt>
+        <div
+          className="relative inline-flex items-center shrink-0"
+          onMouseEnter={() => setShowTooltip(true)}
+          onMouseLeave={() => setShowTooltip(false)}
+        >
+          <button
+            type="button"
+            className="text-muted-foreground/60 transition-colors hover:text-purple-600 focus:outline-hidden"
+            title={hint}
+            aria-label={hint}
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowTooltip((prev) => !prev);
+            }}
+          >
+            <Info className="size-3.5" />
+          </button>
+
+          {showTooltip && (
+            <div className="pointer-events-none absolute right-0 bottom-full mb-2 z-50 w-52 rounded-lg border border-border/90 bg-popover p-2.5 text-[11px] font-normal normal-case leading-snug text-popover-foreground shadow-xl backdrop-blur-xs animate-in fade-in-0 zoom-in-95">
+              <p>{hint}</p>
+            </div>
+          )}
+        </div>
+      </div>
+      <dd className="mt-1 text-base font-bold tabular-nums text-foreground">
+        {formatMetric(value)}
+      </dd>
+    </div>
+  );
+}
+
 export default function NetworksTab() {
   const active = useDataset((state) => state.active);
   const sna = useDataset((state) => state.sna);
@@ -72,6 +189,8 @@ export default function NetworksTab() {
   const progress = useDataset((state) => state.progress);
   const computeSna = useDataset((state) => state.computeSna);
   const computeNetwork = useDataset((state) => state.computeNetwork);
+  const { t, locale } = useLocale();
+  const isEn = locale === 'en';
 
   const [kind, setKind] = useState<CooccurrenceKind>('Coautoria');
   const [topN, setTopN] = useState<number>(50);
@@ -99,8 +218,19 @@ export default function NetworksTab() {
         },
         {
           accessorKey: 'kind',
-          header: 'Tipo',
-          cell: ({ row }) => <Badge variant="outline">{String(row.original['kind'])}</Badge>,
+          header: 'Tipo / Type',
+          cell: ({ row }) => {
+            const val = String(row.original['kind']);
+            const variant =
+              val === 'Autor'
+                ? 'purple'
+                : val === 'País'
+                  ? 'indigo'
+                  : val === 'Venue'
+                    ? 'cyan'
+                    : 'blue';
+            return <Badge variant={variant}>{val}</Badge>;
+          },
         },
         { accessorKey: 'degreeAbsolute', header: 'Grau absoluto' },
         { accessorKey: 'degreeCentrality', header: 'Centralidade de grau' },
@@ -112,7 +242,7 @@ export default function NetworksTab() {
   );
 
   if (!active) {
-    return <EmptyState title="Redes e Grafos de Conhecimento" />;
+    return <EmptyState title={t('tab_networks')} />;
   }
 
   return (
@@ -130,30 +260,25 @@ export default function NetworksTab() {
       )}
 
       {sna && (
-        <Card>
+        <Card className="border-t-4 border-t-purple-500 shadow-xs">
           <CardHeader>
-            <CardTitle className="text-base">Ecologia profunda da rede</CardTitle>
+            <CardTitle className="text-base font-bold text-foreground">{t('network_deep_title')}</CardTitle>
             <CardDescription>
-              Grafo heterogêneo ligando documentos a autores, países e venues:{' '}
-              {sna.global.nodeCount.toLocaleString('pt-BR')} nós,{' '}
-              {sna.global.edgeCount.toLocaleString('pt-BR')} arestas e{' '}
-              {sna.global.componentCount.toLocaleString('pt-BR')} componentes.{' '}
-              {sna.betweennessExact
-                ? 'Betweenness calculado de forma exata.'
-                : 'Betweenness estimado por amostragem determinística, dado o tamanho do grafo.'}
+              {t('network_deep_desc')}{' '}
+              <strong className="text-foreground">{sna.global.nodeCount.toLocaleString('pt-BR')}</strong> {t('network_nodes')},{' '}
+              <strong className="text-foreground">{sna.global.edgeCount.toLocaleString('pt-BR')}</strong> {t('network_edges')} e{' '}
+              <strong className="text-foreground">{sna.global.componentCount.toLocaleString('pt-BR')}</strong> {t('network_components')}.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3 lg:grid-cols-4">
-              {METRIC_LABELS.map(({ key, label, hint }) => (
-                <div key={key}>
-                  <dt className="text-xs text-muted-foreground" title={hint}>
-                    {label}
-                  </dt>
-                  <dd className="text-sm font-medium tabular-nums">
-                    {formatMetric(sna.global[key] as number | string)}
-                  </dd>
-                </div>
+            <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {METRIC_LABELS.map(({ key, label, labelEn, hint, hintEn }) => (
+                <NetworkMetricCard
+                  key={key}
+                  label={isEn ? labelEn : label}
+                  value={sna.global[key] as number | string}
+                  hint={isEn ? hintEn : hint}
+                />
               ))}
             </dl>
           </CardContent>
@@ -162,18 +287,16 @@ export default function NetworksTab() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Rede de coocorrência</CardTitle>
+          <CardTitle className="text-base">{t('network_cooccurrence_title')}</CardTitle>
           <CardDescription>
-            Entidades conectadas por aparecerem no mesmo documento. A espessura da aresta
-            reflete a frequência da coocorrência; a cor, a comunidade detectada pelo
-            Louvain.
+            {t('network_cooccurrence_desc')}
           </CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="space-y-1.5">
-              <Label htmlFor="network-kind">Tipo de rede</Label>
+              <Label htmlFor="network-kind">{t('network_kind_label')}</Label>
               <Select value={kind} onValueChange={(value) => setKind(value as CooccurrenceKind)}>
                 <SelectTrigger id="network-kind">
                   <SelectValue />
@@ -189,7 +312,7 @@ export default function NetworksTab() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="network-top">Entidades exibidas</Label>
+              <Label htmlFor="network-top">{t('network_top_label')}</Label>
               <Select value={String(topN)} onValueChange={(value) => setTopN(Number(value))}>
                 <SelectTrigger id="network-top">
                   <SelectValue />
@@ -205,7 +328,7 @@ export default function NetworksTab() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="network-size">Tamanho dos nós</Label>
+              <Label htmlFor="network-size">{t('network_size_label')}</Label>
               <Select
                 value={sizeMetric}
                 onValueChange={(value) => setSizeMetric(value as SizeMetric)}
@@ -227,9 +350,8 @@ export default function NetworksTab() {
           {network && (
             <>
               <p className="text-xs text-muted-foreground">
-                {network.nodes.length} entidades, {network.edges.length} conexões,{' '}
-                {network.communityCount} comunidades. Passe o cursor sobre um nó para ver
-                suas métricas.
+                {network.nodes.length} nós, {network.edges.length} arestas,{' '}
+                {network.communityCount} comunidades.
               </p>
               <Suspense
                 fallback={
@@ -250,10 +372,9 @@ export default function NetworksTab() {
       {sna && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Métricas por nó</CardTitle>
+            <CardTitle className="text-base">{t('network_nodes_metrics_title')}</CardTitle>
             <CardDescription>
-              Todos os {sna.nodes.length.toLocaleString('pt-BR')} nós do grafo heterogêneo,
-              ordenados por grau.
+              {t('network_nodes_metrics_desc')}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -261,7 +382,7 @@ export default function NetworksTab() {
               data={sna.nodes as unknown as Record<string, unknown>[]}
               columns={snaColumns}
               exportName="metricas-sna"
-              filterPlaceholder="Filtrar nós…"
+              filterPlaceholder={t('table_filter_placeholder')}
             />
           </CardContent>
         </Card>
