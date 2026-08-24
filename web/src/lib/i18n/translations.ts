@@ -163,6 +163,13 @@ export const TRANSLATIONS = {
     chat_btn_send: 'Enviar',
     chat_btn_stop: 'Parar',
     chat_analyzing: 'Analisando a base bibliométrica...',
+    chat_status_querying_table: 'Consultando tabela analítica local ({table})...',
+    chat_status_filtering_docs: 'Filtrando e agregando estatísticas da base...',
+    chat_status_general_metrics: 'Calculando indicadores bibliométricos globais...',
+    chat_status_entity_profile: 'Analisando perfil detalhado de {entity}...',
+    chat_tool_executed: 'Consulta analítica executada na base local',
+    chat_tools_executed_count: 'consultas analíticas locais realizadas',
+    chat_tools_badge: 'Cálculo determinístico no navegador',
     chat_no_key_warning:
       'Para conversar com o Assistente Científico, configure sua chave de API própria (BYOK) no botão acima.',
 
@@ -368,6 +375,13 @@ export const TRANSLATIONS = {
     chat_btn_send: 'Send',
     chat_btn_stop: 'Stop',
     chat_analyzing: 'Analyzing bibliometric database...',
+    chat_status_querying_table: 'Querying local analytical table ({table})...',
+    chat_status_filtering_docs: 'Filtering and aggregating dataset statistics...',
+    chat_status_general_metrics: 'Calculating global bibliometric indicators...',
+    chat_status_entity_profile: 'Analyzing detailed profile for {entity}...',
+    chat_tool_executed: 'Analytical query executed on local dataset',
+    chat_tools_executed_count: 'local analytical queries executed',
+    chat_tools_badge: 'Deterministic in-browser calculation',
     chat_no_key_warning:
       'To chat with the Scientific Assistant, please configure your own API key (BYOK) using the button above.',
 

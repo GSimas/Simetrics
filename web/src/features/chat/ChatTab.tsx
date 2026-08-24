@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, KeyRound, Send, Square, User } from 'lucide-react';
+import { Bot, Cpu, Database, KeyRound, Send, Sparkles, Square, User } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -10,7 +10,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { streamChat, type ChatTurn } from '@/lib/ai-client';
+import { streamChat, type ChatTurn, type ChatStatusUpdate } from '@/lib/ai-client';
 import { useAiConfig } from '@/state/ai-config.store';
 import { useDataset } from '@/state/dataset.store';
 import { useLocale } from '@/state/locale.store';
@@ -32,6 +32,7 @@ export default function ChatTab() {
   const [messages, setMessages] = useState<ChatTurn[]>([]);
   const [draft, setDraft] = useState('');
   const [streaming, setStreaming] = useState(false);
+  const [currentStatus, setCurrentStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
@@ -44,7 +45,7 @@ export default function ChatTab() {
   useEffect(() => {
     const container = scrollRef.current;
     if (container) container.scrollTop = container.scrollHeight;
-  }, [displayedMessages]);
+  }, [displayedMessages, currentStatus]);
 
   const suggestions = [
     t('chat_sugg_1'),
@@ -61,14 +62,16 @@ export default function ChatTab() {
       setMessages((current) => [
         ...current,
         { role: 'user', content: question },
-        { role: 'assistant', content: '' },
+        { role: 'assistant', content: '', toolsExecuted: [] },
       ]);
       setDraft('');
       setError(null);
       setStreaming(true);
+      setCurrentStatus(null);
 
       const controller = new AbortController();
       abortRef.current = controller;
+      const executedTools: string[] = [];
 
       try {
         const context = await getAiWorker().buildChatContext(active, question, CONTEXT_SIZE);
@@ -77,13 +80,29 @@ export default function ChatTab() {
           question,
           history,
           context,
+          dataset: active,
           signal: controller.signal,
+          onStatus: (status: ChatStatusUpdate) => {
+            if (status.type === 'tool_call') {
+              setCurrentStatus(status.message);
+              if (status.toolName && !executedTools.includes(status.toolName)) {
+                executedTools.push(status.toolName);
+              }
+            } else if (status.type === 'tool_result') {
+              setCurrentStatus(null);
+            }
+          },
           onChunk: (text) =>
             setMessages((current) => {
               const next = [...current];
               const last = next[next.length - 1];
               if (last?.role === 'assistant') {
-                next[next.length - 1] = { role: 'assistant', content: last.content + text };
+                const updatedTools = executedTools.length > 0 ? [...executedTools] : last.toolsExecuted;
+                next[next.length - 1] = {
+                  role: 'assistant',
+                  content: last.content + text,
+                  ...(updatedTools ? { toolsExecuted: updatedTools } : {}),
+                };
               }
               return next;
             }),
@@ -99,6 +118,7 @@ export default function ChatTab() {
         });
       } finally {
         setStreaming(false);
+        setCurrentStatus(null);
         abortRef.current = null;
       }
     },
@@ -126,15 +146,22 @@ export default function ChatTab() {
               {t('chat_title')}
             </CardTitle>
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setAiModalOpen(true)}
-              className="gap-1.5 rounded-lg text-xs font-semibold"
-            >
-              <KeyRound className="size-3.5 text-purple-600" />
-              <span>{isAiConfigured ? t('ai_configured') : t('ai_settings_btn')}</span>
-            </Button>
+            <div className="flex items-center gap-2">
+              <div className="hidden sm:flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50/70 px-2.5 py-1 text-[11px] font-medium text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300">
+                <Cpu className="size-3 text-emerald-600 dark:text-emerald-400" />
+                <span>{t('chat_tools_badge')}</span>
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setAiModalOpen(true)}
+                className="gap-1.5 rounded-lg text-xs font-semibold"
+              >
+                <KeyRound className="size-3.5 text-purple-600" />
+                <span>{isAiConfigured ? t('ai_configured') : t('ai_settings_btn')}</span>
+              </Button>
+            </div>
           </div>
           <CardDescription>
             {t('chat_desc')}
@@ -185,21 +212,36 @@ export default function ChatTab() {
 
                 <div
                   className={cn(
-                    'max-w-[80%] rounded-xl px-4 py-2.5 text-sm shadow-2xs leading-relaxed',
+                    'max-w-[85%] rounded-xl px-4 py-2.5 text-sm shadow-2xs leading-relaxed',
                     message.role === 'user'
                       ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium'
                       : 'border border-border/80 bg-card text-foreground',
                   )}
                 >
+                  {/* Badge de Ferramentas Executadas Localmente */}
+                  {message.role === 'assistant' && message.toolsExecuted && message.toolsExecuted.length > 0 && (
+                    <div className="mb-2.5 flex items-center gap-1.5 rounded-md border border-emerald-200/80 bg-emerald-50/60 px-2 py-0.5 text-[11px] font-medium text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300">
+                      <Database className="size-3 text-emerald-600 dark:text-emerald-400" />
+                      <span>
+                        {message.toolsExecuted.length === 1
+                          ? t('chat_tool_executed')
+                          : `${message.toolsExecuted.length} ${t('chat_tools_executed_count')}`}
+                      </span>
+                    </div>
+                  )}
+
                   {message.role === 'user' ? (
                     <p className="whitespace-pre-wrap">{message.content}</p>
                   ) : message.content ? (
                     <MarkdownContent content={message.content} />
                   ) : streaming && index === displayedMessages.length - 1 ? (
-                    <span className="flex items-center gap-1.5 text-muted-foreground">
-                      <span className="size-2 animate-bounce rounded-full bg-emerald-500" />
-                      {t('chat_analyzing')}
-                    </span>
+                    <div className="flex items-center gap-2 text-muted-foreground text-xs py-1">
+                      <span className="relative flex size-2">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                        <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+                      </span>
+                      <span>{currentStatus || t('chat_analyzing')}</span>
+                    </div>
                   ) : null}
                 </div>
               </div>
@@ -208,7 +250,8 @@ export default function ChatTab() {
 
           {messages.length === 0 && (
             <div className="space-y-2">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <Sparkles className="size-3.5 text-amber-500" />
                 {t('chat_suggestions_label')}
               </p>
               <div className="flex flex-wrap gap-2">
@@ -247,8 +290,7 @@ export default function ChatTab() {
               aria-label="Pergunta para o assistente"
               disabled={streaming}
               className="rounded-lg shadow-2xs"
-            >
-            </Input>
+            />
 
             {streaming ? (
               <Button type="button" variant="outline" onClick={() => abortRef.current?.abort()}>

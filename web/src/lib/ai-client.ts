@@ -1,10 +1,19 @@
 import type { ChatContext } from '@/workers/ai.worker';
+import type { Dataset } from '@/lib/types';
 import { useAiConfig, type AiConfig } from '@/state/ai-config.store';
 import { useLocale } from '@/state/locale.store';
+import {
+  ANALYTICAL_TOOLS,
+  executeAnalyticalTool,
+  toClaudeTools,
+  toGeminiTools,
+  toOpenAiTools,
+} from '@/core/tools';
 
 export interface ChatTurn {
   role: 'user' | 'assistant';
   content: string;
+  toolsExecuted?: string[] | undefined;
 }
 
 export class AiError extends Error {
@@ -14,11 +23,21 @@ export class AiError extends Error {
   }
 }
 
+export interface ChatStatusUpdate {
+  type: 'thinking' | 'tool_call' | 'tool_result';
+  message: string;
+  toolName?: string;
+  toolArgs?: Record<string, unknown>;
+  toolResult?: unknown;
+}
+
 export interface ChatStreamOptions {
   question: string;
   history: readonly ChatTurn[];
   context: ChatContext;
+  dataset?: Dataset;
   onChunk: (text: string) => void;
+  onStatus?: (status: ChatStatusUpdate) => void;
   signal?: AbortSignal;
 }
 
@@ -86,6 +105,40 @@ function sanitizeThemeName(raw: string): string {
   );
 }
 
+function formatToolStatus(
+  toolName: string,
+  args: Record<string, unknown>,
+  locale: 'pt' | 'en' = 'pt',
+): string {
+  const isEn = locale === 'en';
+  if (toolName === 'query_analytical_table') {
+    const tbl = String(args.table ?? 'dados');
+    const tblName = isEn
+      ? tbl
+      : tbl === 'authors'
+        ? 'autores'
+        : tbl === 'countries'
+          ? 'países'
+          : tbl === 'venues'
+            ? 'periódicos'
+            : tbl === 'keywords'
+              ? 'palavras-chave'
+              : tbl;
+    return isEn ? `Querying analytical table (${tblName})...` : `Consultando tabela analítica (${tblName})...`;
+  }
+  if (toolName === 'filter_and_aggregate_documents') {
+    return isEn ? 'Filtering and aggregating dataset statistics...' : 'Filtrando e agregando estatísticas da base...';
+  }
+  if (toolName === 'get_dataset_general_metrics') {
+    return isEn ? 'Calculating global bibliometric indicators...' : 'Calculando indicadores bibliométricos globais...';
+  }
+  if (toolName === 'get_entity_profile') {
+    const name = String(args.name ?? '');
+    return isEn ? `Analyzing detailed profile for "${name}"...` : `Analisando perfil detalhado de "${name}"...`;
+  }
+  return isEn ? 'Executing local analytical query...' : 'Executando consulta analítica na base local...';
+}
+
 function buildSystemPrompt(
   context: ChatContext,
   locale: 'pt' | 'en' = 'pt',
@@ -99,14 +152,22 @@ ${JSON.stringify(context.aggregate)}
 ## ${isEn ? 'Relevant Documents for the current question' : 'Documentos relevantes para a pergunta atual'}
 ${JSON.stringify(context.documents)}
 
+## ${isEn ? 'Local Analytical Tools' : 'Ferramentas Analíticas Locais'}
+${
+  isEn
+    ? 'You have access to powerful local analytical tools (query_analytical_table, filter_and_aggregate_documents, get_dataset_general_metrics, get_entity_profile). When the user asks for rankings, counts, temporal filters, specific authors, countries, venues, or statistics, ALWAYS call the appropriate tool to obtain 100% exact mathematical data directly from the user’s in-memory dataset before answering.'
+    : 'Você tem acesso a ferramentas analíticas locais (query_analytical_table, filter_and_aggregate_documents, get_dataset_general_metrics, get_entity_profile). Quando o usuário fizer perguntas sobre rankings, contagens, filtros por ano/país/autor/periódico, ou estatísticas, SEMPRE invoque a ferramenta apropriada para obter dados matematicamente exatos calculados instantaneamente na base local em memória antes de responder.'
+}
+
 ## ${isEn ? 'Your Tasks' : 'Suas tarefas'}
-- ${isEn ? 'Answer strictly based on the data above.' : 'Responder com base exclusivamente nos dados acima.'}
+- ${isEn ? 'Answer strictly based on the data and tool results.' : 'Responder com base exclusivamente nos dados da base e resultados das ferramentas.'}
 - ${isEn ? 'Recommend foundational papers based on themes, abstracts, and citations.' : 'Recomendar artigos fundamentais considerando tema, resumo e impacto (citações).'}
 - ${isEn ? 'Suggest suitable journals for manuscript submission based on the profiles in the dataset.' : 'Sugerir periódicos para submissão a partir do perfil do manuscrito descrito pelo usuário.'}
 - ${isEn ? 'Identify leading researchers and experts for collaboration or citation.' : 'Identificar especialistas para parceria ou referência.'}
+- ${isEn ? 'Present tabular comparisons and rankings using clean Markdown tables with proper headers, alignment rows (|:---|), and clear line breaks between rows.' : 'Apresentar comparações e rankings usando tabelas Markdown estruturadas, com cabeçalhos, linhas de alinhamento (|:---|) e quebras de linha entre cada linha.'}
 
 ## ${isEn ? 'Strict Rules' : 'Regras absolutas'}
-- ${isEn ? 'Recommend ONLY items present in the data above. Never fabricate titles, authors, or journals.' : 'Recomende SOMENTE itens presentes nos dados acima. Nunca invente títulos, autores ou periódicos.'}
+- ${isEn ? 'Recommend ONLY items present in the data above or returned by tools. Never fabricate titles, authors, or journals.' : 'Recomende SOMENTE itens presentes nos dados da base ou devolvidos pelas ferramentas. Nunca invente títulos, autores ou periódicos.'}
 - ${isEn ? 'Cite document titles and author names exactly as they appear.' : 'Cite títulos de documentos e nomes de autores exatamente como aparecem.'}
 - ${isEn ? 'If the context lacks sufficient data, explicitly state what is missing.' : 'Se os dados não forem suficientes para responder, aponte explicitamente a lacuna.'}
 - ${isEn ? 'Respond in English.' : 'Responda em português.'}`;
@@ -154,7 +215,7 @@ async function labelClusterServerless(
   return body.name;
 }
 
-/** Executa chat com streaming suportando múltiplos provedores (BYOK) */
+/** Executa chat com streaming suportando múltiplos provedores e Function Calling local (BYOK) */
 export async function streamChat(options: ChatStreamOptions): Promise<void> {
   const config = useAiConfig.getState().config;
   const locale = useLocale.getState().locale;
@@ -183,7 +244,7 @@ export async function streamChat(options: ChatStreamOptions): Promise<void> {
   }
 }
 
-/** Streaming via Google Gemini REST API */
+/** Streaming via Google Gemini REST API com suporte a Function Calling */
 async function streamGemini(
   apiKey: string,
   model: string,
@@ -194,7 +255,17 @@ async function streamGemini(
     model,
   )}:streamGenerateContent?alt=sse&key=${encodeURIComponent(apiKey)}`;
 
-  const contents = [
+  type GeminiPart =
+    | { text: string }
+    | { functionCall: { name: string; args: Record<string, unknown> } }
+    | { functionResponse: { name: string; response: { name: string; content: unknown } } };
+
+  type GeminiContent = {
+    role: string;
+    parts: GeminiPart[];
+  };
+
+  let contents: GeminiContent[] = [
     ...options.history.map((turn) => ({
       role: turn.role === 'user' ? 'user' : 'model',
       parts: [{ text: turn.content }],
@@ -202,67 +273,139 @@ async function streamGemini(
     { role: 'user', parts: [{ text: options.question }] },
   ];
 
-  const body = {
-    system_instruction: { parts: [{ text: systemPrompt }] },
-    contents,
-    generationConfig: { temperature: 0.3, maxOutputTokens: 8192 },
-  };
+  const tools = options.dataset ? toGeminiTools(ANALYTICAL_TOOLS) : undefined;
+  const locale = useLocale.getState().locale;
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-    ...(options.signal ? { signal: options.signal } : {}),
-  });
+  let toolIterations = 0;
+  const MAX_TOOL_ITERATIONS = 3;
 
-  if (!response.ok) {
-    const errorBody = await response.json().catch(() => ({}));
-    throw new AiError(errorBody.error?.message || `Google Gemini API error (HTTP ${response.status})`);
-  }
+  while (toolIterations <= MAX_TOOL_ITERATIONS) {
+    const body: Record<string, unknown> = {
+      system_instruction: { parts: [{ text: systemPrompt }] },
+      contents,
+      generationConfig: { temperature: 0.2, maxOutputTokens: 8192 },
+    };
+    if (tools) body.tools = tools;
 
-  if (!response.body) throw new AiError('A resposta chegou vazia.');
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      ...(options.signal ? { signal: options.signal } : {}),
+    });
 
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({}));
+      throw new AiError(
+        errorBody.error?.message || `Google Gemini API error (HTTP ${response.status})`,
+      );
+    }
 
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
+    if (!response.body) throw new AiError('A resposta chegou vazia.');
 
-      const lines = buffer.split('\n');
-      buffer = lines.pop() ?? '';
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let modelParts: GeminiPart[] = [];
+    let receivedFunctionCall: {
+      name: string;
+      args: Record<string, unknown>;
+      rawPart: GeminiPart;
+    } | null = null;
 
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (trimmed.startsWith('data:')) {
-          const jsonStr = trimmed.slice(5).trim();
-          if (jsonStr) {
-            try {
-              const data = JSON.parse(jsonStr);
-              const parts = data.candidates?.[0]?.content?.parts;
-              if (Array.isArray(parts)) {
-                for (const part of parts) {
-                  if (typeof part?.text === 'string') {
-                    options.onChunk(part.text);
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith('data:')) {
+            const jsonStr = trimmed.slice(5).trim();
+            if (jsonStr) {
+              try {
+                const data = JSON.parse(jsonStr);
+                const parts = data.candidates?.[0]?.content?.parts;
+                if (Array.isArray(parts)) {
+                  for (const part of parts) {
+                    modelParts.push(part);
+                    if (part?.functionCall) {
+                      receivedFunctionCall = {
+                        name: part.functionCall.name,
+                        args: part.functionCall.args || {},
+                        rawPart: part,
+                      };
+                    }
+                    if (typeof part?.text === 'string') {
+                      options.onChunk(part.text);
+                    }
                   }
                 }
+              } catch {
+                // chunk json incompleto ou de heartbeat
               }
-            } catch {
-              // chunk json incompleto ou de heartbeat
             }
           }
         }
       }
+    } finally {
+      reader.releaseLock();
     }
-  } finally {
-    reader.releaseLock();
+
+    // Se houve chamada de ferramenta e temos o dataset local disponível
+    if (receivedFunctionCall && options.dataset && toolIterations < MAX_TOOL_ITERATIONS) {
+      toolIterations++;
+      const { name, args } = receivedFunctionCall;
+
+      options.onStatus?.({
+        type: 'tool_call',
+        message: formatToolStatus(name, args, locale),
+        toolName: name,
+        toolArgs: args,
+      });
+
+      const toolRes = executeAnalyticalTool(name, args, options.dataset);
+
+      options.onStatus?.({
+        type: 'tool_result',
+        message: '',
+        toolName: name,
+        toolResult: toolRes.result,
+      });
+
+      contents = [
+        ...contents,
+        {
+          role: 'model',
+          parts: modelParts.length > 0 ? modelParts : [receivedFunctionCall.rawPart],
+        },
+        {
+          role: 'user',
+          parts: [
+            {
+              functionResponse: {
+                name,
+                response: {
+                  name,
+                  content: toolRes.result ?? { error: toolRes.error },
+                },
+              },
+            },
+          ],
+        },
+      ];
+      continue;
+    }
+
+    break;
   }
 }
 
-/** Streaming via OpenAI / OpenRouter / Custom compatible API */
+/** Streaming via OpenAI / OpenRouter / Custom compatible API com Tool Calling */
 async function streamOpenAiCompatible(
   apiKey: string,
   model: string,
@@ -271,76 +414,178 @@ async function streamOpenAiCompatible(
   options: ChatStreamOptions,
 ): Promise<void> {
   const url = `${baseUrl.replace(/\/+$/, '')}/chat/completions`;
+  const locale = useLocale.getState().locale;
 
-  const messages = [
+  interface OpenAiMessage {
+    role: string;
+    content: string | null;
+    tool_calls?: Array<{
+      id: string;
+      type: 'function';
+      function: { name: string; arguments: string };
+    }>;
+    tool_call_id?: string;
+  }
+
+  const messages: OpenAiMessage[] = [
     { role: 'system', content: systemPrompt },
     ...options.history.map((turn) => ({ role: turn.role, content: turn.content })),
     { role: 'user', content: options.question },
   ];
 
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  };
-  if (apiKey) {
-    headers['Authorization'] = `Bearer ${apiKey}`;
-  }
+  const tools = options.dataset ? toOpenAiTools(ANALYTICAL_TOOLS) : undefined;
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
+  let toolIterations = 0;
+  const MAX_TOOL_ITERATIONS = 3;
+
+  while (toolIterations <= MAX_TOOL_ITERATIONS) {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (apiKey) {
+      headers['Authorization'] = `Bearer ${apiKey}`;
+    }
+
+    const body: Record<string, unknown> = {
       model,
       messages,
-      temperature: 0.3,
+      temperature: 0.2,
       max_tokens: 8192,
       stream: true,
-    }),
-    ...(options.signal ? { signal: options.signal } : {}),
-  });
+    };
+    if (tools) {
+      body.tools = tools;
+      body.tool_choice = 'auto';
+    }
 
-  if (!response.ok) {
-    const errorBody = await response.json().catch(() => ({}));
-    throw new AiError(errorBody.error?.message || `API error (HTTP ${response.status})`);
-  }
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+      ...(options.signal ? { signal: options.signal } : {}),
+    });
 
-  if (!response.body) throw new AiError('A resposta chegou vazia.');
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({}));
+      throw new AiError(errorBody.error?.message || `API error (HTTP ${response.status})`);
+    }
 
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
+    if (!response.body) throw new AiError('A resposta chegou vazia.');
 
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
 
-      const lines = buffer.split('\n');
-      buffer = lines.pop() ?? '';
+    let accumulatedText = '';
+    const accumulatedToolCalls: Array<{ id: string; name: string; arguments: string }> = [];
 
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (trimmed.startsWith('data:')) {
-          const jsonStr = trimmed.slice(5).trim();
-          if (jsonStr === '[DONE]') break;
-          if (jsonStr) {
-            try {
-              const data = JSON.parse(jsonStr);
-              const delta = data.choices?.[0]?.delta?.content;
-              if (delta) options.onChunk(delta);
-            } catch {
-              // chunk parsing
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith('data:')) {
+            const jsonStr = trimmed.slice(5).trim();
+            if (jsonStr === '[DONE]') break;
+            if (jsonStr) {
+              try {
+                const data = JSON.parse(jsonStr);
+                const delta = data.choices?.[0]?.delta;
+                if (delta?.content) {
+                  accumulatedText += delta.content;
+                  options.onChunk(delta.content);
+                }
+                if (Array.isArray(delta?.tool_calls)) {
+                  for (const tc of delta.tool_calls) {
+                    const idx = tc.index ?? 0;
+                    if (!accumulatedToolCalls[idx]) {
+                      accumulatedToolCalls[idx] = {
+                        id: tc.id ?? '',
+                        name: tc.function?.name ?? '',
+                        arguments: tc.function?.arguments ?? '',
+                      };
+                    } else {
+                      if (tc.id) accumulatedToolCalls[idx].id = tc.id;
+                      if (tc.function?.name) accumulatedToolCalls[idx].name += tc.function.name;
+                      if (tc.function?.arguments) {
+                        accumulatedToolCalls[idx].arguments += tc.function.arguments;
+                      }
+                    }
+                  }
+                }
+              } catch {
+                // chunk parsing
+              }
             }
           }
         }
       }
+    } finally {
+      reader.releaseLock();
     }
-  } finally {
-    reader.releaseLock();
+
+    const validToolCalls = accumulatedToolCalls.filter((tc) => tc && tc.name);
+    if (validToolCalls.length > 0 && options.dataset && toolIterations < MAX_TOOL_ITERATIONS) {
+      toolIterations++;
+
+      messages.push({
+        role: 'assistant',
+        content: accumulatedText || null,
+        tool_calls: validToolCalls.map((tc) => ({
+          id: tc.id || `call_${Date.now()}`,
+          type: 'function',
+          function: {
+            name: tc.name,
+            arguments: tc.arguments,
+          },
+        })),
+      });
+
+      for (const tc of validToolCalls) {
+        let parsedArgs: Record<string, unknown> = {};
+        try {
+          parsedArgs = tc.arguments ? JSON.parse(tc.arguments) : {};
+        } catch {
+          parsedArgs = {};
+        }
+
+        options.onStatus?.({
+          type: 'tool_call',
+          message: formatToolStatus(tc.name, parsedArgs, locale),
+          toolName: tc.name,
+          toolArgs: parsedArgs,
+        });
+
+        const toolRes = executeAnalyticalTool(tc.name, parsedArgs, options.dataset);
+
+        options.onStatus?.({
+          type: 'tool_result',
+          message: '',
+          toolName: tc.name,
+          toolResult: toolRes.result,
+        });
+
+        messages.push({
+          role: 'tool',
+          tool_call_id: tc.id || `call_${Date.now()}`,
+          content: JSON.stringify(toolRes.result ?? { error: toolRes.error }),
+        });
+      }
+
+      continue;
+    }
+
+    break;
   }
 }
 
-/** Streaming via Anthropic Claude API */
+/** Streaming via Anthropic Claude API com Tool Calling */
 async function streamClaude(
   apiKey: string,
   model: string,
@@ -348,70 +593,160 @@ async function streamClaude(
   options: ChatStreamOptions,
 ): Promise<void> {
   const url = 'https://api.anthropic.com/v1/messages';
+  const locale = useLocale.getState().locale;
 
-  const messages = [
+  interface ClaudeMessage {
+    role: string;
+    content: unknown;
+  }
+
+  const messages: ClaudeMessage[] = [
     ...options.history.map((turn) => ({ role: turn.role, content: turn.content })),
     { role: 'user', content: options.question },
   ];
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
+  const tools = options.dataset ? toClaudeTools(ANALYTICAL_TOOLS) : undefined;
+
+  let toolIterations = 0;
+  const MAX_TOOL_ITERATIONS = 3;
+
+  while (toolIterations <= MAX_TOOL_ITERATIONS) {
+    const body: Record<string, unknown> = {
       model,
       system: systemPrompt,
       messages,
       max_tokens: 8192,
-      temperature: 0.3,
+      temperature: 0.2,
       stream: true,
-    }),
-    ...(options.signal ? { signal: options.signal } : {}),
-  });
+    };
+    if (tools) body.tools = tools;
 
-  if (!response.ok) {
-    const errorBody = await response.json().catch(() => ({}));
-    throw new AiError(errorBody.error?.message || `Anthropic Claude API error (HTTP ${response.status})`);
-  }
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify(body),
+      ...(options.signal ? { signal: options.signal } : {}),
+    });
 
-  if (!response.body) throw new AiError('A resposta chegou vazia.');
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({}));
+      throw new AiError(
+        errorBody.error?.message || `Anthropic Claude API error (HTTP ${response.status})`,
+      );
+    }
 
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
+    if (!response.body) throw new AiError('A resposta chegou vazia.');
 
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
 
-      const lines = buffer.split('\n');
-      buffer = lines.pop() ?? '';
+    let accumulatedText = '';
+    let currentToolUse: { id: string; name: string; inputJson: string } | null = null;
+    const toolUses: Array<{ id: string; name: string; inputJson: string }> = [];
 
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (trimmed.startsWith('data:')) {
-          const jsonStr = trimmed.slice(5).trim();
-          if (jsonStr) {
-            try {
-              const data = JSON.parse(jsonStr);
-              if (data.type === 'content_block_delta' && data.delta?.text) {
-                options.onChunk(data.delta.text);
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith('data:')) {
+            const jsonStr = trimmed.slice(5).trim();
+            if (jsonStr) {
+              try {
+                const data = JSON.parse(jsonStr);
+                if (data.type === 'content_block_start' && data.content_block?.type === 'tool_use') {
+                  currentToolUse = {
+                    id: data.content_block.id,
+                    name: data.content_block.name,
+                    inputJson: '',
+                  };
+                  toolUses.push(currentToolUse);
+                } else if (
+                  data.type === 'content_block_delta' &&
+                  data.delta?.type === 'input_json_delta' &&
+                  currentToolUse
+                ) {
+                  currentToolUse.inputJson += data.delta.partial_json ?? '';
+                } else if (data.type === 'content_block_delta' && data.delta?.text) {
+                  accumulatedText += data.delta.text;
+                  options.onChunk(data.delta.text);
+                }
+              } catch {
+                // chunk parse
               }
-            } catch {
-              // chunk parse
             }
           }
         }
       }
+    } finally {
+      reader.releaseLock();
     }
-  } finally {
-    reader.releaseLock();
+
+    if (toolUses.length > 0 && options.dataset && toolIterations < MAX_TOOL_ITERATIONS) {
+      toolIterations++;
+
+      const assistantContent: unknown[] = [];
+      if (accumulatedText) assistantContent.push({ type: 'text', text: accumulatedText });
+      for (const tu of toolUses) {
+        let input: Record<string, unknown> = {};
+        try {
+          input = tu.inputJson ? JSON.parse(tu.inputJson) : {};
+        } catch {
+          input = {};
+        }
+        assistantContent.push({ type: 'tool_use', id: tu.id, name: tu.name, input });
+      }
+      messages.push({ role: 'assistant', content: assistantContent });
+
+      const userToolResults: unknown[] = [];
+      for (const tu of toolUses) {
+        let parsedArgs: Record<string, unknown> = {};
+        try {
+          parsedArgs = tu.inputJson ? JSON.parse(tu.inputJson) : {};
+        } catch {
+          parsedArgs = {};
+        }
+
+        options.onStatus?.({
+          type: 'tool_call',
+          message: formatToolStatus(tu.name, parsedArgs, locale),
+          toolName: tu.name,
+          toolArgs: parsedArgs,
+        });
+
+        const toolRes = executeAnalyticalTool(tu.name, parsedArgs, options.dataset);
+
+        options.onStatus?.({
+          type: 'tool_result',
+          message: '',
+          toolName: tu.name,
+          toolResult: toolRes.result,
+        });
+
+        userToolResults.push({
+          type: 'tool_result',
+          tool_use_id: tu.id,
+          content: JSON.stringify(toolRes.result ?? { error: toolRes.error }),
+        });
+      }
+
+      messages.push({ role: 'user', content: userToolResults });
+      continue;
+    }
+
+    break;
   }
 }
 
@@ -550,7 +885,10 @@ export async function testAiConnection(config: AiConfig): Promise<string> {
   if (!config.apiKey && config.provider !== 'custom') {
     throw new AiError('Chave de API não informada.');
   }
-  const result = await generateTextWithProvider(config, 'Responda apenas "OK" para testar a conexão.');
+  const result = await generateTextWithProvider(
+    config,
+    'Responda apenas "OK" para testar a conexão.',
+  );
   if (!result || !result.trim()) {
     throw new AiError('O modelo respondeu com texto vazio.');
   }

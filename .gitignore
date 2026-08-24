@@ -13,3 +13,6 @@ web/*.tsbuildinfo
 # Versioná-los produziria links quebrados em qualquer outra máquina.
 .agents/
 .claude/skills/
+.DS_Store
+*.DS_Store
+
