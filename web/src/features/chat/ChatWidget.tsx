@@ -131,13 +131,13 @@ export function ChatWidget() {
 
   return (
     <>
-      {/* Botão de Ação Flutuante (FAB) no Canto Inferior Direito */}
-      <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2">
+      {/* Botão de Ação Flutuante (FAB) no Canto Inferior Direito (acima do café) */}
+      <div className="fixed bottom-[60px] right-5 z-50 flex items-center justify-end gap-2">
         <button
           type="button"
           onClick={() => setIsOpen((prev) => !prev)}
           className={cn(
-            'group relative flex items-center gap-2.5 rounded-full px-4 py-3 text-white shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 focus:outline-hidden',
+            'group relative flex items-center gap-2.5 rounded-full px-4 py-2.5 sm:py-3 text-white shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 focus:outline-hidden',
             isOpen
               ? 'bg-slate-800 dark:bg-slate-700'
               : 'bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 shadow-emerald-500/25 ring-2 ring-emerald-400/40',
@@ -167,7 +167,7 @@ export function ChatWidget() {
 
       {/* Janela Flutuante do Widget de Chat */}
       {isOpen && (
-        <div className="fixed bottom-20 right-4 sm:right-6 z-50 flex h-[580px] max-h-[82vh] w-[94vw] sm:w-[440px] flex-col overflow-hidden rounded-2xl border border-border/90 bg-card/95 shadow-2xl backdrop-blur-md animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-4">
+        <div className="fixed bottom-[116px] right-4 sm:right-6 z-50 flex h-[540px] max-h-[72vh] w-[94vw] sm:w-[440px] flex-col overflow-hidden rounded-2xl border border-border/90 bg-card/95 shadow-2xl backdrop-blur-md animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-4">
           {/* Cabeçalho do Widget */}
           <div className="flex items-center justify-between border-b border-border/80 bg-gradient-to-r from-emerald-600/10 via-teal-600/5 to-transparent px-4 py-3">
             <div className="flex items-center gap-2.5">

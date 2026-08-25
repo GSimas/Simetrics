@@ -12,6 +12,7 @@ import SearchTab from '@/features/search/SearchTab';
 import ReportTab from '@/features/report/ReportTab';
 import FeedbackTab from '@/features/feedback/FeedbackTab';
 import { ChatWidget } from '@/features/chat/ChatWidget';
+import { BuyMeCoffeeButton } from '@/components/BuyMeCoffeeButton';
 import { type TranslationKey } from '@/lib/i18n/translations';
 import { cn } from '@/lib/utils';
 import { useDataset } from '@/state/dataset.store';
@@ -165,8 +166,11 @@ export default function App() {
         </main>
       </div>
 
-      {/* Widget Flutuante da Simi - Assistente Científico (FAB) */}
+      {/* Widget Flutuante da Simi - Assistente Científico (FAB - Canto Inferior Direito) */}
       <ChatWidget />
+
+      {/* Botão Flutuante de Café Luminoso (Pague-me um café - Canto Inferior Esquerdo) */}
+      <BuyMeCoffeeButton />
 
       {/* Rodapé com crédito de desenvolvimento centralizado */}
       <footer className="mt-20 border-t border-border/80 bg-card/60 py-6 backdrop-blur-xs">

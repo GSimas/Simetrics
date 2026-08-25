@@ -15,6 +15,8 @@ export const TRANSLATIONS = {
     theme_dark: 'Alternar para Modo Claro',
     theme_light: 'Alternar para Modo Escuro',
     lang_toggle: 'Mudar para Inglês',
+    buy_me_coffee: 'Pague-me um café',
+    buy_me_coffee_tooltip: 'Apoie o Simetrics pagando um café! ☕',
 
     // Tabs
     tab_overview: 'Informações Principais',
@@ -244,6 +246,8 @@ export const TRANSLATIONS = {
     theme_dark: 'Switch to Light Mode',
     theme_light: 'Switch to Dark Mode',
     lang_toggle: 'Mudar para Português',
+    buy_me_coffee: 'Buy me a coffee',
+    buy_me_coffee_tooltip: 'Support Simetrics by buying me a coffee! ☕',
 
     // Tabs
     tab_overview: 'Overview & Metrics',
