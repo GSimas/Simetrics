@@ -15,6 +15,7 @@ import {
   getGraphWorker,
   getIngestWorker,
   proxyProgress,
+  terminateWorkers,
 } from '@/workers/client';
 
 /**
@@ -26,7 +27,7 @@ import {
  * dela derivava, e é o que `resetDerived` faz.
  */
 
-export type DedupStrategy = 'none' | 'doi' | 'similarity';
+export type DedupStrategy = 'none' | 'doi' | 'similarity' | 'both';
 
 interface DatasetState {
   /** Base como veio dos arquivos, antes de qualquer deduplicação. */
@@ -44,7 +45,11 @@ interface DatasetState {
   /** Resultado da categorização temática, quando já executada. */
   clustering: ClusteringResult | null;
 
+  isIngesting: boolean;
+  isDeduplicating: boolean;
+  isCategorizingThemes: boolean;
   progress: WorkerProgress | null;
+  snaProgress: WorkerProgress | null;
   error: string | null;
 
   loadFiles: (files: UploadedFile[]) => Promise<void>;
@@ -82,11 +87,15 @@ export const useDataset = create<DatasetState>((set, get) => ({
   duplicates: [],
   dedupStrategy: 'none',
   ...DERIVED_RESET,
+  isIngesting: false,
+  isDeduplicating: false,
+  isCategorizingThemes: false,
   progress: null,
+  snaProgress: null,
   error: null,
 
   async loadFiles(files) {
-    set({ progress: { phase: 'Lendo arquivos', ratio: 0 }, error: null });
+    set({ isIngesting: true, progress: { phase: 'Lendo arquivos', ratio: 0 }, error: null });
 
     try {
       const worker = getIngestWorker();
@@ -106,12 +115,12 @@ export const useDataset = create<DatasetState>((set, get) => ({
     } catch (cause) {
       set({ error: describeError(cause) });
     } finally {
-      set({ progress: null });
+      set({ isIngesting: false, progress: null });
     }
   },
 
   async loadDemo() {
-    set({ progress: { phase: 'Carregando base de demonstração', ratio: 0 }, error: null });
+    set({ isIngesting: true, progress: { phase: 'Carregando base de demonstração', ratio: 0 }, error: null });
 
     try {
       const sources: RisSource[] = await Promise.all(
@@ -136,7 +145,7 @@ export const useDataset = create<DatasetState>((set, get) => ({
     } catch (cause) {
       set({ error: describeError(cause) });
     } finally {
-      set({ progress: null });
+      set({ isIngesting: false, progress: null });
     }
   },
 
@@ -144,7 +153,7 @@ export const useDataset = create<DatasetState>((set, get) => ({
     const { original } = get();
     if (!original) return;
 
-    set({ progress: { phase: 'Deduplicando', ratio: 0 }, error: null });
+    set({ isDeduplicating: true, progress: { phase: 'Deduplicando', ratio: 0 }, error: null });
 
     try {
       if (strategy === 'none') {
@@ -162,14 +171,25 @@ export const useDataset = create<DatasetState>((set, get) => ({
       // A deduplicação parte SEMPRE da base original, nunca da já deduplicada: aplicar
       // uma estratégia sobre o resultado da outra acumularia remoções e impediria o
       // usuário de voltar atrás.
-      const result =
-        strategy === 'doi'
-          ? await worker.dedupByDoi(original)
-          : await worker.dedupBySimilarity(
-              original,
-              threshold,
-              proxyProgress((update: WorkerProgress) => set({ progress: update })),
-            );
+      let result: { kept: Dataset; removed: DuplicateRecord[] };
+
+      if (strategy === 'doi') {
+        result = await worker.dedupByDoi(original);
+      } else if (strategy === 'similarity') {
+        result = await worker.dedupBySimilarity(
+          original,
+          threshold,
+          proxyProgress((update: WorkerProgress) => set({ progress: update })),
+        );
+      } else if (strategy === 'both') {
+        result = await worker.dedupBoth(
+          original,
+          threshold,
+          proxyProgress((update: WorkerProgress) => set({ progress: update })),
+        );
+      } else {
+        result = { kept: original, removed: [] };
+      }
 
       set({
         active: result.kept,
@@ -181,7 +201,7 @@ export const useDataset = create<DatasetState>((set, get) => ({
     } catch (cause) {
       set({ error: describeError(cause) });
     } finally {
-      set({ progress: null });
+      set({ isDeduplicating: false, progress: null });
     }
   },
 
@@ -190,13 +210,10 @@ export const useDataset = create<DatasetState>((set, get) => ({
     if (!active || overview) return;
 
     try {
-      set({ progress: { phase: 'Calculando indicadores', ratio: 0.3 } });
       const result = await getAnalyticsWorker().overview(active);
       set({ overview: result });
     } catch (cause) {
       set({ error: describeError(cause) });
-    } finally {
-      set({ progress: null });
     }
   },
 
@@ -205,13 +222,10 @@ export const useDataset = create<DatasetState>((set, get) => ({
     if (!active || tables) return;
 
     try {
-      set({ progress: { phase: 'Montando tabelas analíticas', ratio: 0.5 } });
       const result = await getAnalyticsWorker().tables(active);
       set({ tables: result });
     } catch (cause) {
       set({ error: describeError(cause) });
-    } finally {
-      set({ progress: null });
     }
   },
 
@@ -220,15 +234,16 @@ export const useDataset = create<DatasetState>((set, get) => ({
     if (!active || sna) return;
 
     try {
+      set({ snaProgress: { phase: 'Iniciando análise de redes', ratio: 0 } });
       const result = await getGraphWorker().heterogeneous(
         active,
-        proxyProgress((update: WorkerProgress) => set({ progress: update })),
+        proxyProgress((update: WorkerProgress) => set({ snaProgress: update })),
       );
       set({ sna: result });
     } catch (cause) {
       set({ error: describeError(cause) });
     } finally {
-      set({ progress: null });
+      set({ snaProgress: null });
     }
   },
 
@@ -247,7 +262,7 @@ export const useDataset = create<DatasetState>((set, get) => ({
     const { active } = get();
     if (!active) return;
 
-    set({ progress: { phase: 'Agrupando documentos', ratio: 0 }, error: null });
+    set({ isCategorizingThemes: true, progress: { phase: 'Agrupando documentos', ratio: 0 }, error: null });
 
     try {
       const result = await getAiWorker().cluster(
@@ -299,7 +314,7 @@ export const useDataset = create<DatasetState>((set, get) => ({
     } catch (cause) {
       set({ error: describeError(cause) });
     } finally {
-      set({ progress: null });
+      set({ isCategorizingThemes: false, progress: null });
     }
   },
 
@@ -316,12 +331,17 @@ export const useDataset = create<DatasetState>((set, get) => ({
   },
 
   reset() {
+    terminateWorkers();
     set({
       original: null,
       active: null,
       duplicates: [],
       dedupStrategy: 'none',
+      isIngesting: false,
+      isDeduplicating: false,
+      isCategorizingThemes: false,
       progress: null,
+      snaProgress: null,
       error: null,
       ...DERIVED_RESET,
     });

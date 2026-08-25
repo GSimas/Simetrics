@@ -164,3 +164,23 @@ export function dedupBySimilarity(
 
   return { kept, removed };
 }
+
+/**
+ * Deduplicação dupla (DOI e Similaridade de título).
+ *
+ * Aplica primeiro a deduplicação por DOI (identidade exata e inequívoca) e,
+ * sobre a base resultante, aplica a deduplicação por similaridade de título (TF-IDF).
+ * Acumula todos os registros removidos com seus documentos de referência mantidos.
+ */
+export function dedupBoth(
+  rows: Dataset,
+  options: SimilarityDedupOptions = {},
+): DedupResult {
+  const doiResult = dedupByDoi(rows);
+  const simResult = dedupBySimilarity(doiResult.kept, options);
+
+  return {
+    kept: simResult.kept,
+    removed: [...doiResult.removed, ...simResult.removed],
+  };
+}

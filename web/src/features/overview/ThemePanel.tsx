@@ -29,7 +29,8 @@ export function ThemePanel() {
   const active = useDataset((state) => state.active);
   const clustering = useDataset((state) => state.clustering);
   const categorize = useDataset((state) => state.categorizeThemes);
-  const busy = useDataset((state) => state.progress !== null);
+  const isCategorizingThemes = useDataset((state) => state.isCategorizingThemes);
+  const busy = isCategorizingThemes;
   const t = useLocale((state) => state.t);
   const isAiConfigured = useAiConfig((state) => state.isConfigured());
   const [aiModalOpen, setAiModalOpen] = useState(false);

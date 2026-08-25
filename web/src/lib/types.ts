@@ -123,6 +123,7 @@ export type SearchEntityType =
   | 'Autor'
   | 'País'
   | 'Local de Publicação (Venue)'
+  | 'Palavra-chave'
   | 'Tema';
 
 /** Progresso emitido pelos workers, substituindo st.progress. */

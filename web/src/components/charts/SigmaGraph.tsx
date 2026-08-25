@@ -25,8 +25,6 @@ const COMMUNITY_COLORS = [
   '#4BAFC9', '#D45D79', '#7A8B99', '#8C6D46', '#5C6BC0',
 ] as const;
 
-const EDGE_COLOR = 'rgba(130, 140, 150, 0.28)';
-
 export interface SigmaGraphProps {
   nodes: readonly RenderNode[];
   edges: readonly RenderEdge[];
@@ -47,17 +45,34 @@ export default function SigmaGraph({
   const sigmaRef = useRef<Sigma | null>(null);
   const clickHandlerRef = useRef(onNodeClick);
   const [hovered, setHovered] = useState<RenderNode | null>(null);
+  const [isDark, setIsDark] = useState<boolean>(() =>
+    typeof document !== 'undefined' ? document.documentElement.classList.contains('dark') : false,
+  );
 
   // O handler fica numa ref para que trocá-lo não force a reconstrução do grafo.
   useEffect(() => {
     clickHandlerRef.current = onNodeClick;
   }, [onNodeClick]);
 
+  // Monitora alterações de tema (dark/light) no elemento raiz para sincronizar os contrastes do WebGL
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container || nodes.length === 0) return;
 
     const graph = new Graph({ type: 'undirected', multi: false });
+
+    // Cores de alto contraste adaptadas ao modo claro / escuro
+    const labelColor = isDark ? '#f8fafc' : '#0f172a';
+    const edgeColor = isDark ? 'rgba(148, 163, 184, 0.65)' : 'rgba(71, 85, 105, 0.65)';
 
     // Posição inicial em círculo. O ForceAtlas2 não sai do lugar se todos os nós começarem
     // sobrepostos: com forças simétricas, o deslocamento resultante é zero.
@@ -76,8 +91,8 @@ export default function SigmaGraph({
       if (!graph.hasNode(edge.source) || !graph.hasNode(edge.target)) continue;
       if (graph.hasEdge(edge.source, edge.target)) continue;
       graph.addEdge(edge.source, edge.target, {
-        size: Math.min(4, 0.4 + Math.log2(edge.weight + 1)),
-        color: EDGE_COLOR,
+        size: Math.max(1.2, Math.min(5, 0.8 + Math.log2(edge.weight + 1))),
+        color: edgeColor,
       });
     }
 
@@ -97,9 +112,14 @@ export default function SigmaGraph({
 
     const renderer = new Sigma(graph, container, {
       renderLabels: true,
-      labelDensity: 0.5,
-      labelRenderedSizeThreshold: 5,
-      defaultEdgeColor: EDGE_COLOR,
+      labelDensity: 0.6,
+      labelRenderedSizeThreshold: 3,
+      labelFont: 'Inter, system-ui, -apple-system, sans-serif',
+      labelWeight: '600',
+      labelSize: 12,
+      labelColor: { color: labelColor },
+      defaultEdgeColor: edgeColor,
+      minEdgeThickness: 1.5,
       minCameraRatio: 0.05,
       maxCameraRatio: 12,
     });
@@ -114,7 +134,7 @@ export default function SigmaGraph({
       renderer.kill();
       sigmaRef.current = null;
     };
-  }, [nodes, edges]);
+  }, [nodes, edges, isDark]);
 
   return (
     <div className={cn('relative w-full overflow-hidden rounded-lg border', className)}>

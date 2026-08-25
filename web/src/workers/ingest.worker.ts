@@ -1,6 +1,6 @@
 import * as Comlink from 'comlink';
 
-import { dedupByDoi, dedupBySimilarity } from '@/core/dedup';
+import { dedupBoth, dedupByDoi, dedupBySimilarity } from '@/core/dedup';
 import { processFiles, type UploadedFile } from '@/core/parsers';
 import { processRisFiles, type RisSource } from '@/core/parsers/pipeline-ris';
 import { MAX_DOCUMENTS } from '@/lib/schema';
@@ -57,6 +57,22 @@ const api = {
     return dedupBySimilarity(dataset, {
       threshold,
       onProgress: (ratio) => onProgress?.({ phase: 'Comparando títulos', ratio }),
+    });
+  },
+
+  dedupBoth(
+    dataset: Dataset,
+    threshold: number,
+    onProgress?: ProgressCallback,
+  ): DedupResult {
+    onProgress?.({ phase: 'Deduplicando por DOI', ratio: 0.1 });
+    return dedupBoth(dataset, {
+      threshold,
+      onProgress: (ratio) =>
+        onProgress?.({
+          phase: 'Comparando títulos por similaridade',
+          ratio: 0.2 + ratio * 0.8,
+        }),
     });
   },
 };

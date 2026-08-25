@@ -186,7 +186,7 @@ export default function NetworksTab() {
   const active = useDataset((state) => state.active);
   const sna = useDataset((state) => state.sna);
   const network = useDataset((state) => state.network);
-  const progress = useDataset((state) => state.progress);
+  const snaProgress = useDataset((state) => state.snaProgress);
   const computeSna = useDataset((state) => state.computeSna);
   const computeNetwork = useDataset((state) => state.computeNetwork);
   const { t, locale } = useLocale();
@@ -247,14 +247,14 @@ export default function NetworksTab() {
 
   return (
     <div className="space-y-4">
-      {progress && (
+      {snaProgress && (
         <Card>
           <CardContent className="space-y-1.5 pt-6">
             <div className="flex justify-between text-xs text-muted-foreground">
-              <span>{progress.phase}</span>
-              <span className="tabular-nums">{Math.round(progress.ratio * 100)}%</span>
+              <span>{snaProgress.phase}</span>
+              <span className="tabular-nums">{Math.round(snaProgress.ratio * 100)}%</span>
             </div>
-            <Progress value={progress.ratio * 100} />
+            <Progress value={snaProgress.ratio * 100} />
           </CardContent>
         </Card>
       )}

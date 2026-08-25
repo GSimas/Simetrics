@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath, URL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-import { dedupByDoi, dedupBySimilarity } from '@/core/dedup';
+import { dedupBoth, dedupByDoi, dedupBySimilarity } from '@/core/dedup';
 import { processRisFiles, type RisSource } from '@/core/parsers/pipeline-ris';
 import { bibliometrixMetrics, metadataCompleteness, summarize } from '@/core/summary';
 import { authorsTable, countriesTable, keywordsTable, venuesTable } from '@/core/tables';
@@ -80,6 +80,15 @@ describe('deduplicação', () => {
     const { kept, removed } = dedupBySimilarity(dataset, { threshold: 0.9 });
 
     expect(removed.length).toBeGreaterThanOrEqual(golden.dedupSimilaridade.removed);
+    expect(kept.length + removed.length).toBe(dataset.length);
+  });
+
+  it('executa deduplicação dupla combinando DOI e similaridade', () => {
+    const { kept, removed } = dedupBoth(dataset, { threshold: 0.9 });
+    const doiResult = dedupByDoi(dataset);
+
+    // Deve remover no mínimo tantas duplicatas quanto a remoção por DOI
+    expect(removed.length).toBeGreaterThanOrEqual(doiResult.removed.length);
     expect(kept.length + removed.length).toBe(dataset.length);
   });
 });
