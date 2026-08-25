@@ -12,6 +12,7 @@ export interface SearchOptions {
   authors: string[];
   countries: string[];
   venues: string[];
+  keywords: string[];
   themes: string[];
 }
 
@@ -21,11 +22,13 @@ export function buildSearchOptions(rows: Dataset): SearchOptions {
   const titleColumn = pickColumn(columns, FIELD_CANDIDATES.title);
   const authorsColumn = pickColumn(columns, FIELD_CANDIDATES.authors);
   const venueColumn = pickColumn(columns, FIELD_CANDIDATES.venue);
+  const keywordsColumn = pickColumn(columns, FIELD_CANDIDATES.keywords);
 
   const documents = new Set<string>();
   const authors = new Set<string>();
   const countries = new Set<string>();
   const venues = new Set<string>();
+  const keywords = new Set<string>();
   const themes = new Set<string>();
 
   for (const doc of rows) {
@@ -47,6 +50,12 @@ export function buildSearchOptions(rows: Dataset): SearchOptions {
       if (venue && !isNullLike(venue)) venues.add(venue);
     }
 
+    if (keywordsColumn) {
+      for (const kw of splitTokens(doc[keywordsColumn])) {
+        if (kw && !isNullLike(kw)) keywords.add(kw);
+      }
+    }
+
     if (columns.has(FIELD.THEME)) {
       const theme = String(doc[FIELD.THEME] ?? '').trim();
       if (theme && !isNullLike(theme)) themes.add(theme);
@@ -61,6 +70,7 @@ export function buildSearchOptions(rows: Dataset): SearchOptions {
     authors: sorted(authors),
     countries: sorted(countries),
     venues: sorted(venues),
+    keywords: sorted(keywords),
     themes: sorted(themes),
   };
 }
@@ -83,6 +93,9 @@ export function filterByEntity(
   const titleColumn = pickColumn(columns, FIELD_CANDIDATES.title);
   const authorsColumn = pickColumn(columns, FIELD_CANDIDATES.authors);
   const venueColumn = pickColumn(columns, FIELD_CANDIDATES.venue);
+  const keywordsColumn = pickColumn(columns, FIELD_CANDIDATES.keywords);
+
+  const termLower = term.toLowerCase().trim();
 
   const matches = (doc: SimetricsDoc): boolean => {
     switch (type) {
@@ -94,6 +107,10 @@ export function filterByEntity(
         return columns.has(FIELD.COUNTRY) ? splitTokens(doc[FIELD.COUNTRY]).includes(term) : false;
       case 'Local de Publicação (Venue)':
         return venueColumn ? String(doc[venueColumn] ?? '').trim() === term : false;
+      case 'Palavra-chave':
+        return keywordsColumn
+          ? splitTokens(doc[keywordsColumn]).some((kw) => kw.toLowerCase().trim() === termLower)
+          : false;
       case 'Tema':
         return columns.has(FIELD.THEME) ? String(doc[FIELD.THEME] ?? '').trim() === term : false;
       default:
@@ -115,6 +132,8 @@ export function optionsForType(options: SearchOptions, type: SearchEntityType): 
       return options.countries;
     case 'Local de Publicação (Venue)':
       return options.venues;
+    case 'Palavra-chave':
+      return options.keywords;
     case 'Tema':
       return options.themes;
     default:
@@ -129,6 +148,7 @@ export function availableTypes(options: SearchOptions): SearchEntityType[] {
   if (options.authors.length > 0) types.push('Autor');
   if (options.countries.length > 0) types.push('País');
   if (options.venues.length > 0) types.push('Local de Publicação (Venue)');
+  if (options.keywords.length > 0) types.push('Palavra-chave');
   // Temas só existem depois da categorização por IA.
   if (options.themes.length > 0) types.push('Tema');
   return types;

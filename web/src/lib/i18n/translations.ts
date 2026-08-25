@@ -58,9 +58,12 @@ export const TRANSLATIONS = {
     dedup_title: 'Deduplicação',
     dedup_description:
       'Bases diferentes indexam os mesmos artigos. O DOI é a evidência mais forte de identidade; a similaridade de título alcança os registros sem DOI, ao custo de algum risco de falso positivo.',
+    dedup_strategy_label: 'Estratégia de deduplicação',
     dedup_none: 'Base completa',
     dedup_doi: 'Deduplicar por DOI',
     dedup_similarity: 'Deduplicar por similaridade',
+    dedup_both: 'Deduplicação por ambas (DOI e similaridade)',
+    dedup_execute_btn: 'Executar deduplicação',
     dedup_removed: 'documentos removidos',
 
     // Theme Panel (AI)
@@ -105,6 +108,7 @@ export const TRANSLATIONS = {
     tables_title: 'Tabelas analíticas',
     tables_description:
       'Índices h, g, i10 e m por entidade. Clique nos cabeçalhos para ordenar; exporte em CSV o recorte filtrado.',
+    table_tab_all_docs: 'Todos os documentos',
     table_tab_authors: 'Autores',
     table_tab_countries: 'Países',
     table_tab_venues: 'Venues',
@@ -143,17 +147,30 @@ export const TRANSLATIONS = {
     search_similar_title: 'Entidades semelhantes',
     search_similar_desc:
       'Similaridade de Jaccard sobre o "DNA acadêmico": palavras-chave, coautores e veículos em comum.',
-    search_lexico_title: 'Lexicometria',
-    search_lexico_desc: 'Palavras-chave mais frequentes nos documentos desta entidade.',
+    search_lexico_title: 'Lexicometria e Produção',
+    search_lexico_desc: 'Palavras-chave e evolução temporal das publicações desta entidade.',
+    search_tab_cloud: 'Nuvem de palavras',
+    search_tab_timeline: 'Produção histórica',
+    search_timeline_title: 'Evolução anual de publicações',
+    search_timeline_docs: 'Publicações',
     search_docs_title: 'Documentos',
-    search_docs_desc: 'Ordenados por citações, do mais citado ao menos citado.',
+    search_docs_desc: 'Ordenados por citações, do mais citado ao menos citado. Clique no título para ver o dossiê do documento.',
+    search_country_authors: 'Autores vinculados ao país',
+    search_country_authors_desc: 'Pesquisadores com publicações vinculadas a este país. Clique no autor para abrir seu dossiê.',
+    search_doc_authors: 'Autores desta publicação',
+    search_doc_authors_desc: 'Autores que assinam este documento e suas métricas na base. Clique no autor para abrir seu dossiê.',
+    search_view_author: 'Ver perfil do autor',
+    search_view_doc: 'Ver dossiê do documento',
+    search_abstract: 'Resumo',
+    search_keywords: 'Palavras-chave',
+    search_doi_link: 'Acessar DOI / Link',
 
     // Chat Tab
-    chat_title: 'Assistente Científico',
+    chat_title: 'Simi - Assistente Científico',
     chat_desc:
       'Conversando com seus documentos. A cada pergunta, os documentos mais relevantes são selecionados no seu navegador via BM25 e enviados com segurança ao modelo configurado.',
     chat_greeting:
-      'Olá! Sou o Assistente do Simetrics. Respondo com base nos documentos da sua base carregada. Posso recomendar leituras fundamentais, identificar especialistas ou sugerir periódicos para submissão. O que você gostaria de investigar?',
+      'Olá! Sou a Simi, sua assistente científica no Simetrics. Respondo com base nos documentos da sua base carregada. Posso recomendar leituras fundamentais, identificar especialistas ou sugerir periódicos para submissão. O que você gostaria de investigar?',
     chat_suggestions_label: 'Sugestões de perguntas:',
     chat_sugg_1: 'Quais são os documentos fundamentais desta base?',
     chat_sugg_2: 'Quem são os autores mais influentes e em que eles trabalham?',
@@ -171,7 +188,7 @@ export const TRANSLATIONS = {
     chat_tools_executed_count: 'consultas analíticas locais realizadas',
     chat_tools_badge: 'Cálculo determinístico no navegador',
     chat_no_key_warning:
-      'Para conversar com o Assistente Científico, configure sua chave de API própria (BYOK) no botão acima.',
+      'Para conversar com a Simi, configure sua chave de API própria (BYOK) no botão acima.',
 
     // Feedback Tab
     feedback_title: 'Avaliação da Plataforma (SUS)',
@@ -270,9 +287,12 @@ export const TRANSLATIONS = {
     dedup_title: 'Deduplication',
     dedup_description:
       'Different databases index the same papers. DOI is the strongest identity evidence; title similarity catches records without DOI at some risk of false positives.',
+    dedup_strategy_label: 'Deduplication strategy',
     dedup_none: 'Full dataset',
     dedup_doi: 'Deduplicate by DOI',
     dedup_similarity: 'Deduplicate by similarity',
+    dedup_both: 'Deduplicate by both (DOI and similarity)',
+    dedup_execute_btn: 'Run deduplication',
     dedup_removed: 'documents removed',
 
     // Theme Panel (AI)
@@ -317,6 +337,7 @@ export const TRANSLATIONS = {
     tables_title: 'Analytical Tables',
     tables_description:
       'Indices h, g, i10, and m per entity. Click headers to sort; export the filtered selection to CSV.',
+    table_tab_all_docs: 'All Documents',
     table_tab_authors: 'Authors',
     table_tab_countries: 'Countries',
     table_tab_venues: 'Venues',
@@ -355,17 +376,30 @@ export const TRANSLATIONS = {
     search_similar_title: 'Similar Entities',
     search_similar_desc:
       'Jaccard similarity over "Academic DNA": shared keywords, co-authors, and publishing venues.',
-    search_lexico_title: 'Lexicometrics',
-    search_lexico_desc: 'Most frequent keywords in documents associated with this entity.',
+    search_lexico_title: 'Lexicometrics & Production',
+    search_lexico_desc: 'Keywords and historical publication output for this entity.',
+    search_tab_cloud: 'Word Cloud',
+    search_tab_timeline: 'Historical Production',
+    search_timeline_title: 'Annual Publication Output',
+    search_timeline_docs: 'Publications',
     search_docs_title: 'Documents',
-    search_docs_desc: 'Sorted by citations from most to least cited.',
+    search_docs_desc: 'Sorted by citations from most to least cited. Click a title to view its dossier.',
+    search_country_authors: 'Authors Affiliated with Country',
+    search_country_authors_desc: 'Researchers with publications affiliated with this country. Click an author to open their dossier.',
+    search_doc_authors: 'Authors of this Publication',
+    search_doc_authors_desc: 'Authors of this document and their metrics in the dataset. Click an author to open their dossier.',
+    search_view_author: 'View author profile',
+    search_view_doc: 'View document dossier',
+    search_abstract: 'Abstract',
+    search_keywords: 'Keywords',
+    search_doi_link: 'Access DOI / Link',
 
     // Chat Tab
-    chat_title: 'Scientific Assistant',
+    chat_title: 'Simi - Scientific Assistant',
     chat_desc:
       'Chatting with your dataset. For each query, the most relevant documents are selected in your browser via BM25 and safely sent to your configured AI model.',
     chat_greeting:
-      "Hello! I'm the Simetrics Assistant. I answer based on the documents in your loaded dataset. I can recommend foundational readings, identify research leaders, or suggest journals for submission. What would you like to explore?",
+      "Hello! I'm Simi, your scientific assistant in Simetrics. I answer based on the documents in your loaded dataset. I can recommend foundational readings, identify research leaders, or suggest journals for submission. What would you like to explore?",
     chat_suggestions_label: 'Suggested questions:',
     chat_sugg_1: 'What are the foundational papers in this dataset?',
     chat_sugg_2: 'Who are the most influential authors and what are they working on?',
@@ -383,7 +417,7 @@ export const TRANSLATIONS = {
     chat_tools_executed_count: 'local analytical queries executed',
     chat_tools_badge: 'Deterministic in-browser calculation',
     chat_no_key_warning:
-      'To chat with the Scientific Assistant, please configure your own API key (BYOK) using the button above.',
+      'To chat with Simi, please configure your own API key (BYOK) using the button above.',
 
     // Feedback Tab
     feedback_title: 'Platform Usability Scale (SUS)',

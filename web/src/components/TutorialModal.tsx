@@ -165,8 +165,8 @@ const TUTORIAL_STEPS_PT: TutorialStep[] = [
       },
       {
         icon: Bot,
-        label: 'Assistente Científico Flutuante',
-        text: 'Acesse o assistente via widget flutuante no canto inferior direito a partir de qualquer aba.',
+        label: 'Simi - Assistente Científico Flutuante',
+        text: 'Acesse a Simi via widget flutuante no canto inferior direito a partir de qualquer aba.',
       },
     ],
     previewType: 'byok',
@@ -350,8 +350,8 @@ const TUTORIAL_STEPS_EN: TutorialStep[] = [
       },
       {
         icon: Bot,
-        label: 'Floating Scientific Assistant',
-        text: 'Access the conversational assistant anytime via the floating widget in the bottom-right corner across all tabs.',
+        label: 'Simi - Floating Scientific Assistant',
+        text: 'Access Simi anytime via the floating widget in the bottom-right corner across all tabs.',
       },
     ],
     previewType: 'byok',

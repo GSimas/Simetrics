@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import {
   BookOpen,
   Building2,
@@ -21,6 +21,13 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -54,13 +61,22 @@ export default function OverviewTab() {
   const computeOverview = useDataset((state) => state.computeOverview);
   const computeTables = useDataset((state) => state.computeTables);
   const applyDedup = useDataset((state) => state.applyDedup);
-  const busy = useDataset((state) => state.progress !== null);
+  const isDeduplicating = useDataset((state) => state.isDeduplicating);
+  const isIngesting = useDataset((state) => state.isIngesting);
+  const busy = isDeduplicating || isIngesting;
   const t = useLocale((state) => state.t);
+
+  const [selectedStrategy, setSelectedStrategy] = useState<DedupStrategy>(dedupStrategy);
+
+  useEffect(() => {
+    setSelectedStrategy(dedupStrategy);
+  }, [dedupStrategy]);
 
   const dedupLabels: Record<DedupStrategy, string> = {
     none: t('dedup_none'),
     doi: t('dedup_doi'),
     similarity: t('dedup_similarity'),
+    both: t('dedup_both'),
   };
 
   useEffect(() => {
@@ -160,21 +176,43 @@ export default function OverviewTab() {
           <CardDescription>{t('dedup_description')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="flex flex-wrap items-center gap-2">
-            {(Object.keys(dedupLabels) as DedupStrategy[]).map((strategy) => (
-              <Button
-                key={strategy}
-                size="sm"
-                variant={dedupStrategy === strategy ? 'default' : 'outline'}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="w-72 sm:w-80">
+              <Select
+                value={selectedStrategy}
+                onValueChange={(val) => setSelectedStrategy(val as DedupStrategy)}
                 disabled={busy}
-                onClick={() => void applyDedup(strategy)}
               >
-                {dedupLabels[strategy]}
-              </Button>
-            ))}
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder={t('dedup_strategy_label')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">{t('dedup_none')}</SelectItem>
+                  <SelectItem value="doi">{t('dedup_doi')}</SelectItem>
+                  <SelectItem value="similarity">{t('dedup_similarity')}</SelectItem>
+                  <SelectItem value="both">{t('dedup_both')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Button
+              size="sm"
+              variant="default"
+              disabled={busy}
+              onClick={() => void applyDedup(selectedStrategy)}
+              className="gap-2 cursor-pointer font-medium"
+            >
+              {t('dedup_execute_btn')}
+            </Button>
+
+            {dedupStrategy !== 'none' && (
+              <Badge variant="blue" className="text-xs">
+                {dedupLabels[dedupStrategy]}
+              </Badge>
+            )}
 
             {duplicates.length > 0 && (
-              <Badge variant="warning">
+              <Badge variant="warning" className="text-xs">
                 {duplicates.length.toLocaleString('pt-BR')} {t('dedup_removed')}
               </Badge>
             )}
@@ -183,6 +221,49 @@ export default function OverviewTab() {
       </Card>
 
       <ThemePanel />
+
+      {overview && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t('meta_quality_title')}</CardTitle>
+            <CardDescription>{t('meta_quality_description')}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Metadado</TableHead>
+                    <TableHead>Faltantes</TableHead>
+                    <TableHead>%</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {overview.completeness.map((row) => (
+                    <TableRow key={row.field}>
+                      <TableCell className="font-medium">{row.field}</TableCell>
+                      <TableCell className="tabular-nums">
+                        {row.missing.toLocaleString('pt-BR')}
+                      </TableCell>
+                      <TableCell className="tabular-nums">
+                        {row.missingPct.toLocaleString('pt-BR', {
+                          minimumFractionDigits: 1,
+                          maximumFractionDigits: 1,
+                        })}
+                        %
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={STATUS_VARIANT[row.status]}>{row.status}</Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {overview && (
         <div className="grid gap-4 lg:grid-cols-2">
@@ -254,49 +335,6 @@ export default function OverviewTab() {
             </CardContent>
           </Card>
         </div>
-      )}
-
-      {overview && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">{t('meta_quality_title')}</CardTitle>
-            <CardDescription>{t('meta_quality_description')}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Metadado</TableHead>
-                    <TableHead>Faltantes</TableHead>
-                    <TableHead>%</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {overview.completeness.map((row) => (
-                    <TableRow key={row.field}>
-                      <TableCell className="font-medium">{row.field}</TableCell>
-                      <TableCell className="tabular-nums">
-                        {row.missing.toLocaleString('pt-BR')}
-                      </TableCell>
-                      <TableCell className="tabular-nums">
-                        {row.missingPct.toLocaleString('pt-BR', {
-                          minimumFractionDigits: 1,
-                          maximumFractionDigits: 1,
-                        })}
-                        %
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={STATUS_VARIANT[row.status]}>{row.status}</Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
       )}
 
       {duplicates.length > 0 && (

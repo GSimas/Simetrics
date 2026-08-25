@@ -36,12 +36,14 @@ export function UploadPanel() {
   const loadFiles = useDataset((state) => state.loadFiles);
   const loadDemo = useDataset((state) => state.loadDemo);
   const reset = useDataset((state) => state.reset);
+  const isIngesting = useDataset((state) => state.isIngesting);
+  const isDeduplicating = useDataset((state) => state.isDeduplicating);
   const progress = useDataset((state) => state.progress);
   const error = useDataset((state) => state.error);
   const active = useDataset((state) => state.active);
   const t = useLocale((state) => state.t);
 
-  const busy = progress !== null;
+  const busy = isIngesting || isDeduplicating;
 
   const handleSelect = (fileList: FileList | null): void => {
     if (!fileList) return;
@@ -85,14 +87,14 @@ export function UploadPanel() {
             id="simetrics-upload"
           />
 
-          <Button asChild variant="gradient" disabled={busy} className="cursor-pointer font-medium">
+          <Button asChild variant="gradient" disabled={isIngesting} className="cursor-pointer font-medium">
             <label htmlFor="simetrics-upload">
               <FileUp className="size-4" aria-hidden />
               {t('upload_select_files')}
             </label>
           </Button>
 
-          <Button variant="success" onClick={() => void loadDemo()} disabled={busy} className="font-medium">
+          <Button variant="success" onClick={() => void loadDemo()} disabled={isIngesting} className="font-medium cursor-pointer">
             <Rocket className="size-4" aria-hidden />
             {t('upload_load_demo')}
           </Button>
@@ -107,8 +109,8 @@ export function UploadPanel() {
                 variant="ghost"
                 size="sm"
                 onClick={reset}
-                disabled={busy}
-                className="text-muted-foreground hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950 dark:hover:text-red-300"
+                disabled={isIngesting}
+                className="text-muted-foreground hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950 dark:hover:text-red-300 cursor-pointer"
               >
                 <Trash2 className="size-4" aria-hidden />
                 {t('upload_clear')}

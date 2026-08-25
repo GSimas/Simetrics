@@ -36,6 +36,7 @@ export const FIELD_CANDIDATES = {
   venue: [FIELD.SECONDARY_TITLE, 'SO', 'JO'],
   year: [FIELD.YEAR_CLEAN, FIELD.YEAR, 'PY'],
   keywords: [FIELD.KEYWORDS, 'KW', 'DE'],
+  abstract: [FIELD.ABSTRACT, 'AB'],
   doi: [FIELD.DOI, 'DO'],
   references: [FIELD.REFERENCES_UNIFIED, 'REFERENCES', FIELD.CITED_REFERENCES, 'CR'],
   affiliation: ['AUTHOR ADDRESS', 'AD', 'C1', 'AFFILIATIONS'],

@@ -24,6 +24,7 @@ interface Profiles {
   authors: Map<string, Set<string>>;
   countries: Map<string, Set<string>>;
   venues: Map<string, Set<string>>;
+  keywords: Map<string, Set<string>>;
 }
 
 function addAll(target: Map<string, Set<string>>, key: string, values: Iterable<string>): void {
@@ -45,12 +46,14 @@ export function buildProfiles(rows: Dataset): Profiles {
     authors: new Map(),
     countries: new Map(),
     venues: new Map(),
+    keywords: new Map(),
   };
 
   for (const doc of rows) {
     const title = titleColumn ? String(doc[titleColumn] ?? '').trim() : '';
     const authors = new Set(authorsColumn ? splitTokens(doc[authorsColumn]) : []);
-    // Palavras-chave entram em minúsculas: "Memetics" e "memetics" são o mesmo traço.
+    const rawKeywords = keywordsColumn ? splitTokens(doc[keywordsColumn]) : [];
+    // Palavras-chave entram em minúsculas para match de traço: "Memetics" e "memetics" são o mesmo traço.
     const keywords = new Set(keywordsColumn ? splitTokens(doc[keywordsColumn], 'lower') : []);
     const countries = new Set(columns.has(FIELD.COUNTRY) ? splitTokens(doc[FIELD.COUNTRY]) : []);
     const venue = venueColumn ? String(doc[venueColumn] ?? '').trim() : '';
@@ -74,6 +77,11 @@ export function buildProfiles(rows: Dataset): Profiles {
     if (venue) {
       addAll(profiles.venues, venue, [...keywords, ...authors, ...countries]);
     }
+
+    for (const kw of rawKeywords) {
+      const otherKws = [...keywords].filter((other) => other !== kw.toLowerCase());
+      addAll(profiles.keywords, kw, [...otherKws, ...authors, ...venueSet]);
+    }
   }
 
   return profiles;
@@ -89,6 +97,8 @@ function profilesFor(profiles: Profiles, type: SearchEntityType): Map<string, Se
       return profiles.countries;
     case 'Local de Publicação (Venue)':
       return profiles.venues;
+    case 'Palavra-chave':
+      return profiles.keywords;
     default:
       // Temas não têm perfil próprio: são um rótulo atribuído pela IA, não uma entidade
       // com traços observáveis na base.
