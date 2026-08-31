@@ -1,0 +1,204 @@
+import { useEffect, useRef } from 'react';
+import { Network, PlayCircle, Sparkles, Upload, Zap } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { EmptyState } from '@/features/EmptyState';
+import { ProjectCard } from '@/features/landing/ProjectCard';
+import type { TranslationKey } from '@/lib/i18n/translations';
+import type { AppView } from '@/lib/use-hash-route';
+import { useDataset } from '@/state/dataset.store';
+import { useLocale } from '@/state/locale.store';
+import { useProjectStore } from '@/state/project.store';
+
+const HIGHLIGHTS = [
+  {
+    Icon: Zap,
+    labelKey: 'landing_highlight_1_label' as TranslationKey,
+    textKey: 'landing_highlight_1_text' as TranslationKey,
+  },
+  {
+    Icon: Network,
+    labelKey: 'landing_highlight_2_label' as TranslationKey,
+    textKey: 'landing_highlight_2_text' as TranslationKey,
+  },
+  {
+    Icon: Sparkles,
+    labelKey: 'landing_highlight_3_label' as TranslationKey,
+    textKey: 'landing_highlight_3_text' as TranslationKey,
+  },
+] as const;
+
+export interface LandingScreenProps {
+  navigate: (view: AppView, projectId?: string) => void;
+  onOpenTutorial: () => void;
+}
+
+export function LandingScreen({ navigate, onOpenTutorial }: LandingScreenProps) {
+  const { t } = useLocale();
+  const importInputRef = useRef<HTMLInputElement>(null);
+
+  const projects = useProjectStore((state) => state.projects);
+  const isLoadingList = useProjectStore((state) => state.isLoadingList);
+  const error = useProjectStore((state) => state.error);
+  const refreshList = useProjectStore((state) => state.refreshList);
+  const openProject = useProjectStore((state) => state.open);
+  const renameProject = useProjectStore((state) => state.rename);
+  const duplicateProject = useProjectStore((state) => state.duplicate);
+  const exportProject = useProjectStore((state) => state.exportToFile);
+  const deleteProject = useProjectStore((state) => state.remove);
+  const importFromFile = useProjectStore((state) => state.importFromFile);
+  const clearError = useProjectStore((state) => state.clearError);
+  const resetDataset = useDataset((state) => state.reset);
+
+  useEffect(() => {
+    void refreshList();
+    // Só na montagem: a lista já se mantém atualizada sozinha após cada ação (rename,
+    // duplicate, delete, import e o checkpoint automático já chamam refreshList).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const mostRecent = projects[0];
+
+  const handleOpen = async (id: string): Promise<void> => {
+    await openProject(id);
+    if (!useProjectStore.getState().error) navigate('workspace', id);
+  };
+
+  const handleNewBlank = (): void => {
+    resetDataset();
+    navigate('workspace');
+  };
+
+  const handleImportChange = (fileList: FileList | null): void => {
+    const file = fileList?.[0];
+    if (!file) return;
+    void importFromFile(file);
+    if (importInputRef.current) importInputRef.current.value = '';
+  };
+
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      <div className="h-1.5 w-full bg-gradient-to-r from-blue-600 via-indigo-500 to-purple-600" />
+
+      <main className="container flex flex-col gap-12 py-12 sm:py-16">
+        <section className="flex flex-col items-center gap-6 text-center">
+          <div className="flex size-20 items-center justify-center rounded-3xl border border-primary/25 bg-gradient-to-br from-blue-50 to-indigo-50/70 p-3 shadow-xs dark:from-blue-950 dark:to-indigo-950">
+            <img src="/simetrics-logo.png" alt="Simetrics Logo" className="h-14 w-auto object-contain" />
+          </div>
+
+          <div className="space-y-2">
+            <h1 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
+              {t('app_title')}
+            </h1>
+            <p className="text-base font-medium text-muted-foreground sm:text-lg">
+              {t('app_subtitle')}
+            </p>
+          </div>
+
+          <p className="max-w-2xl text-sm text-muted-foreground sm:text-base">
+            {t('landing_pitch')}
+          </p>
+
+          <div className="grid w-full max-w-3xl gap-3 sm:grid-cols-3">
+            {HIGHLIGHTS.map(({ Icon, labelKey, textKey }) => (
+              <Card key={labelKey} className="border-border/80 text-left shadow-2xs">
+                <CardContent className="flex flex-col gap-2 p-4">
+                  <Icon className="size-5 text-primary" aria-hidden />
+                  <p className="text-sm font-semibold text-foreground">{t(labelKey)}</p>
+                  <p className="text-xs text-muted-foreground">{t(textKey)}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            {mostRecent ? (
+              <>
+                <Button
+                  variant="gradient"
+                  size="lg"
+                  className="cursor-pointer font-semibold"
+                  onClick={() => void handleOpen(mostRecent.id)}
+                >
+                  <PlayCircle className="size-5" aria-hidden />
+                  {t('landing_cta_continue').replace('{name}', mostRecent.name)}
+                </Button>
+                <Button variant="outline" size="lg" className="cursor-pointer" onClick={handleNewBlank}>
+                  {t('landing_cta_new_blank')}
+                </Button>
+              </>
+            ) : (
+              <Button variant="gradient" size="lg" className="cursor-pointer font-semibold" onClick={handleNewBlank}>
+                <PlayCircle className="size-5" aria-hidden />
+                {t('landing_cta_start')}
+              </Button>
+            )}
+            <Button variant="ghost" size="lg" className="cursor-pointer" onClick={onOpenTutorial}>
+              {t('landing_cta_tutorial')}
+            </Button>
+          </div>
+        </section>
+
+        <section className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-bold text-foreground">{t('landing_projects_title')}</h2>
+
+            <div className="flex items-center gap-2">
+              <input
+                ref={importInputRef}
+                type="file"
+                accept="application/json"
+                onChange={(event) => handleImportChange(event.target.files)}
+                className="hidden"
+                id="simetrics-import-project"
+              />
+              <Button asChild variant="outline" size="sm" className="cursor-pointer font-medium">
+                <label htmlFor="simetrics-import-project">
+                  <Upload className="size-4" aria-hidden />
+                  {t('landing_projects_import')}
+                </label>
+              </Button>
+            </div>
+          </div>
+
+          {error && (
+            <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/5 p-2 text-sm text-destructive">
+              <span>{error}</span>
+              <button
+                type="button"
+                onClick={clearError}
+                className="shrink-0 font-medium underline underline-offset-2 cursor-pointer"
+              >
+                {t('landing_dismiss_error')}
+              </button>
+            </div>
+          )}
+
+          {projects.length > 0 ? (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {projects.map((project) => (
+                <ProjectCard
+                  key={project.id}
+                  project={project}
+                  onOpen={(id) => void handleOpen(id)}
+                  onRename={(id, name) => void renameProject(id, name)}
+                  onDuplicate={(id) => void duplicateProject(id)}
+                  onExport={(id) => void exportProject(id)}
+                  onDelete={(id) => void deleteProject(id)}
+                />
+              ))}
+            </div>
+          ) : (
+            !isLoadingList && (
+              <EmptyState
+                title={t('landing_projects_empty_title')}
+                description={t('landing_projects_empty_desc')}
+              />
+            )
+          )}
+        </section>
+      </main>
+    </div>
+  );
+}

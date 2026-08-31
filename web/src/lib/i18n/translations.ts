@@ -231,6 +231,59 @@ export const TRANSLATIONS = {
       'Privacidade garantida: Sua chave de API é salva exclusivamente no armazenamento local do seu navegador (localStorage) e enviada diretamente para a API do provedor escolhido. Nossos servidores não têm acesso à sua chave.',
     ai_test_success: 'Conexão testada com sucesso!',
     ai_test_failed: 'Falha no teste de conexão:',
+
+    // Navegação — Projetos
+    nav_projects_btn: 'Meus Projetos',
+    project_save_status_saving: 'Salvando…',
+    project_save_status_saved: 'Salvo às {time}',
+    project_save_status_error: 'Falha ao salvar',
+
+    // Tela Inicial (Landing)
+    landing_pitch:
+      'O Simetrics transforma exports de bases bibliográficas (Scopus, Web of Science, SciELO e mais) em indicadores cientométricos, redes de colaboração e mapeamento temático por Inteligência Artificial — tudo processado no seu navegador, sem enviar seus dados a nenhum servidor.',
+    landing_highlight_1_label: '100% no seu navegador',
+    landing_highlight_1_text:
+      'Seus dados nunca saem do seu computador. Todo o processamento roda via Web Workers, direto no navegador.',
+    landing_highlight_2_label: 'Ecologia do Conhecimento',
+    landing_highlight_2_text:
+      'Mapeie a estrutura intelectual da sua base através de grafos, métricas de rede, PCA e similaridade.',
+    landing_highlight_3_label: 'Inteligência Artificial',
+    landing_highlight_3_text:
+      'Categorização temática automática e assistente conversacional sobre a sua base de artigos.',
+    landing_cta_continue: 'Continuar "{name}"',
+    landing_cta_new_blank: 'Novo projeto em branco',
+    landing_cta_start: 'Iniciar',
+    landing_cta_tutorial: 'Ver tutorial',
+    landing_projects_title: 'Meus Projetos',
+    landing_projects_import: 'Importar projeto (.json)',
+    landing_dismiss_error: 'Dispensar',
+    landing_projects_empty_title: 'Nenhum projeto salvo ainda',
+    landing_projects_empty_desc:
+      'Carregue uma base para começar — o Simetrics salva seu progresso automaticamente neste navegador.',
+
+    // Cartão de Projeto
+    project_card_open: 'Abrir',
+    project_card_rename: 'Renomear',
+    project_card_rename_save: 'Salvar nome',
+    project_card_rename_cancel: 'Cancelar renomeação',
+    project_card_duplicate: 'Duplicar',
+    project_card_export: 'Exportar (.json)',
+    project_card_delete: 'Excluir',
+    project_card_docs: '{count} documentos',
+    project_card_updated: 'Atualizado em {date}',
+    project_delete_confirm_title: 'Excluir projeto?',
+    project_delete_confirm_desc: 'Isso excluirá permanentemente "{name}" deste navegador. Esta ação não pode ser desfeita.',
+    project_delete_cancel: 'Cancelar',
+
+    // Projetos — mensagens do sistema
+    project_untitled: 'Projeto sem título',
+    project_copy_suffix: '(cópia)',
+    project_import_suffix: '(importado)',
+    project_save_quota_error: 'Armazenamento local cheio — exporte este projeto em JSON e apague um projeto antigo para liberar espaço.',
+    project_save_error: 'Não foi possível salvar o projeto neste navegador.',
+    project_busy_error: 'Aguarde a operação atual terminar antes de trocar de projeto.',
+    project_not_found_error: 'Projeto não encontrado — pode ter sido excluído.',
+    project_import_invalid_json: 'Arquivo inválido: selecione um arquivo .json exportado do Simetrics.',
   },
   en: {
     // Header & Brand
@@ -462,6 +515,59 @@ export const TRANSLATIONS = {
       'Privacy guaranteed: Your API key is stored exclusively in your browser local storage (localStorage) and sent directly to the selected provider API endpoint. Our servers never see or touch your key.',
     ai_test_success: 'Connection tested successfully!',
     ai_test_failed: 'Connection test failed:',
+
+    // Navigation — Projects
+    nav_projects_btn: 'My Projects',
+    project_save_status_saving: 'Saving…',
+    project_save_status_saved: 'Saved at {time}',
+    project_save_status_error: 'Failed to save',
+
+    // Landing Screen
+    landing_pitch:
+      'Simetrics turns exports from bibliographic databases (Scopus, Web of Science, SciELO, and more) into scientometric indicators, collaboration networks, and AI-driven thematic mapping — all processed in your browser, without sending your data to any server.',
+    landing_highlight_1_label: '100% in your browser',
+    landing_highlight_1_text:
+      'Your data never leaves your computer. All processing runs via Web Workers, right in the browser.',
+    landing_highlight_2_label: 'Knowledge Ecology',
+    landing_highlight_2_text:
+      'Map the intellectual structure of your dataset through graphs, network metrics, PCA, and similarity.',
+    landing_highlight_3_label: 'Artificial Intelligence',
+    landing_highlight_3_text:
+      'Automatic thematic categorization and a conversational assistant over your article dataset.',
+    landing_cta_continue: 'Continue "{name}"',
+    landing_cta_new_blank: 'New blank project',
+    landing_cta_start: 'Get Started',
+    landing_cta_tutorial: 'Watch the tour',
+    landing_projects_title: 'My Projects',
+    landing_projects_import: 'Import project (.json)',
+    landing_dismiss_error: 'Dismiss',
+    landing_projects_empty_title: 'No saved projects yet',
+    landing_projects_empty_desc:
+      'Load a dataset to get started — Simetrics saves your progress automatically in this browser.',
+
+    // Project Card
+    project_card_open: 'Open',
+    project_card_rename: 'Rename',
+    project_card_rename_save: 'Save name',
+    project_card_rename_cancel: 'Cancel rename',
+    project_card_duplicate: 'Duplicate',
+    project_card_export: 'Export (.json)',
+    project_card_delete: 'Delete',
+    project_card_docs: '{count} documents',
+    project_card_updated: 'Updated {date}',
+    project_delete_confirm_title: 'Delete project?',
+    project_delete_confirm_desc: 'This will permanently delete "{name}" from this browser. This action cannot be undone.',
+    project_delete_cancel: 'Cancel',
+
+    // Projects — system messages
+    project_untitled: 'Untitled project',
+    project_copy_suffix: '(copy)',
+    project_import_suffix: '(imported)',
+    project_save_quota_error: 'Local storage is full — export this project as JSON and delete an older project to free up space.',
+    project_save_error: 'Could not save the project in this browser.',
+    project_busy_error: 'Wait for the current operation to finish before switching projects.',
+    project_not_found_error: 'Project not found — it may have been deleted.',
+    project_import_invalid_json: 'Invalid file: please select a .json file exported from Simetrics.',
   },
 } as const;
 

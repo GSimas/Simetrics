@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import { BarChart3, ClipboardList, FileText, Network, Search } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { BarChart3, ClipboardList, FileText, FolderOpen, Network, Search } from 'lucide-react';
 
 import { AiSettingsButton, AiSettingsModal } from '@/components/AiSettingsModal';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { TutorialModal, TutorialTriggerButton } from '@/components/TutorialModal';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import OverviewTab from '@/features/overview/OverviewTab';
 import NetworksTab from '@/features/networks/NetworksTab';
@@ -13,10 +14,13 @@ import ReportTab from '@/features/report/ReportTab';
 import FeedbackTab from '@/features/feedback/FeedbackTab';
 import { ChatWidget } from '@/features/chat/ChatWidget';
 import { BuyMeCoffeeButton } from '@/components/BuyMeCoffeeButton';
+import { LandingScreen } from '@/features/landing/LandingScreen';
 import { type TranslationKey } from '@/lib/i18n/translations';
+import { useHashRoute } from '@/lib/use-hash-route';
 import { cn } from '@/lib/utils';
 import { useDataset } from '@/state/dataset.store';
 import { useLocale } from '@/state/locale.store';
+import { useProjectStore } from '@/state/project.store';
 
 const TABS = [
   {
@@ -76,6 +80,36 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<string>('overview');
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [aiSettingsOpen, setAiSettingsOpen] = useState(false);
+  const [route, navigate] = useHashRoute();
+  const saveStatus = useProjectStore((state) => state.saveStatus);
+  const lastSavedAt = useProjectStore((state) => state.lastSavedAt);
+
+  // Recuperação de `#/workspace/<id>` — recarregar a página, ou navegar via
+  // back/forward do navegador entre dois projetos, cai aqui: só re-hidrata quando o
+  // projeto pedido pela rota é diferente do que já está carregado (evita reabrir em
+  // laço a cada render). Um id inexistente/corrompido volta para a landing.
+  useEffect(() => {
+    if (route.view !== 'workspace' || !route.projectId) return;
+    if (useProjectStore.getState().activeProjectId === route.projectId) return;
+
+    void (async () => {
+      await useProjectStore.getState().open(route.projectId!);
+      if (useProjectStore.getState().error) navigate('landing');
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route.view, route.projectId]);
+
+  if (route.view === 'landing') {
+    return (
+      <>
+        <LandingScreen navigate={navigate} onOpenTutorial={() => setTutorialOpen(true)} />
+        {/* Montado aqui também: sem isso, abrir o tutorial a partir da landing não
+            renderizaria nada, já que este early-return substitui a árvore inteira do
+            workspace (onde o modal normalmente vive, mais abaixo). */}
+        <TutorialModal open={tutorialOpen} onOpenChange={setTutorialOpen} />
+      </>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col justify-between relative">
@@ -115,11 +149,41 @@ export default function App() {
             </button>
 
             <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('landing')}
+                className="h-9 gap-1.5 rounded-xl border-border/80 bg-card/80 text-xs font-semibold text-foreground shadow-2xs hover:border-primary/40 hover:bg-muted cursor-pointer"
+              >
+                <FolderOpen className="size-3.5 text-primary" aria-hidden />
+                <span>{t('nav_projects_btn')}</span>
+              </Button>
+
               {documentCount > 0 && (
                 <div className="flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50/80 px-3.5 py-1.5 text-xs font-semibold text-blue-700 shadow-2xs dark:border-blue-900/60 dark:bg-blue-950/60 dark:text-blue-300">
                   <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
                   <span className="tabular-nums">{documentCount.toLocaleString('pt-BR')}</span>
                   <span className="font-normal text-muted-foreground">{t('active_docs')}</span>
+                </div>
+              )}
+
+              {saveStatus !== 'idle' && (
+                <div
+                  className="flex items-center gap-1.5 rounded-full border border-border/80 bg-card px-3 py-1.5 text-[11px] font-medium text-muted-foreground shadow-2xs"
+                  title={saveStatus === 'error' ? (useProjectStore.getState().error ?? undefined) : undefined}
+                >
+                  {saveStatus === 'saving' && <span>{t('project_save_status_saving')}</span>}
+                  {saveStatus === 'saved' && lastSavedAt && (
+                    <span>
+                      {t('project_save_status_saved').replace(
+                        '{time}',
+                        new Date(lastSavedAt).toLocaleTimeString(),
+                      )}
+                    </span>
+                  )}
+                  {saveStatus === 'error' && (
+                    <span className="text-destructive">{t('project_save_status_error')}</span>
+                  )}
                 </div>
               )}
 

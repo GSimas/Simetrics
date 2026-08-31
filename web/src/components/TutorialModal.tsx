@@ -411,33 +411,19 @@ const TUTORIAL_STEPS_EN: TutorialStep[] = [
 ];
 
 interface TutorialModalProps {
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
-export function TutorialModal({ open: controlledOpen, onOpenChange }: TutorialModalProps) {
+/**
+ * Sempre controlado — a tela inicial (LandingScreen) é quem decide a primeira
+ * experiência do usuário agora, este modal só abre por ação explícita (botão do header
+ * ou "Ver tutorial" na landing).
+ */
+export function TutorialModal({ open: isOpen, onOpenChange: handleOpenChange }: TutorialModalProps) {
   const locale = useLocale((state) => state.locale);
   const steps = locale === 'en' ? TUTORIAL_STEPS_EN : TUTORIAL_STEPS_PT;
-
-  const [internalOpen, setInternalOpen] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return !localStorage.getItem('simetrics-tutorial-seen');
-  });
   const [stepIndex, setStepIndex] = useState(0);
-
-  const isControlled = controlledOpen !== undefined;
-  const isOpen = isControlled ? controlledOpen : internalOpen;
-
-  const handleOpenChange = (open: boolean) => {
-    if (!open) {
-      localStorage.setItem('simetrics-tutorial-seen', 'true');
-    }
-    if (isControlled && onOpenChange) {
-      onOpenChange(open);
-    } else {
-      setInternalOpen(open);
-    }
-  };
 
   const currentStep: TutorialStep = steps[stepIndex] ?? steps[0]!;
   const isFirst = stepIndex === 0;

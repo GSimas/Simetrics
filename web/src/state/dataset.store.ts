@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { subscribeWithSelector } from 'zustand/middleware';
 
 import type { AnalyticsBundle, EntityTables } from '@/workers/analytics.worker';
 import type { CooccurrenceReport, SnaReport } from '@/core/graph';
@@ -8,6 +9,7 @@ import { applyThemes, fallbackThemeName, type ClusteringResult } from '@/core/cl
 import { buildSearchOptions, type SearchOptions } from '@/core/search';
 import { labelCluster } from '@/lib/ai-client';
 import { DEMO_FILES } from '@/lib/demo';
+import type { DatabaseName } from '@/lib/schema';
 import type { Dataset, DuplicateRecord, WorkerProgress } from '@/lib/types';
 import {
   getAiWorker,
@@ -29,6 +31,13 @@ import {
 
 export type DedupStrategy = 'none' | 'doi' | 'similarity' | 'both';
 
+/** Metadados de origem de um arquivo carregado — tudo que sobra após a ingestão, usado
+ * só para exibição (nome do projeto padrão, cartão de projeto na tela inicial). */
+export interface DatasetSourceFile {
+  name: string;
+  database: DatabaseName | string;
+}
+
 interface DatasetState {
   /** Base como veio dos arquivos, antes de qualquer deduplicação. */
   original: Dataset | null;
@@ -36,6 +45,12 @@ interface DatasetState {
   active: Dataset | null;
   duplicates: DuplicateRecord[];
   dedupStrategy: DedupStrategy;
+  /** Limiar usado na última deduplicação por similaridade — `null` quando não se aplica
+   * (estratégia 'none'/'doi'). Existe só para o Projeto lembrar o valor ao reabrir. */
+  dedupThreshold: number | null;
+  /** Arquivos de origem da base ativa — preenchido por `loadFiles`/`loadDemo`, os únicos
+   * dois pontos de entrada de dados no app. Usado pela camada de Projetos. */
+  sourceFiles: DatasetSourceFile[];
 
   overview: AnalyticsBundle | null;
   tables: EntityTables | null;
@@ -67,8 +82,10 @@ interface DatasetState {
   reset: () => void;
 }
 
-/** Tudo o que deixa de valer quando a base ativa muda. */
-const DERIVED_RESET = {
+/** Tudo o que deixa de valer quando a base ativa muda. Exportado porque
+ * `state/project.store.ts` reaproveita a mesma forma ao hidratar um projeto salvo, em
+ * vez de duplicar a lista de campos e arriscar as duas ficarem dessincronizadas. */
+export const DERIVED_RESET = {
   overview: null,
   tables: null,
   sna: null,
@@ -81,11 +98,13 @@ function describeError(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);
 }
 
-export const useDataset = create<DatasetState>((set, get) => ({
+export const useDataset = create<DatasetState>()(subscribeWithSelector((set, get) => ({
   original: null,
   active: null,
   duplicates: [],
   dedupStrategy: 'none',
+  dedupThreshold: null,
+  sourceFiles: [],
   ...DERIVED_RESET,
   isIngesting: false,
   isDeduplicating: false,
@@ -109,6 +128,8 @@ export const useDataset = create<DatasetState>((set, get) => ({
         active: dataset,
         duplicates: [],
         dedupStrategy: 'none',
+        dedupThreshold: null,
+        sourceFiles: files.map(({ name, database }) => ({ name, database })),
         ...DERIVED_RESET,
         searchOptions: buildSearchOptions(dataset),
       });
@@ -139,6 +160,8 @@ export const useDataset = create<DatasetState>((set, get) => ({
         active: dataset,
         duplicates: [],
         dedupStrategy: 'none',
+        dedupThreshold: null,
+        sourceFiles: DEMO_FILES.map(({ name, database }) => ({ name, database })),
         ...DERIVED_RESET,
         searchOptions: buildSearchOptions(dataset),
       });
@@ -161,6 +184,7 @@ export const useDataset = create<DatasetState>((set, get) => ({
           active: original,
           duplicates: [],
           dedupStrategy: 'none',
+          dedupThreshold: null,
           ...DERIVED_RESET,
           searchOptions: buildSearchOptions(original),
         });
@@ -195,6 +219,7 @@ export const useDataset = create<DatasetState>((set, get) => ({
         active: result.kept,
         duplicates: result.removed,
         dedupStrategy: strategy,
+        dedupThreshold: strategy === 'similarity' || strategy === 'both' ? threshold : null,
         ...DERIVED_RESET,
         searchOptions: buildSearchOptions(result.kept),
       });
@@ -337,6 +362,8 @@ export const useDataset = create<DatasetState>((set, get) => ({
       active: null,
       duplicates: [],
       dedupStrategy: 'none',
+      dedupThreshold: null,
+      sourceFiles: [],
       isIngesting: false,
       isDeduplicating: false,
       isCategorizingThemes: false,
@@ -346,7 +373,7 @@ export const useDataset = create<DatasetState>((set, get) => ({
       ...DERIVED_RESET,
     });
   },
-}));
+})));
 
 /** True quando há base carregada — usado para liberar as abas de análise. */
 export function useHasDataset(): boolean {
