@@ -1,6 +1,12 @@
 import { useEffect, useRef } from 'react';
 import { Network, PlayCircle, Sparkles, Upload, Zap } from 'lucide-react';
 
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/features/EmptyState';
@@ -10,6 +16,14 @@ import type { AppView } from '@/lib/use-hash-route';
 import { useDataset } from '@/state/dataset.store';
 import { useLocale } from '@/state/locale.store';
 import { useProjectStore } from '@/state/project.store';
+
+const FAQ_ITEMS = [
+  { questionKey: 'landing_faq_q1', answerKey: 'landing_faq_a1' },
+  { questionKey: 'landing_faq_q2', answerKey: 'landing_faq_a2' },
+  { questionKey: 'landing_faq_q3', answerKey: 'landing_faq_a3' },
+  { questionKey: 'landing_faq_q4', answerKey: 'landing_faq_a4' },
+  { questionKey: 'landing_faq_q5', answerKey: 'landing_faq_a5' },
+] as const satisfies readonly { questionKey: TranslationKey; answerKey: TranslationKey }[];
 
 const HIGHLIGHTS = [
   {
@@ -138,6 +152,20 @@ export function LandingScreen({ navigate, onOpenTutorial }: LandingScreenProps) 
               {t('landing_cta_tutorial')}
             </Button>
           </div>
+        </section>
+
+        <section className="mx-auto w-full max-w-3xl">
+          <h2 className="mb-2 text-center text-lg font-bold text-foreground">
+            {t('landing_faq_title')}
+          </h2>
+          <Accordion type="single" collapsible className="rounded-xl border border-border/80 bg-card px-4 shadow-2xs">
+            {FAQ_ITEMS.map(({ questionKey, answerKey }) => (
+              <AccordionItem key={questionKey} value={questionKey}>
+                <AccordionTrigger className="cursor-pointer">{t(questionKey)}</AccordionTrigger>
+                <AccordionContent>{t(answerKey)}</AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
         </section>
 
         <section className="space-y-4">

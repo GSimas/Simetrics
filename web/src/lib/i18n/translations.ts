@@ -275,6 +275,24 @@ export const TRANSLATIONS = {
     landing_projects_empty_desc:
       'Carregue uma base para começar — o Simetrics salva seu progresso automaticamente neste navegador.',
 
+    // Landing — Perguntas frequentes (FAQ)
+    landing_faq_title: 'Perguntas frequentes',
+    landing_faq_q1: 'O que é o Simetrics?',
+    landing_faq_a1:
+      'Uma plataforma gratuita de bibliometria e cientometria. Ela transforma exports de bases acadêmicas (Scopus, Web of Science, SciELO e outras) em indicadores cientométricos, redes de colaboração e mapeamento temático por IA.',
+    landing_faq_q2: 'O Simetrics é gratuito?',
+    landing_faq_a2:
+      'Sim, totalmente gratuito e sem necessidade de cadastro. Os recursos de IA (categorização temática, assistente científico) são opcionais e usam a chave de API do próprio usuário (BYOK).',
+    landing_faq_q3: 'Meus dados ficam salvos onde? É seguro enviar minha base?',
+    landing_faq_a3:
+      'Todo o processamento acontece no seu navegador — os documentos nunca são enviados a nenhum servidor. Os projetos que você salva ficam armazenados localmente, neste navegador e neste dispositivo, via IndexedDB.',
+    landing_faq_q4: 'Quais formatos de arquivo o Simetrics aceita?',
+    landing_faq_a4:
+      'RIS (SciELO, Web of Science, Scopus, Mendeley, Cochrane), CSV (Scopus, Cochrane), Excel (Web of Science) e TXT/NBIB (PubMed).',
+    landing_faq_q5: 'Preciso de conta ou chave de API para usar?',
+    landing_faq_a5:
+      'Não. A análise bibliométrica completa funciona sem conta e sem chave de API. Uma chave própria (Gemini, OpenAI, Claude ou OpenRouter) só é necessária para os recursos opcionais de IA.',
+
     // Cartão de Projeto
     project_card_open: 'Abrir',
     project_card_rename: 'Renomear',
@@ -571,6 +589,24 @@ export const TRANSLATIONS = {
     landing_projects_empty_title: 'No saved projects yet',
     landing_projects_empty_desc:
       'Load a dataset to get started — Simetrics saves your progress automatically in this browser.',
+
+    // Landing — Frequently Asked Questions (FAQ)
+    landing_faq_title: 'Frequently asked questions',
+    landing_faq_q1: 'What is Simetrics?',
+    landing_faq_a1:
+      'A free bibliometric and scientometric analysis platform. It turns exports from academic databases (Scopus, Web of Science, SciELO, and others) into scientometric indicators, collaboration networks, and AI-driven thematic mapping.',
+    landing_faq_q2: 'Is Simetrics free?',
+    landing_faq_a2:
+      'Yes, completely free and no account required. The AI features (thematic categorization, scientific assistant) are optional and use the user’s own API key (BYOK).',
+    landing_faq_q3: 'Where is my data stored? Is it safe to upload my dataset?',
+    landing_faq_a3:
+      'All processing happens in your browser — documents are never sent to any server. Projects you save are stored locally, in this browser and on this device, via IndexedDB.',
+    landing_faq_q4: 'Which file formats does Simetrics accept?',
+    landing_faq_a4:
+      'RIS (SciELO, Web of Science, Scopus, Mendeley, Cochrane), CSV (Scopus, Cochrane), Excel (Web of Science), and TXT/NBIB (PubMed).',
+    landing_faq_q5: 'Do I need an account or an API key to use it?',
+    landing_faq_a5:
+      'No. Full bibliometric analysis works without an account or an API key. Your own key (Gemini, OpenAI, Claude, or OpenRouter) is only needed for the optional AI features.',
 
     // Project Card
     project_card_open: 'Open',

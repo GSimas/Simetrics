@@ -1,0 +1,42 @@
+# Simetrics
+
+> Plataforma gratuita de inteligência bibliométrica e mapeamento científico. Transforma
+> exports de bases acadêmicas em indicadores cientométricos, redes de colaboração e
+> categorização temática por IA — inteiramente no navegador do usuário, sem enviar
+> dados a nenhum servidor.
+
+Simetrics é uma ferramenta client-side (sem cadastro, sem custo) para pesquisadores,
+bibliotecários e analistas que fazem bibliometria/cientometria. O usuário envia um ou
+mais arquivos exportados de bases acadêmicas e a ferramenta calcula métricas, monta
+redes e produz relatórios exportáveis — todo o processamento roda no navegador via Web
+Workers; os documentos nunca saem do computador do usuário.
+
+## Formatos de entrada aceitos
+
+- RIS (SciELO, Web of Science, Scopus, Mendeley, Cochrane)
+- CSV (Scopus, Cochrane)
+- Excel (Web of Science)
+- TXT/NBIB (PubMed/Medline)
+
+## O que a ferramenta calcula
+
+- Índices cientométricos por autor/país/venue/palavra-chave (h-index, g-index, i10, m-index)
+- Deduplicação por DOI e por similaridade de título
+- Redes de coautoria e colaboração internacional, com mapa coroplético
+- Categorização temática automática por IA (clustering + nomeação via Gemini/OpenAI/
+  Claude/OpenRouter — o usuário fornece sua própria chave de API, opcional)
+- Mapas conceituais (PCA 2D/3D), mapa temático (centralidade × densidade), evolução
+  temática de palavras-chave entre períodos, historiograph de citações internas
+- Verificação da Lei de Lotka sobre produtividade de autores
+- Exportação de relatórios em PDF e DOCX
+
+## Projetos locais
+
+Bases carregadas podem ser salvas como "Projetos" no próprio navegador (IndexedDB) e
+exportadas/importadas como arquivo `.json` — não há conta nem sincronização em nuvem.
+
+## Links
+
+- Aplicação: https://simetrics.app/
+- Código-fonte: https://github.com/GSimas/Simetrics
+- Desenvolvedor: https://gustavosimas.com

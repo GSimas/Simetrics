@@ -2,13 +2,121 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/simetrics-logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Simetrics — Análise Bibliométrica e Cientométrica</title>
     <meta
       name="description"
-      content="Simetrics — plataforma de análise bibliométrica e cientométrica. Redes de conhecimento, índices cientométricos e mapeamento temático por IA."
+      content="Simetrics — plataforma gratuita de análise bibliométrica e cientométrica. Redes de colaboração, índices cientométricos e mapeamento temático por IA, 100% no seu navegador."
     />
-    <title>Simetrics — Análise Bibliométrica e Cientométrica</title>
+    <link rel="canonical" href="https://simetrics.app/" />
+
+    <!-- Ícones — ver web/README para a origem (recorte da marca, sem SVG vetorial de
+         origem disponível, por isso não há favicon.svg). -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#1273B9" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Simetrics" />
+    <meta property="og:url" content="https://simetrics.app/" />
+    <meta property="og:title" content="Simetrics — Análise Bibliométrica e Cientométrica" />
+    <meta
+      property="og:description"
+      content="Plataforma gratuita de inteligência bibliométrica e mapeamento científico. Redes de colaboração, índices cientométricos e mapeamento temático por IA — 100% no seu navegador."
+    />
+    <meta property="og:image" content="https://simetrics.app/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="pt_BR" />
+    <meta property="og:locale:alternate" content="en_US" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Simetrics — Análise Bibliométrica e Cientométrica" />
+    <meta
+      name="twitter:description"
+      content="Plataforma gratuita de inteligência bibliométrica e mapeamento científico, 100% no seu navegador."
+    />
+    <meta name="twitter:image" content="https://simetrics.app/og-image.png" />
+
+    <!-- Dados estruturados: SoftwareApplication (com o autor aninhado, sem bloco Person
+         separado) e FAQPage, espelhando o FAQ visível em LandingScreen.tsx. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Simetrics",
+        "url": "https://simetrics.app/",
+        "description": "Plataforma gratuita de inteligência bibliométrica e mapeamento científico. Transforma exports de bases acadêmicas (Scopus, Web of Science, SciELO, PubMed, Cochrane) em indicadores cientométricos, redes de colaboração e mapeamento temático por IA — 100% no navegador, sem enviar dados a servidores.",
+        "applicationCategory": "EducationalApplication",
+        "operatingSystem": "Web",
+        "browserRequirements": "Requer JavaScript habilitado",
+        "inLanguage": ["pt-BR", "en"],
+        "image": "https://simetrics.app/og-image.png",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "author": {
+          "@type": "Person",
+          "name": "Gustavo Simas",
+          "url": "https://gustavosimas.com"
+        }
+      }
+    </script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "O que é o Simetrics?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Uma plataforma gratuita de bibliometria e cientometria. Ela transforma exports de bases acadêmicas (Scopus, Web of Science, SciELO e outras) em indicadores cientométricos, redes de colaboração e mapeamento temático por IA."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "O Simetrics é gratuito?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Sim, totalmente gratuito e sem necessidade de cadastro. Os recursos de IA (categorização temática, assistente científico) são opcionais e usam a chave de API do próprio usuário (BYOK)."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Meus dados ficam salvos onde? É seguro enviar minha base?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Todo o processamento acontece no seu navegador — os documentos nunca são enviados a nenhum servidor. Os projetos que você salva ficam armazenados localmente, neste navegador e neste dispositivo, via IndexedDB."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Quais formatos de arquivo o Simetrics aceita?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "RIS (SciELO, Web of Science, Scopus, Mendeley, Cochrane), CSV (Scopus, Cochrane), Excel (Web of Science) e TXT/NBIB (PubMed)."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Preciso de conta ou chave de API para usar?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Não. A análise bibliométrica completa funciona sem conta e sem chave de API. Uma chave própria (Gemini, OpenAI, Claude ou OpenRouter) só é necessária para os recursos opcionais de IA."
+            }
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
     <!--
@@ -44,7 +152,103 @@
         <textarea name="ux_comentarios"></textarea>
     </form>
 
-    <div id="root"></div>
+    <div id="root">
+      <!--
+        Espelho estático do conteúdo da landing (hero + destaques + FAQ), visível só até o
+        React assumir. Existe porque o Simetrics é um SPA client-side puro (sem SSR) — um
+        rastreador que não executa JavaScript veria só esta div vazia sem isto. Fica DENTRO
+        de #root de propósito: main.tsx faz `createRoot(root).render(...)`, que substitui
+        todo o conteúdo daqui no primeiro render — se este bloco estivesse fora de #root,
+        o React nunca o tocaria e ele duplicaria o conteúdo pra usuários reais.
+
+        Cobre só o que é conteúdo de marketing (hero, destaques, FAQ) — não a lista de
+        Projetos, que é estado real do usuário (IndexedDB) e não existe para um rastreador.
+
+        Manter em sincronia com as chaves `landing_*`/`app_*` de src/lib/i18n/translations.ts
+        (só a versão pt — HTML bruto não escolhe idioma) sempre que o texto da landing mudar.
+      -->
+      <div id="seo-fallback" style="max-width: 48rem; margin: 0 auto; padding: 3rem 1.5rem; text-align: center; font-family: system-ui, -apple-system, sans-serif;">
+        <h1 style="font-size: 2rem; font-weight: 800; margin: 0 0 0.5rem;">Simetrics</h1>
+        <p style="font-size: 1.125rem; font-weight: 500; color: #475569; margin: 0 0 1.5rem;">
+          Plataforma de Inteligência Bibliométrica &amp; Mapeamento Científico
+        </p>
+        <p style="font-size: 1rem; color: #475569; margin: 0 0 2rem;">
+          O Simetrics transforma exports de bases bibliográficas (Scopus, Web of Science,
+          SciELO e mais) em indicadores cientométricos, redes de colaboração e mapeamento
+          temático por Inteligência Artificial — tudo processado no seu navegador, sem
+          enviar seus dados a nenhum servidor.
+        </p>
+
+        <h2 style="font-size: 1rem; font-weight: 700; margin: 0 0 0.25rem;">100% no seu navegador</h2>
+        <p style="font-size: 0.875rem; color: #475569; margin: 0 0 1rem;">
+          Seus dados nunca saem do seu computador. Todo o processamento roda via Web
+          Workers, direto no navegador.
+        </p>
+
+        <h2 style="font-size: 1rem; font-weight: 700; margin: 0 0 0.25rem;">Ecologia do Conhecimento</h2>
+        <p style="font-size: 0.875rem; color: #475569; margin: 0 0 1rem;">
+          Mapeie a estrutura intelectual da sua base através de grafos, métricas de rede,
+          PCA e similaridade.
+        </p>
+
+        <h2 style="font-size: 1rem; font-weight: 700; margin: 0 0 0.25rem;">Inteligência Artificial</h2>
+        <p style="font-size: 0.875rem; color: #475569; margin: 0 0 2rem;">
+          Categorização temática automática e assistente conversacional sobre a sua base
+          de artigos.
+        </p>
+
+        <h2 style="font-size: 1.125rem; font-weight: 700; margin: 0 0 1rem;">Perguntas frequentes</h2>
+
+        <h3 style="font-size: 0.95rem; font-weight: 600; margin: 0 0 0.25rem;">O que é o Simetrics?</h3>
+        <p style="font-size: 0.875rem; color: #475569; margin: 0 0 1rem;">
+          Uma plataforma gratuita de bibliometria e cientometria. Ela transforma exports de
+          bases acadêmicas (Scopus, Web of Science, SciELO e outras) em indicadores
+          cientométricos, redes de colaboração e mapeamento temático por IA.
+        </p>
+
+        <h3 style="font-size: 0.95rem; font-weight: 600; margin: 0 0 0.25rem;">O Simetrics é gratuito?</h3>
+        <p style="font-size: 0.875rem; color: #475569; margin: 0 0 1rem;">
+          Sim, totalmente gratuito e sem necessidade de cadastro. Os recursos de IA
+          (categorização temática, assistente científico) são opcionais e usam a chave de
+          API do próprio usuário (BYOK).
+        </p>
+
+        <h3 style="font-size: 0.95rem; font-weight: 600; margin: 0 0 0.25rem;">
+          Meus dados ficam salvos onde? É seguro enviar minha base?
+        </h3>
+        <p style="font-size: 0.875rem; color: #475569; margin: 0 0 1rem;">
+          Todo o processamento acontece no seu navegador — os documentos nunca são
+          enviados a nenhum servidor. Os projetos que você salva ficam armazenados
+          localmente, neste navegador e neste dispositivo, via IndexedDB.
+        </p>
+
+        <h3 style="font-size: 0.95rem; font-weight: 600; margin: 0 0 0.25rem;">
+          Quais formatos de arquivo o Simetrics aceita?
+        </h3>
+        <p style="font-size: 0.875rem; color: #475569; margin: 0 0 1rem;">
+          RIS (SciELO, Web of Science, Scopus, Mendeley, Cochrane), CSV (Scopus, Cochrane),
+          Excel (Web of Science) e TXT/NBIB (PubMed).
+        </p>
+
+        <h3 style="font-size: 0.95rem; font-weight: 600; margin: 0 0 0.25rem;">
+          Preciso de conta ou chave de API para usar?
+        </h3>
+        <p style="font-size: 0.875rem; color: #475569; margin: 0;">
+          Não. A análise bibliométrica completa funciona sem conta e sem chave de API. Uma
+          chave própria (Gemini, OpenAI, Claude ou OpenRouter) só é necessária para os
+          recursos opcionais de IA.
+        </p>
+      </div>
+    </div>
+    <script>
+      // Evita o flash do mirror de marketing acima ao recarregar já dentro do workspace
+      // (ex.: #/workspace/<id> de um projeto salvo) — o React só substitui #root no
+      // primeiro render, que ainda leva um instante para carregar/executar.
+      if (location.hash.indexOf('#/workspace') === 0) {
+        var fallback = document.getElementById('seo-fallback');
+        if (fallback) fallback.style.display = 'none';
+      }
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

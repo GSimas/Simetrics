@@ -1,0 +1,26 @@
+{
+  "name": "Simetrics — Análise Bibliométrica e Cientométrica",
+  "short_name": "Simetrics",
+  "description": "Plataforma gratuita de inteligência bibliométrica: redes de colaboração, índices cientométricos e mapeamento temático por IA, 100% no navegador.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "lang": "pt-BR",
+  "theme_color": "#1273B9",
+  "background_color": "#ffffff",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
