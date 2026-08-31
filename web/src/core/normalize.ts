@@ -10,10 +10,18 @@ export type RawRow = Record<string, unknown>;
  * Ponto de convergência obrigatório: todo importador termina aqui, e é isto que garante
  * que o resto do pipeline possa assumir texto onde espera texto e número onde espera
  * número, sem checagem defensiva em cada função.
+ *
+ * `onProgress`, quando presente, é chamado a cada 250 documentos — mesma cadência de
+ * `findSimilarPairs` (core/ml/tfidf.ts) — para que bases grandes mostrem progresso real
+ * durante esta passada, em vez de um evento só no início e outro no fim.
  */
-export function normalizeDataset(rows: readonly RawRow[]): Dataset {
+export function normalizeDataset(
+  rows: readonly RawRow[],
+  onProgress?: (processed: number, total: number) => void,
+): Dataset {
   if (rows.length === 0) return [];
 
+  const total = rows.length;
   const columns = collectColumns(rows);
 
   // Unificação de referências citadas: o primeiro campo não-vazio vence, na ordem de
@@ -27,7 +35,9 @@ export function normalizeDataset(rows: readonly RawRow[]): Dataset {
       ? FIELD.YEAR
       : null;
 
-  return rows.map((row) => {
+  return rows.map((row, index) => {
+    if (onProgress && index % 250 === 0) onProgress(index, total);
+
     const doc: RawRow = {};
 
     for (const [key, value] of Object.entries(row)) {

@@ -25,11 +25,14 @@ const api = {
   ingest(files: UploadedFile[], onProgress?: ProgressCallback): Dataset {
     onProgress?.({ phase: 'Lendo arquivos', ratio: 0 });
 
-    const dataset = processFiles(files, (ratio, fileName) => {
-      onProgress?.({ phase: 'Integrando', ratio: ratio * 0.9, detail: fileName });
+    // Reserva os últimos 5% para o tique final de consolidação — as fases reais de
+    // cada arquivo (leitura, enriquecimento, padronização; ver processFiles/
+    // processRisFiles) já preenchem os outros 95% com progresso proporcional.
+    const dataset = processFiles(files, (progress) => {
+      onProgress?.({ ...progress, ratio: progress.ratio * 0.95 });
     });
 
-    onProgress?.({ phase: 'Consolidando estrutura', ratio: 1 });
+    onProgress?.({ phase: 'Consolidando estrutura', ratio: 1, detail: `${dataset.length} documentos` });
 
     // O teto anunciado na UI existe para proteger a memória do navegador; documentos
     // além dele são descartados em vez de travarem a aba mais adiante.
@@ -40,8 +43,8 @@ const api = {
    * Atalho para fontes que já se sabe serem RIS — a base de demonstração.
    * Evita o roteamento por extensão e a conversão para ArrayBuffer.
    */
-  ingestRis(sources: RisSource[]): Dataset {
-    const dataset = processRisFiles(sources);
+  ingestRis(sources: RisSource[], onProgress?: ProgressCallback): Dataset {
+    const dataset = processRisFiles(sources, onProgress);
     return dataset.length > MAX_DOCUMENTS ? dataset.slice(0, MAX_DOCUMENTS) : dataset;
   },
 

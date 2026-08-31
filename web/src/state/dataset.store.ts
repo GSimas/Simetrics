@@ -141,19 +141,37 @@ export const useDataset = create<DatasetState>()(subscribeWithSelector((set, get
   },
 
   async loadDemo() {
-    set({ isIngesting: true, progress: { phase: 'Carregando base de demonstração', ratio: 0 }, error: null });
+    set({ isIngesting: true, progress: { phase: 'Baixando bases de exemplo', ratio: 0 }, error: null });
 
     try {
+      // O download (rápido, mas em rede) e o parsing (síncrono, no worker) são fases
+      // visivelmente distintas — reservar os primeiros 30% para o download evita que a
+      // barra fique parada enquanto os 3 arquivos ainda estão chegando pela rede.
+      let downloaded = 0;
       const sources: RisSource[] = await Promise.all(
         DEMO_FILES.map(async ({ name, database }) => {
           const response = await fetch(`${import.meta.env.BASE_URL}demo/${name}`);
           if (!response.ok) throw new Error(`Falha ao carregar ${name}: HTTP ${response.status}`);
-          return { name, database, text: await response.text() };
+          const text = await response.text();
+          downloaded += 1;
+          set({
+            progress: {
+              phase: 'Baixando bases de exemplo',
+              ratio: (downloaded / DEMO_FILES.length) * 0.3,
+              detail: name,
+            },
+          });
+          return { name, database, text };
         }),
       );
 
       const worker = getIngestWorker();
-      const dataset = await worker.ingestRis(sources);
+      const dataset = await worker.ingestRis(
+        sources,
+        proxyProgress((update: WorkerProgress) =>
+          set({ progress: { ...update, ratio: 0.3 + update.ratio * 0.7 } }),
+        ),
+      );
 
       set({
         original: dataset,

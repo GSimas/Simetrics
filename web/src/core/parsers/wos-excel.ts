@@ -1,7 +1,7 @@
 import { read, utils as sheetUtils } from 'xlsx';
 
 import { FIELD } from '@/lib/schema';
-import type { Dataset } from '@/lib/types';
+import type { Dataset, WorkerProgress } from '@/lib/types';
 import { normalizeDataset, type RawRow } from '../normalize';
 import { toNumeric } from '../text';
 
@@ -28,7 +28,12 @@ const CITATION_COLUMNS = ['Times Cited, WoS Core', 'Times Cited, All Databases']
 /** Colunas de afiliação de onde sai o país. */
 const ADDRESS_COLUMNS = ['Addresses', 'Affiliations', 'Author Address'] as const;
 
-export function processWosExcel(buffer: ArrayBuffer): Dataset {
+export function processWosExcel(
+  buffer: ArrayBuffer,
+  onProgress?: (progress: WorkerProgress) => void,
+): Dataset {
+  onProgress?.({ phase: 'Lendo Excel (Web of Science)', ratio: 0.1 });
+
   const workbook = read(buffer, { type: 'array' });
   const firstSheetName = workbook.SheetNames[0];
   if (firstSheetName === undefined) return [];
@@ -87,5 +92,13 @@ export function processWosExcel(buffer: ArrayBuffer): Dataset {
     rows.push(row);
   }
 
-  return normalizeDataset(rows);
+  onProgress?.({ phase: 'Padronizando estrutura', ratio: 0.3, detail: `${rows.length} documentos` });
+
+  return normalizeDataset(rows, (processed, total) => {
+    onProgress?.({
+      phase: 'Padronizando estrutura',
+      ratio: 0.3 + (processed / total) * 0.7,
+      detail: `${processed} de ${total} documentos`,
+    });
+  });
 }

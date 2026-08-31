@@ -1,5 +1,5 @@
 import { FIELD } from '@/lib/schema';
-import type { Dataset } from '@/lib/types';
+import type { Dataset, WorkerProgress } from '@/lib/types';
 import { normalizeDataset, type RawRow } from '../normalize';
 import { extractCountriesPubmed } from './countries';
 
@@ -70,7 +70,12 @@ function asList(value: string | string[] | undefined): string[] {
   return Array.isArray(value) ? value : [value];
 }
 
-export function processPubmed(text: string): Dataset {
+export function processPubmed(
+  text: string,
+  onProgress?: (progress: WorkerProgress) => void,
+): Dataset {
+  onProgress?.({ phase: 'Lendo PubMed/Medline', ratio: 0.1 });
+
   const records = parseMedline(text);
   if (records.length === 0) return [];
 
@@ -123,5 +128,13 @@ export function processPubmed(text: string): Dataset {
     return row;
   });
 
-  return normalizeDataset(rows);
+  onProgress?.({ phase: 'Padronizando estrutura', ratio: 0.3, detail: `${rows.length} documentos` });
+
+  return normalizeDataset(rows, (processed, total) => {
+    onProgress?.({
+      phase: 'Padronizando estrutura',
+      ratio: 0.3 + (processed / total) * 0.7,
+      detail: `${processed} de ${total} documentos`,
+    });
+  });
 }

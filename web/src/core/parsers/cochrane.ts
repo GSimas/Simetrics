@@ -1,7 +1,7 @@
 import Papa from 'papaparse';
 
 import { FIELD } from '@/lib/schema';
-import type { Dataset } from '@/lib/types';
+import type { Dataset, WorkerProgress } from '@/lib/types';
 import { normalizeDataset, type RawRow } from '../normalize';
 import { parseRis, type RisValue } from './ris';
 import { stripBom } from './bom';
@@ -79,7 +79,13 @@ function processRis(text: string): RawRow[] {
   });
 }
 
-export function processCochrane(fileName: string, text: string): Dataset {
+export function processCochrane(
+  fileName: string,
+  text: string,
+  onProgress?: (progress: WorkerProgress) => void,
+): Dataset {
+  onProgress?.({ phase: 'Lendo Cochrane', ratio: 0.1 });
+
   const rows = fileName.toLowerCase().endsWith('.csv') ? processCsv(text) : processRis(text);
 
   for (const row of rows) {
@@ -92,5 +98,13 @@ export function processCochrane(fileName: string, text: string): Dataset {
     }
   }
 
-  return normalizeDataset(rows);
+  onProgress?.({ phase: 'Padronizando estrutura', ratio: 0.3, detail: `${rows.length} documentos` });
+
+  return normalizeDataset(rows, (processed, total) => {
+    onProgress?.({
+      phase: 'Padronizando estrutura',
+      ratio: 0.3 + (processed / total) * 0.7,
+      detail: `${processed} de ${total} documentos`,
+    });
+  });
 }

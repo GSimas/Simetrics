@@ -1,7 +1,7 @@
 import Papa from 'papaparse';
 
 import { FIELD } from '@/lib/schema';
-import type { Dataset } from '@/lib/types';
+import type { Dataset, WorkerProgress } from '@/lib/types';
 import { normalizeDataset, type RawRow } from '../normalize';
 import { toNumeric } from '../text';
 import { stripBom } from './bom';
@@ -45,7 +45,12 @@ function extractCountries(value: unknown): string {
   return [...countries].join('; ');
 }
 
-export function processScopusCsv(text: string): Dataset {
+export function processScopusCsv(
+  text: string,
+  onProgress?: (progress: WorkerProgress) => void,
+): Dataset {
+  onProgress?.({ phase: 'Lendo CSV (Scopus)', ratio: 0.1 });
+
   // O Scopus exporta com BOM; `skipEmptyLines` reproduz o `on_bad_lines='skip'`.
   const parsed = Papa.parse<Record<string, string>>(stripBom(text), {
     header: true,
@@ -90,5 +95,13 @@ export function processScopusCsv(text: string): Dataset {
     rows.push(row);
   }
 
-  return normalizeDataset(rows);
+  onProgress?.({ phase: 'Padronizando estrutura', ratio: 0.3, detail: `${rows.length} documentos` });
+
+  return normalizeDataset(rows, (processed, total) => {
+    onProgress?.({
+      phase: 'Padronizando estrutura',
+      ratio: 0.3 + (processed / total) * 0.7,
+      detail: `${processed} de ${total} documentos`,
+    });
+  });
 }
