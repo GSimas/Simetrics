@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   MAX_BOXPLOT_ITEMS,
@@ -28,7 +29,7 @@ import {
 import type { ConceptTerm } from '@/core/viz/concept-map';
 import type { KeywordGenetics } from '@/core/viz/genetics';
 import type { HistoriographData } from '@/core/viz/historiograph';
-import type { SankeyData } from '@/core/viz/sankey';
+import type { Period, SankeyData } from '@/core/viz/sankey';
 import type { ThematicMap } from '@/core/viz/thematic-map';
 import type { Dataset } from '@/lib/types';
 import { useAsyncResult } from '@/lib/use-async-result';
@@ -62,7 +63,7 @@ export interface VisualAnalysesProps {
 }
 
 export function VisualAnalyses({ dataset }: VisualAnalysesProps) {
-  const [panel, setPanel] = useState<PanelKey>('boxplot');
+  const [panel, setPanel] = useState<PanelKey>('sankey');
   const t = useLocale((state) => state.t);
 
   return (
@@ -77,19 +78,19 @@ export function VisualAnalyses({ dataset }: VisualAnalysesProps) {
       <CardContent>
         <Tabs value={panel} onValueChange={(value) => setPanel(value as PanelKey)}>
           <TabsList className="h-auto flex-wrap gap-1 bg-slate-100 dark:bg-slate-800/80 p-1.5">
-            <TabsTrigger value="boxplot">{t('visual_tab_boxplot')}</TabsTrigger>
             <TabsTrigger value="sankey">{t('visual_tab_sankey')}</TabsTrigger>
+            <TabsTrigger value="boxplot">{t('visual_tab_boxplot')}</TabsTrigger>
             <TabsTrigger value="genetics">{t('visual_tab_genetics')}</TabsTrigger>
             <TabsTrigger value="concept">{t('visual_tab_concept')}</TabsTrigger>
             <TabsTrigger value="thematic">{t('visual_tab_thematic')}</TabsTrigger>
             <TabsTrigger value="historiograph">{t('visual_tab_historiograph')}</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="boxplot">
-            {panel === 'boxplot' && <BoxplotPanel dataset={dataset} />}
-          </TabsContent>
           <TabsContent value="sankey">
             {panel === 'sankey' && <SankeyPanel dataset={dataset} />}
+          </TabsContent>
+          <TabsContent value="boxplot">
+            {panel === 'boxplot' && <BoxplotPanel dataset={dataset} />}
           </TabsContent>
           <TabsContent value="genetics">
             {panel === 'genetics' && <GeneticsPanel dataset={dataset} />}
@@ -268,81 +269,134 @@ function BoxplotPanel({ dataset }: { dataset: Dataset }) {
   );
 }
 
-/** Fluxo de evolução temática entre três períodos. */
+/**
+ * Fluxo de evolução temática entre três períodos.
+ *
+ * Os períodos partem de uma sugestão automática (três fatias de tamanho semelhante
+ * cobrindo toda a base), mas o usuário pode ajustar o início/fim de cada um livremente
+ * pelos sliders — os limites do slider são o próprio intervalo coberto pela sugestão,
+ * então não dá para arrastar para um ano sem documento algum na base.
+ */
 function SankeyPanel({ dataset }: { dataset: Dataset }) {
   const [topN, setTopN] = useState(10);
+  const [periods, setPeriods] = useState<[Period, Period, Period] | null>(null);
 
-  const { data, loading } = useAsyncResult(`sankey ${topN}`, async () => {
-    const worker = getAnalyticsWorker();
-    const suggested = await worker.sankeyPeriods(dataset);
-    if (!suggested) return null;
-    return { periods: suggested, sankey: await worker.sankey(dataset, suggested, topN) };
-  });
+  const { data: suggested, loading: loadingPeriods } = useAsyncResult<
+    [Period, Period, Period] | null
+  >('sankey-periods', () => getAnalyticsWorker().sankeyPeriods(dataset));
 
-  const periods = data?.periods ?? null;
-  const sankey: SankeyData | null = data?.sankey ?? null;
+  // Os períodos ajustados pelo usuário prevalecem; a sugestão automática só define o
+  // ponto de partida, antes da primeira interação com os sliders.
+  const effectivePeriods = periods ?? suggested;
 
-  if (loading) return chartMessage('Calculando fluxos temáticos…');
-  if (!periods || !sankey) {
-    return chartMessage('A base precisa de anos e palavras-chave para montar o fluxo.');
+  const { data: sankey, loading: loadingSankey } = useAsyncResult<SankeyData | null>(
+    `sankey ${topN} ${effectivePeriods ? effectivePeriods.flat().join('-') : 'none'}`,
+    () =>
+      effectivePeriods
+        ? getAnalyticsWorker().sankey(dataset, effectivePeriods, topN)
+        : Promise.resolve(null),
+  );
+
+  if (!suggested) {
+    return chartMessage(
+      loadingPeriods
+        ? 'Calculando fluxos temáticos…'
+        : 'A base precisa de anos e palavras-chave para montar o fluxo.',
+    );
   }
+
+  const [datasetStart] = suggested[0];
+  const [, datasetEnd] = suggested[2];
+  const activePeriods = effectivePeriods ?? suggested;
+
+  const updatePeriod = (index: 0 | 1 | 2, next: Period): void => {
+    const base = [...activePeriods] as [Period, Period, Period];
+    base[index] = next;
+    setPeriods(base);
+  };
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="space-y-1.5">
-          <Label htmlFor="sankey-top">Termos por período</Label>
-          <Select value={String(topN)} onValueChange={(value) => setTopN(Number(value))}>
-            <SelectTrigger id="sankey-top" className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {[5, 8, 10, 15, 20].map((option) => (
-                <SelectItem key={option} value={String(option)}>
-                  Top {option}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <p className="text-xs text-muted-foreground">
-          Períodos: {periods.map(([start, end]) => `${start}–${end}`).join(' · ')}. As linhas
-          mais grossas são termos que sobreviveram de um período ao seguinte; as finas, termos
-          distintos que costumam aparecer nos mesmos documentos.
-        </p>
+      <div className="space-y-1.5">
+        <Label htmlFor="sankey-top">Termos por período</Label>
+        <Select value={String(topN)} onValueChange={(value) => setTopN(Number(value))}>
+          <SelectTrigger id="sankey-top" className="w-40">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {[5, 8, 10, 15, 20].map((option) => (
+              <SelectItem key={option} value={String(option)}>
+                Top {option}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
-      <Suspense fallback={chartMessage('Carregando gráfico…')}>
-        <PlotlyChart
-          exportName="evolucao-tematica"
-          height={620}
-          data={[
-            {
-              type: 'sankey',
-              orientation: 'h',
-              node: {
-                pad: 14,
-                thickness: 18,
-                line: { color: 'rgba(0,0,0,0.25)', width: 0.5 },
-                label: sankey.nodes.map((node) => node.label),
-                color: sankey.nodes.map((node) => PALETTE[node.period % PALETTE.length] as string),
-              },
-              link: {
-                source: sankey.links.map((link) => link.source),
-                target: sankey.links.map((link) => link.target),
-                value: sankey.links.map((link) => link.value),
-                color: sankey.links.map((link) =>
-                  link.kind === 'continuidade'
-                    ? 'rgba(18, 115, 185, 0.45)'
-                    : 'rgba(150, 160, 170, 0.25)',
-                ),
-              },
-            } as never,
-          ]}
-          layout={{ margin: { l: 10, r: 10, t: 10, b: 10 } }}
-        />
-      </Suspense>
+      <div className="grid gap-4 rounded-md border p-3 sm:grid-cols-3">
+        {activePeriods.map(([start, end], index) => (
+          <div key={index} className="space-y-2">
+            <Label>
+              Período {index + 1}: {start}–{end}
+            </Label>
+            <Slider
+              min={datasetStart}
+              max={datasetEnd}
+              step={1}
+              value={[start, end]}
+              onValueChange={(value) => {
+                const [nextStart, nextEnd] = value as [number, number];
+                updatePeriod(index as 0 | 1 | 2, [nextStart, nextEnd]);
+              }}
+              className="py-1"
+            />
+          </div>
+        ))}
+      </div>
+
+      <p className="text-xs text-muted-foreground">
+        As linhas mais grossas são termos que sobreviveram de um período ao seguinte; as
+        finas, termos distintos que costumam aparecer nos mesmos documentos.
+      </p>
+
+      {!sankey ? (
+        chartMessage(
+          loadingSankey
+            ? 'Calculando fluxos temáticos…'
+            : 'Nenhum fluxo para os períodos selecionados — tente um recorte mais amplo.',
+        )
+      ) : (
+        <Suspense fallback={chartMessage('Carregando gráfico…')}>
+          <PlotlyChart
+            exportName="evolucao-tematica"
+            height={620}
+            data={[
+              {
+                type: 'sankey',
+                orientation: 'h',
+                node: {
+                  pad: 14,
+                  thickness: 18,
+                  line: { color: 'rgba(0,0,0,0.25)', width: 0.5 },
+                  label: sankey.nodes.map((node) => node.label),
+                  color: sankey.nodes.map((node) => PALETTE[node.period % PALETTE.length] as string),
+                },
+                link: {
+                  source: sankey.links.map((link) => link.source),
+                  target: sankey.links.map((link) => link.target),
+                  value: sankey.links.map((link) => link.value),
+                  color: sankey.links.map((link) =>
+                    link.kind === 'continuidade'
+                      ? 'rgba(18, 115, 185, 0.45)'
+                      : 'rgba(150, 160, 170, 0.25)',
+                  ),
+                },
+              } as never,
+            ]}
+            layout={{ margin: { l: 10, r: 10, t: 10, b: 10 } }}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }
