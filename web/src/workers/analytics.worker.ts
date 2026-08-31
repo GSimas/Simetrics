@@ -16,6 +16,11 @@ import { conceptMap, type ConceptMapOptions, type ConceptTerm } from '@/core/viz
 import { keywordGenetics, type KeywordGenetics } from '@/core/viz/genetics';
 import { historiograph, type HistoriographData } from '@/core/viz/historiograph';
 import {
+  productionTimeline,
+  type ProductionCategory,
+  type ProductionSeries,
+} from '@/core/viz/production-timeline';
+import {
   sankeyEvolution,
   suggestPeriods,
   type Period,
@@ -62,6 +67,15 @@ const api = {
       docsPerYear: docsPerYear(dataset),
       lotka: lotkaDistribution(docsPerAuthor(dataset)),
     };
+  },
+
+  /**
+   * Produção ao longo do tempo, quebrada pela categoria escolhida (país, tema de IA,
+   * base de dados ou tipo de trabalho) — separado de `overview` porque só é calculado
+   * quando o usuário troca a categoria, não a cada carregamento da base.
+   */
+  productionTimeline(dataset: Dataset, category: ProductionCategory): ProductionSeries[] {
+    return productionTimeline(dataset, category);
   },
 
   /** As quatro tabelas analíticas, com índices h/g/i10/m por entidade. */

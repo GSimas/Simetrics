@@ -10,6 +10,7 @@ import {
   Users,
 } from 'lucide-react';
 
+import type { Trace } from '@/components/charts/plotly';
 import { KpiCard } from '@/components/KpiCard';
 import { UploadPanel } from '@/components/UploadPanel';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +22,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -36,14 +38,28 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import type { MetadataCompleteness } from '@/lib/types';
+import type { ProductionCategory, ProductionSeries } from '@/core/viz/production-timeline';
+import type { Dataset, MetadataCompleteness } from '@/lib/types';
+import { useAsyncResult } from '@/lib/use-async-result';
 import { useDataset, type DedupStrategy } from '@/state/dataset.store';
 import { useLocale } from '@/state/locale.store';
+import { getAnalyticsWorker } from '@/workers/client';
 import { EntityTables } from './EntityTables';
 import { ThemePanel } from './ThemePanel';
 import { VisualAnalyses } from './VisualAnalyses';
+import { PALETTE, chartMessage } from './viz-shared';
 
 const PlotlyChart = lazy(() => import('@/components/charts/PlotlyChart'));
+
+const PRODUCTION_CATEGORIES: readonly ProductionCategory[] = [
+  'Total',
+  'Países',
+  'Base de Dados',
+  'Tipo de Trabalho',
+  'Temas (IA)',
+];
+
+type ProductionChartMode = 'bars-grouped' | 'bars-stacked' | 'line';
 
 const STATUS_VARIANT: Record<MetadataCompleteness['status'], 'success' | 'default' | 'warning' | 'destructive'> = {
   Excelente: 'success',
@@ -267,33 +283,7 @@ export default function OverviewTab() {
 
       {overview && (
         <div className="grid gap-4 lg:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">{t('prod_title')}</CardTitle>
-              <CardDescription>{t('prod_description')}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Suspense fallback={<ChartSkeleton />}>
-                <PlotlyChart
-                  exportName="producao-por-ano"
-                  height={320}
-                  data={[
-                    {
-                      type: 'bar',
-                      x: overview.docsPerYear.map((point) => point.year),
-                      y: overview.docsPerYear.map((point) => point.count),
-                      marker: { color: '#1273B9' },
-                      hovertemplate: '%{x}: %{y} documentos<extra></extra>',
-                    },
-                  ]}
-                  layout={{
-                    xaxis: { title: { text: 'Ano' } },
-                    yaxis: { title: { text: 'Documentos' } },
-                  }}
-                />
-              </Suspense>
-            </CardContent>
-          </Card>
+          <ProductionTimelineCard dataset={active} />
 
           <Card>
             <CardHeader>
@@ -405,5 +395,127 @@ function ChartSkeleton() {
     <div className="grid h-80 place-items-center text-sm text-muted-foreground">
       Carregando gráfico…
     </div>
+  );
+}
+
+/**
+ * Produção ao longo do tempo — categoria (país, base, tipo de trabalho, tema de IA) e
+ * modo de visualização (barras separadas/agrupadas ou linha) são estado de UI puro;
+ * só a categoria dispara um novo cálculo no worker (`core/viz/production-timeline.ts`).
+ */
+function ProductionTimelineCard({ dataset }: { dataset: Dataset }) {
+  const t = useLocale((state) => state.t);
+  const hasThemes = useDataset((state) => state.clustering !== null);
+  const [category, setCategory] = useState<ProductionCategory>('Total');
+  const [mode, setMode] = useState<ProductionChartMode>('bars-grouped');
+
+  const { data: series } = useAsyncResult<ProductionSeries[]>(`production ${category}`, () =>
+    getAnalyticsWorker().productionTimeline(dataset, category),
+  );
+
+  const resolvedSeries = series ?? [];
+  const isLine = mode === 'line';
+
+  const categoryLabels: Record<ProductionCategory, string> = {
+    Total: t('prod_category_total'),
+    Países: t('prod_category_country'),
+    'Base de Dados': t('prod_category_database'),
+    'Tipo de Trabalho': t('prod_category_doctype'),
+    'Temas (IA)': t('prod_category_theme'),
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">{t('prod_title')}</CardTitle>
+        <CardDescription>{t('prod_description')}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="prod-category">{t('prod_category_label')}</Label>
+            <Select
+              value={category}
+              onValueChange={(value) => setCategory(value as ProductionCategory)}
+            >
+              <SelectTrigger id="prod-category">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PRODUCTION_CATEGORIES.map((option) => (
+                  <SelectItem
+                    key={option}
+                    value={option}
+                    disabled={option === 'Temas (IA)' && !hasThemes}
+                  >
+                    {categoryLabels[option]}
+                    {option === 'Temas (IA)' && !hasThemes ? ` (${t('prod_category_theme_locked')})` : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="prod-mode">{t('prod_mode_label')}</Label>
+            <Select value={mode} onValueChange={(value) => setMode(value as ProductionChartMode)}>
+              <SelectTrigger id="prod-mode">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="bars-grouped">{t('prod_mode_bars_grouped')}</SelectItem>
+                <SelectItem value="bars-stacked">{t('prod_mode_bars_stacked')}</SelectItem>
+                <SelectItem value="line">{t('prod_mode_line')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {resolvedSeries.length === 0 ? (
+          chartMessage(
+            category === 'Temas (IA)' && !hasThemes ? t('prod_empty_no_themes') : t('prod_empty_generic'),
+          )
+        ) : (
+          <Suspense fallback={<ChartSkeleton />}>
+            <PlotlyChart
+              exportName="producao-por-ano"
+              height={340}
+              data={resolvedSeries.map((entry, index): Trace => {
+                const color = PALETTE[index % PALETTE.length] as string;
+                const x = entry.points.map((point) => point.year);
+                const y = entry.points.map((point) => point.count);
+
+                return isLine
+                  ? {
+                      type: 'scatter',
+                      mode: 'lines+markers',
+                      name: entry.category,
+                      x,
+                      y,
+                      line: { color, width: 2 },
+                      marker: { color, size: 5 },
+                      hovertemplate: `${entry.category} — %{x}: %{y} documentos<extra></extra>`,
+                    }
+                  : {
+                      type: 'bar',
+                      name: entry.category,
+                      x,
+                      y,
+                      marker: { color },
+                      hovertemplate: `${entry.category} — %{x}: %{y} documentos<extra></extra>`,
+                    };
+              })}
+              layout={{
+                xaxis: { title: { text: 'Ano' } },
+                yaxis: { title: { text: 'Documentos' } },
+                barmode: mode === 'bars-stacked' ? 'stack' : 'group',
+                showlegend: resolvedSeries.length > 1,
+                legend: { orientation: 'h', y: -0.2 },
+              }}
+            />
+          </Suspense>
+        )}
+      </CardContent>
+    </Card>
   );
 }

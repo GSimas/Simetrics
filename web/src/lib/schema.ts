@@ -41,6 +41,10 @@ export const FIELD_CANDIDATES = {
   references: [FIELD.REFERENCES_UNIFIED, 'REFERENCES', FIELD.CITED_REFERENCES, 'CR'],
   affiliation: ['AUTHOR ADDRESS', 'AD', 'C1', 'AFFILIATIONS'],
   citations: ['TC', 'Z9', 'TIMES CITED', 'CITED BY'],
+  // DOCUMENT TYPE só existe em exports estruturados (Scopus CSV, WoS Excel); o RIS não
+  // tem essa tag — nele o tipo mora em TYPE OF WORK (M3, mais legível: "Article",
+  // "Conference paper") ou, na ausência dele, em TYPE OF REFERENCE (TY, cru: "Jour").
+  documentType: [FIELD.DOCUMENT_TYPE, 'TYPE OF WORK', FIELD.TYPE_OF_REFERENCE],
 } as const satisfies Record<string, readonly string[]>;
 
 /** Separador de valores múltiplos em um único campo (autores, países, keywords). */
