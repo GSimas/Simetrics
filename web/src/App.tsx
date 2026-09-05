@@ -121,18 +121,16 @@ export default function App() {
           <div className="container flex flex-wrap items-center justify-between gap-4 py-3.5 sm:py-4">
             <button
               type="button"
-              onClick={() => setActiveTab('overview')}
+              onClick={() => navigate('landing')}
               className="flex items-center gap-3.5 text-left cursor-pointer rounded-2xl transition-all duration-200 hover:opacity-90 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
-              aria-label={t('tab_overview')}
-              title={t('tab_overview')}
+              aria-label={t('landing_projects_title')}
+              title={t('landing_projects_title')}
             >
-              <div className="flex size-14 sm:size-16 shrink-0 items-center justify-center rounded-2xl border border-primary/25 bg-gradient-to-br from-blue-50 to-indigo-50/70 p-2 shadow-xs dark:from-blue-950 dark:to-indigo-950">
-                <img
-                  src="/simetrics-logo.png"
-                  alt="Simetrics Logo"
-                  className="h-11 sm:h-12 w-auto object-contain transition-transform duration-300 hover:scale-105"
-                />
-              </div>
+              <img
+                src="/simetrics-logo.png"
+                alt="Simetrics Logo"
+                className="h-14 sm:h-16 w-auto shrink-0 object-contain transition-transform duration-300 hover:scale-105"
+              />
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-foreground">

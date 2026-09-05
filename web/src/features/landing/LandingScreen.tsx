@@ -97,9 +97,7 @@ export function LandingScreen({ navigate, onOpenTutorial }: LandingScreenProps) 
 
       <main className="container flex flex-col gap-12 py-12 sm:py-16">
         <section className="flex flex-col items-center gap-6 text-center">
-          <div className="flex size-20 items-center justify-center rounded-3xl border border-primary/25 bg-gradient-to-br from-blue-50 to-indigo-50/70 p-3 shadow-xs dark:from-blue-950 dark:to-indigo-950">
-            <img src="/simetrics-logo.png" alt="Simetrics Logo" className="h-14 w-auto object-contain" />
-          </div>
+          <img src="/simetrics-logo.png" alt="Simetrics Logo" className="h-24 w-auto object-contain sm:h-28" />
 
           <div className="space-y-2">
             <h1 className="text-3xl font-extrabold tracking-tight text-foreground sm:text-4xl">
@@ -116,9 +114,13 @@ export function LandingScreen({ navigate, onOpenTutorial }: LandingScreenProps) 
 
           <div className="grid w-full max-w-3xl gap-3 sm:grid-cols-3">
             {HIGHLIGHTS.map(({ Icon, labelKey, textKey }) => (
-              <Card key={labelKey} className="border-border/80 text-left shadow-2xs">
-                <CardContent className="flex flex-col gap-2 p-4">
-                  <Icon className="size-5 text-primary" aria-hidden />
+              <Card
+                key={labelKey}
+                className="group relative overflow-hidden border-border/80 text-left shadow-2xs transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/10"
+              >
+                <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100 bg-[radial-gradient(circle_at_50%_0%,theme(colors.primary/18%),transparent_70%)]" />
+                <CardContent className="relative flex flex-col gap-2 p-4">
+                  <Icon className="size-5 text-primary transition-transform duration-300 group-hover:scale-110" aria-hidden />
                   <p className="text-sm font-semibold text-foreground">{t(labelKey)}</p>
                   <p className="text-xs text-muted-foreground">{t(textKey)}</p>
                 </CardContent>

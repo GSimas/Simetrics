@@ -137,10 +137,10 @@ export function ChatWidget() {
           type="button"
           onClick={() => setIsOpen((prev) => !prev)}
           className={cn(
-            'group relative flex items-center gap-2.5 rounded-full px-4 py-2.5 sm:py-3 text-white shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 focus:outline-hidden',
+            'group relative flex items-center rounded-full py-2.5 sm:py-3 text-white shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 focus:outline-hidden',
             isOpen
-              ? 'bg-slate-800 dark:bg-slate-700'
-              : 'bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 shadow-emerald-500/25 ring-2 ring-emerald-400/40',
+              ? 'gap-2.5 px-4 bg-slate-800 dark:bg-slate-700'
+              : 'gap-0 px-3.5 hover:gap-2.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 shadow-emerald-500/25 ring-2 ring-emerald-400/40',
           )}
           title={isOpen ? (isEn ? 'Close Assistant' : 'Fechar Assistente') : t('chat_title')}
           aria-label={t('chat_title')}
@@ -149,17 +149,21 @@ export function ChatWidget() {
             <X className="size-5 transition-transform duration-200 group-hover:rotate-90" />
           ) : (
             <>
-              <div className="relative">
+              <div className="relative shrink-0">
                 <Bot className="size-5" />
                 <span className="absolute -right-1 -top-1 flex size-2.5">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-75" />
                   <span className="relative inline-flex size-2.5 rounded-full bg-emerald-400" />
                 </span>
               </div>
-              <span className="text-xs font-bold tracking-wide">
-                {t('chat_title')}
+              <span className="grid grid-cols-[0fr] group-hover:grid-cols-[1fr] transition-[grid-template-columns] duration-300 ease-out">
+                <span className="flex items-center gap-1.5 overflow-hidden">
+                  <span className="text-xs font-bold tracking-wide whitespace-nowrap">
+                    {t('chat_title')}
+                  </span>
+                  <Sparkles className="size-3.5 shrink-0 text-amber-300 animate-pulse" />
+                </span>
               </span>
-              <Sparkles className="size-3.5 text-amber-300 animate-pulse" />
             </>
           )}
         </button>
