@@ -178,7 +178,7 @@ export function generatePdfReport({
       ],
       [
         { content: isEn ? 'Annual Growth Rate' : 'Crescimento Anual', styles: { fontStyle: 'bold' as const } },
-        `${(s.bibliometrix.growthRate * 100).toFixed(2)}%`,
+        `${s.bibliometrix.growthRate.toFixed(2)}%`,
         { content: isEn ? 'Co-authors / Doc' : 'Coautores / Artigo', styles: { fontStyle: 'bold' as const } },
         s.bibliometrix.coauthIndex.toFixed(2),
       ],

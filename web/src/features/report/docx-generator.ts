@@ -176,7 +176,7 @@ export async function generateDocxReport({
           ],
           [
             isEn ? 'Annual Growth Rate' : 'Crescimento Anual',
-            `${(s.bibliometrix.growthRate * 100).toFixed(2)}%`,
+            `${s.bibliometrix.growthRate.toFixed(2)}%`,
             isEn ? 'Co-authors / Doc' : 'Coautores / Artigo',
             s.bibliometrix.coauthIndex.toFixed(2),
           ],

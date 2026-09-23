@@ -677,7 +677,7 @@ export default function ReportTab() {
                     {isEn ? 'Annual Growth' : 'Crescimento Anual'}
                   </p>
                   <p className="text-xl font-bold tabular-nums text-foreground mt-0.5">
-                    {(overview.summary.bibliometrix.growthRate * 100).toFixed(2)}%
+                    {overview.summary.bibliometrix.growthRate.toFixed(2)}%
                   </p>
                 </div>
               </div>
