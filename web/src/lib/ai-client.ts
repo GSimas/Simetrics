@@ -1,7 +1,9 @@
 import type { ChatContext } from '@/workers/ai.worker';
 import type { Dataset } from '@/lib/types';
-import { useAiConfig, type AiConfig } from '@/state/ai-config.store';
+import { openAiCompatibleBaseUrl, useAiConfig, type AiConfig, type AiProvider } from '@/state/ai-config.store';
 import { useLocale } from '@/state/locale.store';
+import { useFreeTier } from '@/state/free-tier.store';
+import { freeTierHeaders } from './device-id';
 import {
   ANALYTICAL_TOOLS,
   executeAnalyticalTool,
@@ -182,9 +184,9 @@ export async function labelCluster(
   const locale = useLocale.getState().locale;
   const prompt = buildLabelPrompt(request.samples, request.topTerms, locale);
 
-  // Se não houver chave configurada, tenta o endpoint nativo Netlify
+  // Sem chave própria, o servidor nomeia o tema com a chave DeepSeek dele.
   if (!config.apiKey && config.provider !== 'custom') {
-    return labelClusterServerless(request, signal);
+    return labelClusterServerless(request, locale, signal);
   }
 
   const rawText = await generateTextWithProvider(config, prompt, signal);
@@ -193,21 +195,22 @@ export async function labelCluster(
   return name;
 }
 
-/** Chamada direta para o endpoint serverless legado se chave não estiver configurada */
+/** Nome de tema pelo servidor (DeepSeek), quando o usuário não tem chave própria. */
 async function labelClusterServerless(
   request: LabelClusterRequest,
+  locale: 'pt' | 'en',
   signal?: AbortSignal,
 ): Promise<string> {
-  const response = await fetch('/api/gemini/label-cluster', {
+  const response = await fetch('/api/themes/label', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(request),
+    body: JSON.stringify({ ...request, locale }),
     ...(signal ? { signal } : {}),
   });
 
   if (!response.ok) {
-    const errorBody = await response.json().catch(() => ({}));
-    throw new AiError(errorBody.error || `HTTP ${response.status}`);
+    const errorBody = (await response.json().catch(() => ({}))) as { error?: { message?: string } };
+    throw new AiError(errorBody.error?.message || `HTTP ${response.status}`);
   }
 
   const body = (await response.json()) as { name?: string };
@@ -221,26 +224,62 @@ export async function streamChat(options: ChatStreamOptions): Promise<void> {
   const locale = useLocale.getState().locale;
   const systemPrompt = buildSystemPrompt(options.context, locale);
 
-  // Se não houver chave configurada, tenta a função serverless nativa se existir
+  // Sem chave própria: perguntas gratuitas do Simi, pelo DeepSeek do servidor. O proxy fala
+  // o formato da OpenAI, então o laço de streaming e ferramentas é o mesmo do BYOK; cada
+  // pergunta leva um id próprio, e todas as rodadas de ferramentas dela contam como uma.
   if (!config.apiKey && config.provider !== 'custom') {
-    return streamChatServerless(options);
+    try {
+      await streamOpenAiCompatible('', 'server', '/api/simi', systemPrompt, options, freeTierHeaders(crypto.randomUUID(), locale));
+    } finally {
+      void useFreeTier.getState().refresh();
+    }
+    return;
   }
 
-  const { provider, apiKey, model, baseUrl } = config;
+  const { provider, apiKey, model } = config;
 
   if (provider === 'gemini') {
     await streamGemini(apiKey, model, systemPrompt, options);
-  } else if (provider === 'openai' || provider === 'openrouter' || provider === 'custom') {
-    const defaultUrl =
-      provider === 'openrouter'
-        ? 'https://openrouter.ai/api/v1'
-        : provider === 'openai'
-          ? 'https://api.openai.com/v1'
-          : baseUrl || 'http://localhost:11434/v1';
-
-    await streamOpenAiCompatible(apiKey, model, defaultUrl, systemPrompt, options);
   } else if (provider === 'claude') {
     await streamClaude(apiKey, model, systemPrompt, options);
+  } else {
+    const baseUrl = openAiCompatibleBaseUrl(config);
+    if (!baseUrl) throw new AiError(`Provedor sem endpoint configurado: ${provider}`);
+    await streamOpenAiCompatible(apiKey, model, baseUrl, systemPrompt, options, {}, provider);
+  }
+}
+
+/**
+ * Ajustes por provedor sobre o corpo no formato da OpenAI.
+ *
+ * A OpenAI trocou `max_tokens` por `max_completion_tokens` e, nos modelos de raciocínio,
+ * só aceita a temperatura padrão. A família GPT-6 só chama ferramentas em chat
+ * completions com `reasoning_effort: "none"`.
+ */
+function tuneOpenAiBody(provider: AiProvider | 'server', model: string, body: Record<string, unknown>): void {
+  if (provider !== 'openai') return;
+  body.max_completion_tokens = body.max_tokens;
+  delete body.max_tokens;
+  delete body.temperature;
+  if (body.tools && /^gpt-6/.test(model)) body.reasoning_effort = 'none';
+}
+
+/**
+ * A Anthropic recusa `temperature` (400) do Opus 4.7 em diante, no Sonnet 5 e na família
+ * Fable. Só os modelos anteriores ainda aceitam o parâmetro.
+ */
+function claudeAcceptsTemperature(model: string): boolean {
+  return /^claude-(haiku-4-5|sonnet-4-6|opus-4-6|sonnet-4-5|opus-4-5)/.test(model);
+}
+
+/** Argumentos de uma chamada de ferramenta; JSON inválido ou truncado vira objeto vazio. */
+function parseToolInput(json: string): Record<string, unknown> {
+  if (!json) return {};
+  try {
+    const parsed: unknown = JSON.parse(json);
+    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
   }
 }
 
@@ -412,6 +451,8 @@ async function streamOpenAiCompatible(
   baseUrl: string,
   systemPrompt: string,
   options: ChatStreamOptions,
+  extraHeaders: Record<string, string> = {},
+  provider: AiProvider | 'server' = 'server',
 ): Promise<void> {
   const url = `${baseUrl.replace(/\/+$/, '')}/chat/completions`;
   const locale = useLocale.getState().locale;
@@ -441,6 +482,7 @@ async function streamOpenAiCompatible(
   while (toolIterations <= MAX_TOOL_ITERATIONS) {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      ...extraHeaders,
     };
     if (apiKey) {
       headers['Authorization'] = `Bearer ${apiKey}`;
@@ -457,6 +499,7 @@ async function streamOpenAiCompatible(
       body.tools = tools;
       body.tool_choice = 'auto';
     }
+    tuneOpenAiBody(provider, model, body);
 
     const response = await fetch(url, {
       method: 'POST',
@@ -615,10 +658,11 @@ async function streamClaude(
       model,
       system: systemPrompt,
       messages,
-      max_tokens: 8192,
-      temperature: 0.2,
+      // O raciocínio (sempre ligado no Opus 5.5 e no Fable 5.1) conta neste teto.
+      max_tokens: 16000,
       stream: true,
     };
+    if (claudeAcceptsTemperature(model)) body.temperature = 0.2;
     if (tools) body.tools = tools;
 
     const response = await fetch(url, {
@@ -646,8 +690,10 @@ async function streamClaude(
     const decoder = new TextDecoder();
     let buffer = '';
 
-    let accumulatedText = '';
-    let currentToolUse: { id: string; name: string; inputJson: string } | null = null;
+    // Cada bloco do turno, na ordem e pelo índice em que o stream o anuncia. O turno volta
+    // inteiro na rodada seguinte: os modelos com raciocínio exigem os blocos de thinking
+    // (com assinatura) de volta, intactos, antes do tool_use que os seguiu.
+    const blocks: Array<Record<string, unknown> & { type: string; inputJson?: string }> = [];
     const toolUses: Array<{ id: string; name: string; inputJson: string }> = [];
 
     try {
@@ -666,22 +712,23 @@ async function streamClaude(
             if (jsonStr) {
               try {
                 const data = JSON.parse(jsonStr);
-                if (data.type === 'content_block_start' && data.content_block?.type === 'tool_use') {
-                  currentToolUse = {
-                    id: data.content_block.id,
-                    name: data.content_block.name,
-                    inputJson: '',
-                  };
-                  toolUses.push(currentToolUse);
-                } else if (
-                  data.type === 'content_block_delta' &&
-                  data.delta?.type === 'input_json_delta' &&
-                  currentToolUse
-                ) {
-                  currentToolUse.inputJson += data.delta.partial_json ?? '';
-                } else if (data.type === 'content_block_delta' && data.delta?.text) {
-                  accumulatedText += data.delta.text;
-                  options.onChunk(data.delta.text);
+                if (data.type === 'content_block_start' && data.content_block) {
+                  const block = { ...data.content_block } as Record<string, unknown> & { type: string; inputJson?: string };
+                  if (block.type === 'tool_use') block.inputJson = '';
+                  blocks[data.index ?? blocks.length] = block;
+                } else if (data.type === 'content_block_delta') {
+                  const block = blocks[data.index ?? blocks.length - 1];
+                  const delta = data.delta ?? {};
+                  if (delta.type === 'text_delta' && typeof delta.text === 'string') {
+                    if (block) block.text = String(block.text ?? '') + delta.text;
+                    options.onChunk(delta.text);
+                  } else if (delta.type === 'input_json_delta' && block) {
+                    block.inputJson = (block.inputJson ?? '') + (delta.partial_json ?? '');
+                  } else if (delta.type === 'thinking_delta' && block) {
+                    block.thinking = String(block.thinking ?? '') + (delta.thinking ?? '');
+                  } else if (delta.type === 'signature_delta' && block) {
+                    block.signature = delta.signature;
+                  }
                 }
               } catch {
                 // chunk parse
@@ -694,20 +741,20 @@ async function streamClaude(
       reader.releaseLock();
     }
 
+    const assistantContent: unknown[] = [];
+    for (const block of blocks) {
+      if (!block) continue;
+      if (block.type === 'tool_use') {
+        const inputJson = block.inputJson ?? '';
+        toolUses.push({ id: String(block.id), name: String(block.name), inputJson });
+        assistantContent.push({ type: 'tool_use', id: block.id, name: block.name, input: parseToolInput(inputJson) });
+      } else if (block.type !== 'text' || block.text) {
+        assistantContent.push(block);
+      }
+    }
+
     if (toolUses.length > 0 && options.dataset && toolIterations < MAX_TOOL_ITERATIONS) {
       toolIterations++;
-
-      const assistantContent: unknown[] = [];
-      if (accumulatedText) assistantContent.push({ type: 'text', text: accumulatedText });
-      for (const tu of toolUses) {
-        let input: Record<string, unknown> = {};
-        try {
-          input = tu.inputJson ? JSON.parse(tu.inputJson) : {};
-        } catch {
-          input = {};
-        }
-        assistantContent.push({ type: 'tool_use', id: tu.id, name: tu.name, input });
-      }
       messages.push({ role: 'assistant', content: assistantContent });
 
       const userToolResults: unknown[] = [];
@@ -750,49 +797,13 @@ async function streamClaude(
   }
 }
 
-/** Streaming via Netlify Serverless fallback */
-async function streamChatServerless(options: ChatStreamOptions): Promise<void> {
-  const response = await fetch('/api/gemini/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      question: options.question,
-      history: options.history,
-      documents: options.context.documents,
-      aggregate: options.context.aggregate,
-    }),
-    ...(options.signal ? { signal: options.signal } : {}),
-  });
-
-  if (!response.ok) {
-    const errorBody = await response.json().catch(() => ({}));
-    throw new AiError(errorBody.error || `HTTP ${response.status}`);
-  }
-  if (!response.body) throw new AiError('A resposta chegou vazia.');
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      options.onChunk(decoder.decode(value, { stream: true }));
-    }
-    const tail = decoder.decode();
-    if (tail) options.onChunk(tail);
-  } finally {
-    reader.releaseLock();
-  }
-}
-
 /** Helper genérico para geração síncrona/curta com provedores */
 async function generateTextWithProvider(
   config: AiConfig,
   prompt: string,
   signal?: AbortSignal,
 ): Promise<string> {
-  const { provider, apiKey, model, baseUrl } = config;
+  const { provider, apiKey, model } = config;
 
   if (provider === 'gemini') {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
@@ -818,26 +829,26 @@ async function generateTextWithProvider(
     return data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
   }
 
-  if (provider === 'openai' || provider === 'openrouter' || provider === 'custom') {
-    const url = `${(provider === 'openrouter'
-      ? 'https://openrouter.ai/api/v1'
-      : provider === 'openai'
-        ? 'https://api.openai.com/v1'
-        : baseUrl || 'http://localhost:11434/v1'
-    ).replace(/\/+$/, '')}/chat/completions`;
+  const compatibleBaseUrl = provider === 'claude' ? null : openAiCompatibleBaseUrl(config);
+  if (compatibleBaseUrl) {
+    const url = `${compatibleBaseUrl.replace(/\/+$/, '')}/chat/completions`;
 
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
 
+    // Folga para modelos que raciocinam antes de responder; o nome é cortado depois.
+    const body: Record<string, unknown> = {
+      model,
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 1024,
+      temperature: 0.2,
+    };
+    tuneOpenAiBody(provider, model, body);
+
     const response = await fetch(url, {
       method: 'POST',
       headers,
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 64,
-        temperature: 0.2,
-      }),
+      body: JSON.stringify(body),
       ...(signal ? { signal } : {}),
     });
 
@@ -862,8 +873,9 @@ async function generateTextWithProvider(
       body: JSON.stringify({
         model,
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: 64,
-        temperature: 0.2,
+        // O raciocínio conta no teto; 64 tokens deixavam a resposta vazia nos modelos novos.
+        max_tokens: 2048,
+        ...(claudeAcceptsTemperature(model) ? { temperature: 0.2 } : {}),
       }),
       ...(signal ? { signal } : {}),
     });
@@ -873,8 +885,9 @@ async function generateTextWithProvider(
       throw new AiError(err.error?.message || `Claude API error (HTTP ${response.status})`);
     }
 
-    const data = await response.json();
-    return data.content?.[0]?.text ?? '';
+    const data = (await response.json()) as { content?: { type: string; text?: string }[] };
+    // Com raciocínio, o primeiro bloco é de thinking: o texto é o bloco `text`.
+    return data.content?.find((block) => block.type === 'text')?.text ?? '';
   }
 
   return '';

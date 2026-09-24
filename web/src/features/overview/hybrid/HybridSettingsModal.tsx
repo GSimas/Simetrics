@@ -165,7 +165,7 @@ function SettingsBody({ onClose }: { onClose: () => void }) {
         <section className="space-y-3 rounded-xl border border-border/80 p-4" aria-labelledby="hybrid-gen-title">
           <h3 id="hybrid-gen-title" className="text-sm font-semibold">{copy.generativeSection}</h3>
           <div className="space-y-1">
-            <Label htmlFor="hybrid-gen-key" className="text-xs">{copy.apiKey}</Label>
+            <Label htmlFor="hybrid-gen-key" className="text-xs">{copy.apiKeyOptional}</Label>
             <SecretInput
               id="hybrid-gen-key"
               value={form.generative.apiKey}
@@ -173,6 +173,7 @@ function SettingsBody({ onClose }: { onClose: () => void }) {
               placeholder="sk-..."
               label={copy.showKey}
             />
+            <p className="text-[11px] text-muted-foreground">{copy.generativeKeyHint}</p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
@@ -213,7 +214,7 @@ function SettingsBody({ onClose }: { onClose: () => void }) {
           <h3 id="hybrid-jev-title" className="text-sm font-semibold">{copy.jevSection}</h3>
           <div className="grid gap-3 sm:grid-cols-[2fr_1fr]">
             <div className="space-y-1">
-              <Label htmlFor="hybrid-jev-key" className="text-xs">{copy.apiKey}</Label>
+              <Label htmlFor="hybrid-jev-key" className="text-xs">{copy.apiKeyOptional}</Label>
               <SecretInput
                 id="hybrid-jev-key"
                 value={form.jev.apiKey}
@@ -221,6 +222,7 @@ function SettingsBody({ onClose }: { onClose: () => void }) {
                 placeholder="ts-..."
                 label={copy.showKey}
               />
+              <p className="text-[11px] text-muted-foreground">{copy.jevKeyHint}</p>
             </div>
             <div className="space-y-1">
               <Label htmlFor="hybrid-jev-model" className="text-xs">{copy.model}</Label>

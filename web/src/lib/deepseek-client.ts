@@ -5,9 +5,10 @@ import { AiError } from './ai-client';
  * Cliente do modelo gerativo da classificação híbrida.
  *
  * A API do DeepSeek é compatível com a da OpenAI e aceita chamadas diretas do navegador
- * (CORS liberado), então a chave vai do navegador para o provedor sem passar por servidor
- * nosso — o mesmo modelo BYOK do chat. Qualquer outro endpoint compatível serve, trocando
- * a URL base.
+ * (CORS liberado), então a chave própria vai do navegador para o provedor sem passar por
+ * servidor nosso — o mesmo modelo BYOK do chat. Qualquer outro endpoint compatível serve,
+ * trocando a URL base. Sem chave própria, a URL base é `/api/hybrid`: o proxy do servidor
+ * com a chave do .env e a cota gratuita por dispositivo.
  */
 
 export interface GenerativeConfig {
@@ -44,9 +45,10 @@ export async function chatJson(
   config: GenerativeConfig,
   prompt: ChatPrompt,
   signal?: AbortSignal,
+  extraHeaders: Record<string, string> = {},
 ): Promise<ChatJsonResult> {
   const url = `${config.baseUrl.replace(/\/+$/, '')}/chat/completions`;
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...extraHeaders };
   if (config.apiKey) headers['Authorization'] = `Bearer ${config.apiKey}`;
 
   const body = JSON.stringify({
@@ -81,7 +83,9 @@ export async function chatJson(
     }
 
     // Limite de taxa e indisponibilidade são transitórios; o resto (chave, modelo) não.
-    const transient = response.status === 429 || response.status >= 500;
+    // Cota gratuita esgotada também chega como 429, mas não adianta tentar de novo.
+    const quotaExhausted = response.headers.has('x-free-limit');
+    const transient = !quotaExhausted && (response.status === 429 || response.status >= 500);
     if (!transient || attempt >= MAX_ATTEMPTS) {
       const err = (await response.json().catch(() => ({}))) as { error?: { message?: string } };
       throw new AiError(err.error?.message || `Modelo gerativo: erro HTTP ${response.status}`);

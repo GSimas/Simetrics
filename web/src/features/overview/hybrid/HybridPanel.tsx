@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { hybridMethodsText } from '@/core/hybrid/report';
 import type { HybridRun } from '@/core/hybrid/types';
 import { useDataset } from '@/state/dataset.store';
+import { useFreeTier } from '@/state/free-tier.store';
 import { useHybridConfig } from '@/state/hybrid-config.store';
 import { useHybrid } from '@/state/hybrid.store';
 import { useLocale } from '@/state/locale.store';
@@ -168,8 +169,15 @@ export function HybridPanel() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [focus, setFocus] = useState('');
 
-  const hasGenerative = Boolean(config.generative.apiKey.trim());
-  const hasJev = Boolean(config.jev.apiKey.trim());
+  const freeStatus = useFreeTier((state) => state.status);
+  const ownGenerative = Boolean(config.generative.apiKey.trim());
+  const ownJev = Boolean(config.jev.apiKey.trim());
+  const freeDiscovery = freeStatus?.deepseek.available && freeStatus.hybrid.limit > 0 ? freeStatus.hybrid : null;
+  // Status ainda desconhecido: deixa tentar, o servidor decide.
+  const canDiscover = ownGenerative || freeStatus === null || (freeDiscovery !== null && freeDiscovery.remaining > 0);
+  const jevAvailable = ownJev || freeStatus?.jev.available !== false;
+  const fill = (text: string, quota: { remaining: number; limit: number }) =>
+    text.replace('{remaining}', String(quota.remaining)).replace('{limit}', String(quota.limit));
   const running = stage === 'running';
 
   return (
@@ -208,8 +216,20 @@ export function HybridPanel() {
 
       {(stage === 'idle' || stage === 'done' || stage === 'error') && (
         <div className="space-y-3">
-          {!hasGenerative && <p className="text-xs text-amber-800 dark:text-amber-300">{copy.missingGenerative}</p>}
-          {!hasJev && <p className="text-xs text-muted-foreground">{copy.missingJev}</p>}
+          {!ownGenerative && freeStatus && (
+            <p className={freeDiscovery?.remaining ? 'text-xs text-muted-foreground' : 'text-xs text-amber-800 dark:text-amber-300'}>
+              {!freeDiscovery
+                ? copy.missingGenerative
+                : freeDiscovery.remaining > 0
+                  ? fill(copy.freeDiscovery, freeDiscovery)
+                  : fill(copy.freeDiscoveryExhausted, freeDiscovery)}
+            </p>
+          )}
+          {!ownJev && freeStatus && (
+            <p className={freeStatus.jev.available ? 'text-xs text-muted-foreground' : 'text-xs text-amber-800 dark:text-amber-300'}>
+              {freeStatus.jev.available ? copy.jevFree : copy.missingJev}
+            </p>
+          )}
           <div className="space-y-1">
             <Label htmlFor="hybrid-focus" className="text-xs">{copy.focusLabel}</Label>
             <Input
@@ -222,11 +242,11 @@ export function HybridPanel() {
             />
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button type="button" onClick={() => void start(focus)} disabled={!hasGenerative || kmeansBusy}>
+            <Button type="button" onClick={() => void start(focus)} disabled={!canDiscover || !jevAvailable || kmeansBusy}>
               <Layers aria-hidden />
               {copy.discover}
             </Button>
-            <Button type="button" variant="outline" onClick={startManual} disabled={kmeansBusy}>
+            <Button type="button" variant="outline" onClick={startManual} disabled={!jevAvailable || kmeansBusy}>
               <ListChecks aria-hidden />
               {copy.manual}
             </Button>

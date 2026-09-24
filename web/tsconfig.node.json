@@ -14,5 +14,5 @@
     "noUnusedParameters": true,
     "types": ["node"]
   },
-  "include": ["vite.config.ts", "netlify/**/*.ts"]
+  "include": ["vite.config.ts", "netlify/**/*.ts", "server/**/*.ts"]
 }

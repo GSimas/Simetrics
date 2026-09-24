@@ -15,8 +15,14 @@ export const HYBRID_COPY = {
     discover: 'Descobrir categorias e classificar',
     manual: 'Definir categorias manualmente',
     missingGenerative: 'Informe a chave do modelo gerativo (DeepSeek) nas configurações para descobrir categorias.',
-    missingJev:
-      'Sem chave do Jev informada: o proxy usará a TYPESAFE_API_KEY do servidor, se existir.',
+    missingJev: 'Jev indisponível: o servidor não tem TYPESAFE_API_KEY. Informe uma chave do Jev nas configurações.',
+    jevFree: 'Classificação pelo Jev: gratuita e sem limite.',
+    freeDiscovery: 'Descoberta gratuita (DeepSeek do Simetrics): restam {remaining} de {limit} classificações neste dispositivo.',
+    freeDiscoveryExhausted:
+      'As {limit} classificações gratuitas deste dispositivo acabaram. Informe sua chave do modelo gerativo, ou defina as categorias manualmente (o Jev continua livre).',
+    apiKeyOptional: 'Chave de API (opcional)',
+    generativeKeyHint: 'Sem chave própria, a descoberta usa o DeepSeek do Simetrics, com cota gratuita por dispositivo.',
+    jevKeyHint: 'Sem chave própria, o Jev do Simetrics é livre.',
     privacy:
       'Título, palavras-chave e resumo dos documentos saem do navegador: a amostra vai ao modelo gerativo, e cada documento vai ao Jev (via proxy, porque a API do Jev não aceita chamadas diretas do navegador).',
     cancel: 'Cancelar',
@@ -100,7 +106,14 @@ export const HYBRID_COPY = {
     discover: 'Discover categories and classify',
     manual: 'Define categories manually',
     missingGenerative: 'Set the generative model (DeepSeek) key in the settings to discover categories.',
-    missingJev: 'No Jev key set: the proxy will use the server TYPESAFE_API_KEY, if any.',
+    missingJev: 'Jev unavailable: the server has no TYPESAFE_API_KEY. Set a Jev key in the settings.',
+    jevFree: 'Classification by Jev: free and unlimited.',
+    freeDiscovery: 'Free discovery (Simetrics DeepSeek): {remaining} of {limit} classifications left on this device.',
+    freeDiscoveryExhausted:
+      'The {limit} free classifications on this device are used up. Set your generative model key, or define the categories manually (Jev stays free).',
+    apiKeyOptional: 'API key (optional)',
+    generativeKeyHint: 'Without your own key, discovery uses the Simetrics DeepSeek with a free per-device quota.',
+    jevKeyHint: 'Without your own key, the Simetrics Jev is free.',
     privacy:
       'Document titles, keywords and abstracts leave the browser: the sample goes to the generative model, and each document goes to Jev (through a proxy, because the Jev API does not accept direct browser calls).',
     cancel: 'Cancel',

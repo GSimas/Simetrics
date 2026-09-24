@@ -6,14 +6,16 @@ Migração do Simetrics (Streamlit/Python) para React + Vite + TypeScript, com d
 
 O processamento pesado — deduplicação, índices cientométricos, similaridade de Jaccard,
 clustering e métricas de rede — roda **inteiramente no cliente, dentro de Web Workers**.
-As Netlify Functions existem apenas para intermediar a API do Gemini e proteger a
-`GEMINI_API_KEY`, respeitando o limite de 10s de execução e 6MB de payload da plataforma.
+O servidor existe só para guardar as chaves do DeepSeek e do Jev e controlar a cota
+gratuita: uma única Netlify Function (`netlify/functions/api.ts`) atende todas as rotas
+`/api/*`, com a lógica em `server/handlers.ts`.
 
 ```
 src/core/      lógica pura, sem React — é o que os testes de paridade exercitam
 src/workers/   fronteira assíncrona (Comlink) entre a UI e o core
 src/features/  uma pasta por aba da interface
-netlify/       funções serverless (somente Gemini)
+server/        endpoints /api (cotas, proxies do DeepSeek e do Jev) — Netlify e Vite
+netlify/       a função que expõe server/ em produção
 ```
 
 ## Desenvolvimento
@@ -25,24 +27,29 @@ npm run dev
 
 Comandos: `build`, `typecheck`, `lint`, `test`, `test:parity`, `benchmark`.
 
-As funções serverless não sobem com o `vite dev`. Para exercitar o assistente e a
-nomeação de temas localmente, rode em outro terminal:
-
-```bash
-npx netlify-cli functions:serve --port 9999
-```
-
-O `vite.config.ts` já encaminha `/api` para essa porta. Alternativamente, `netlify dev`
-sobe os dois lados de uma vez. Sem nenhum dos dois, as chamadas de IA falham — e a
-interface trata isso como qualquer indisponibilidade, sem quebrar.
+O `vite dev` já atende as rotas `/api/*` com os mesmos handlers de produção (plugin em
+`server/vite-plugin.ts`) — não há servidor extra para subir. As chaves vêm do `web/.env`,
+e a cota de desenvolvimento fica em `node_modules/.cache/simetrics/dev-quota.json` (apague
+o arquivo para zerá-la).
 
 ## Variáveis de ambiente
 
-`GEMINI_API_KEY` é obrigatória e fica no painel do Netlify. **Nunca** prefixe com `VITE_` —
+Copie `.env.example` para `.env` e preencha `DEEPSEEK_API_KEY` e `TYPESAFE_API_KEY`. Em
+produção, as mesmas variáveis vão para o painel da Netlify. **Nunca** prefixe com `VITE_` —
 variáveis com esse prefixo são embutidas no bundle do cliente e a chave vazaria.
 
-`GEMINI_CHAT_MODEL` e `GEMINI_LABEL_MODEL` são opcionais e trocam os modelos sem novo
-deploy do código, útil quando um identificador é descontinuado.
+| Variável | Para quê |
+|---|---|
+| `DEEPSEEK_API_KEY` | Simi gratuita, descoberta de categorias gratuita e nome dos temas sem chave própria |
+| `TYPESAFE_API_KEY` | Jev, livre para todos na classificação híbrida |
+| `SIMI_FREE_QUESTIONS` | Perguntas gratuitas do Simi por dispositivo (padrão 10) |
+| `HYBRID_FREE_RUNS` | Classificações híbridas gratuitas por dispositivo (padrão 3) |
+| `*_IP_DAILY_LIMIT`, `QUOTA_SALT` | Tetos diários por IP e sal dos hashes — ver `.env.example` |
+
+**Sobre o "por dispositivo".** O dispositivo é um identificador aleatório guardado no
+navegador; o servidor grava só o hash dele (e o do IP) no Netlify Blobs. Na web não existe
+identificação de dispositivo à prova de fraude — limpar os dados do site gera um novo id —,
+por isso há também o teto diário por IP.
 
 ## Inteligência artificial
 
@@ -55,6 +62,16 @@ vão ao modelo, que devolve o nome do tema — uma requisição por tema. O laç
 Python leva ~25 s numa chamada só, acima do limite de 10 s da Netlify. Quando a nomeação
 falha, o tema recebe um rótulo derivado dos próprios termos característicos: perder o nome
 não pode custar o agrupamento, que é a parte cara.
+
+**Classificação híbrida.** O DeepSeek descobre as categorias numa amostra estratificada e o
+Jev (TypeSafe) classifica a base inteira com confiança calibrada, medindo a concordância
+entre os dois modelos. Detalhes em `src/state/hybrid.store.ts`.
+
+**Chaves próprias (BYOK) ou gratuito.** Com chave própria, o chat fala direto com o
+provedor escolhido (Gemini, OpenAI, Anthropic, DeepSeek, Mistral, xAI, Groq, Cerebras,
+Together, Fireworks, Moonshot, Qwen, Zhipu, Cohere, Hugging Face, OpenRouter ou um
+endpoint local). Sem ela, a Simi responde até 10 perguntas por dispositivo pelo DeepSeek
+do servidor.
 
 **Assistente científico.** A cada pergunta, o worker seleciona por BM25 os ~40 documentos
 mais relevantes e envia só eles, junto com um panorama agregado da base. Medido na base de

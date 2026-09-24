@@ -81,7 +81,7 @@ export const TRANSLATIONS = {
     theme_ql_explanation:
       'O Quociente Locacional acima de 1 indica especialização: a entidade publica naquele tema mais do que a média da base. O desempate entre QLs iguais é pelo volume, para que uma entidade com um único documento no tema não lidere.',
     theme_no_key_warning:
-      'Chave de IA não configurada. Configure sua chave própria (Gemini, OpenAI, Claude, OpenRouter) para rotular os temas com IA ou use os rótulos automáticos.',
+      'Sem chave própria, os temas são nomeados pelo DeepSeek do Simetrics (ou, se indisponível, pelos termos característicos). Configure sua chave para usar outro modelo.',
 
     // Visual Analyses
     visual_title: 'Análises visuais avançadas',
@@ -234,6 +234,11 @@ export const TRANSLATIONS = {
     chat_tools_badge: 'Cálculo determinístico no navegador',
     chat_no_key_warning:
       'Para conversar com a Simi, configure sua chave de API própria (BYOK) no botão acima.',
+    chat_free_remaining:
+      'Simi gratuita: restam {remaining} de {limit} perguntas neste dispositivo. Para uso ilimitado, configure sua própria chave de API.',
+    chat_free_exhausted:
+      'Você usou as {limit} perguntas gratuitas da Simi neste dispositivo. Configure sua própria chave de API para continuar.',
+    chat_free_subtitle: 'DeepSeek grátis · {remaining}/{limit}',
 
     // Feedback Tab
     feedback_title: 'Avaliação da Plataforma (SUS)',
@@ -537,7 +542,7 @@ export const TRANSLATIONS = {
     theme_ql_explanation:
       'A Locational Quotient (LQ) above 1 indicates specialization: the entity publishes in that theme more than the dataset average. Tiebreaks are resolved by volume.',
     theme_no_key_warning:
-      'AI API Key not configured. Configure your own key (Gemini, OpenAI, Claude, OpenRouter) to label themes with AI or use automatic labels.',
+      'Without your own key, themes are named by the Simetrics DeepSeek model (or, if unavailable, by their key terms). Set your key to use another model.',
 
     // Visual Analyses
     visual_title: 'Advanced Visual Analyses',
@@ -689,6 +694,11 @@ export const TRANSLATIONS = {
     chat_tools_badge: 'Deterministic in-browser calculation',
     chat_no_key_warning:
       'To chat with Simi, please configure your own API key (BYOK) using the button above.',
+    chat_free_remaining:
+      'Free Simi: {remaining} of {limit} questions left on this device. For unlimited use, set your own API key.',
+    chat_free_exhausted:
+      'You have used the {limit} free Simi questions on this device. Set your own API key to continue.',
+    chat_free_subtitle: 'Free DeepSeek · {remaining}/{limit}',
 
     // Feedback Tab
     feedback_title: 'Platform Usability Scale (SUS)',

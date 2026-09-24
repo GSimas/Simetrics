@@ -32,10 +32,12 @@ import {
 } from '@/core/hybrid/types';
 import { buildSearchOptions } from '@/core/search';
 import { chatJson } from '@/lib/deepseek-client';
+import { freeTierHeaders } from '@/lib/device-id';
 import { jevEvaluate, runPool } from '@/lib/jev-client';
 import type { Dataset } from '@/lib/types';
 import { getAiWorker, proxyProgress } from '@/workers/client';
 import { DERIVED_RESET, useDataset } from './dataset.store';
+import { useFreeTier } from './free-tier.store';
 import { useHybridConfig, type HybridConfig } from './hybrid-config.store';
 import { useLocale } from './locale.store';
 
@@ -98,6 +100,8 @@ interface Session {
   otherName: string;
   startedAt: string;
   controller: AbortController;
+  /** Id da execução na cota gratuita: todas as chamadas dela descontam uma única vez. */
+  unit: string;
   sample: HybridRun['sample'];
   sampleDocs: HybridDoc[];
   /** Rótulos do modelo gerativo: posição na base → id da categoria. */
@@ -109,6 +113,16 @@ interface Session {
 }
 
 let session: Session | null = null;
+
+/**
+ * Chave própria, ou a do servidor com cota restante. Com o status ainda desconhecido, deixa
+ * tentar: quem decide a cota é o servidor.
+ */
+export function canUseGenerative(config: HybridConfig): boolean {
+  if (config.generative.apiKey.trim()) return true;
+  const status = useFreeTier.getState().status;
+  return status === null || (status.deepseek.available && status.hybrid.remaining > 0);
+}
 
 function describeError(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);
@@ -207,7 +221,16 @@ export const useHybrid = create<HybridState>((set, get) => {
   }
 
   async function generate(target: Session, prompt: Parameters<typeof chatJson>[1]): Promise<string> {
-    const result = await chatJson(target.config.generative, prompt, target.controller.signal);
+    // Sem chave própria, o proxy do servidor usa a chave do .env e desconta da cota gratuita.
+    const own = target.config.generative.apiKey.trim();
+    const result = own
+      ? await chatJson(target.config.generative, prompt, target.controller.signal)
+      : await chatJson(
+          { apiKey: '', model: 'server', baseUrl: '/api/hybrid' },
+          prompt,
+          target.controller.signal,
+          freeTierHeaders(target.unit, target.locale),
+        );
     target.discoveryModel = result.model;
     target.usage.discoveryInputTokens += result.inputTokens;
     target.usage.discoveryOutputTokens += result.outputTokens;
@@ -267,7 +290,10 @@ export const useHybrid = create<HybridState>((set, get) => {
     // 6. Expansão a partir das sobras.
     const allReference = new Map(target.reference);
     let expansionRounds = 0;
-    const canGenerate = Boolean(config.generative.apiKey.trim());
+    // A expansão faz parte da mesma execução: com a chave do servidor, ela desconta da
+    // unidade já aberta na descoberta, mesmo que a cota tenha chegado a zero nela.
+    const canGenerate =
+      Boolean(config.generative.apiKey.trim()) || useFreeTier.getState().status?.deepseek.available !== false;
     for (let attempt = 0; canGenerate && attempt < config.maxExpansionRounds; attempt += 1) {
       const leftovers = leftoverIndices(decisions, config.thresholds);
       if (leftovers.length / target.docs.length <= config.leftoverTrigger) break;
@@ -366,6 +392,7 @@ export const useHybrid = create<HybridState>((set, get) => {
       }
     } finally {
       useDataset.setState({ isCategorizingThemes: false });
+      void useFreeTier.getState().refresh();
     }
   }
 
@@ -380,6 +407,7 @@ export const useHybrid = create<HybridState>((set, get) => {
       otherName: otherCategoryName(locale),
       startedAt: new Date().toISOString(),
       controller: new AbortController(),
+      unit: crypto.randomUUID(),
       sample: { size: 0, seed: SEED, strata: 0, outliers: 0, clusterCount: 0, silhouette: null },
       sampleDocs: [],
       reference: new Map(),
@@ -408,8 +436,12 @@ export const useHybrid = create<HybridState>((set, get) => {
       await runGuarded(target, async () => {
         const isEn = !pt();
         const { config } = target;
-        if (!config.generative.apiKey.trim()) {
-          throw new Error(isEn ? 'Set the generative model API key first.' : 'Informe primeiro a chave do modelo gerativo.');
+        if (!canUseGenerative(config)) {
+          throw new Error(
+            isEn
+              ? 'Set your own generative model API key: the free classifications on this device are used up.'
+              : 'Informe sua própria chave do modelo gerativo: as classificações gratuitas deste dispositivo acabaram.',
+          );
         }
 
         // 1. Agrupamentos para estratificar: reaproveita os do k-means se já existirem.
