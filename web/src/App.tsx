@@ -158,9 +158,6 @@ export default function App() {
               <span className="brand-mark h-10 sm:h-11 text-foreground" aria-hidden />
               <h1 className="sr-only">{t('app_title')}</h1>
               <span className="hidden 2xl:flex flex-col gap-1 border-l border-border pl-4">
-                <span className="eyebrow text-highlight">
-                  {t('app_version')} · {t('landing_highlight_1_label')}
-                </span>
                 <span className="eyebrow max-w-[22rem] leading-snug">{t('app_subtitle')}</span>
               </span>
             </button>
