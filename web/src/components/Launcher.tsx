@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { ArrowUpRight, X, type LucideIcon } from 'lucide-react';
 
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { InfoTip } from '@/components/InfoTip';
 import { usePresence } from '@/lib/use-presence';
 import { cn } from '@/lib/utils';
@@ -23,6 +24,8 @@ export interface LauncherProps {
   keepMounted?: boolean;
   disabled?: boolean;
   className?: string;
+  /** Âncora do tour guiado (`data-tour`). */
+  tour?: string;
 }
 
 /**
@@ -42,6 +45,7 @@ export function Launcher({
   keepMounted = false,
   disabled = false,
   className,
+  tour,
 }: LauncherProps) {
   const t = useLocale((state) => state.t);
   const titleId = useId();
@@ -61,7 +65,7 @@ export function Launcher({
     document.body.style.overflow = 'hidden';
     panelRef.current?.focus();
     // Um gráfico que ficou montado e escondido não acompanhou mudanças de tamanho.
-    requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+    const frame = requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
 
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.key !== 'Escape' || event.defaultPrevented) return;
@@ -74,6 +78,7 @@ export function Launcher({
     document.addEventListener('keydown', onKeyDown);
 
     return () => {
+      cancelAnimationFrame(frame);
       document.removeEventListener('keydown', onKeyDown);
       if (root) root.inert = false;
       document.body.style.overflow = previousOverflow;
@@ -93,6 +98,7 @@ export function Launcher({
       <button
         ref={triggerRef}
         type="button"
+        data-tour={tour}
         onClick={show}
         disabled={disabled}
         aria-haspopup="dialog"
@@ -116,6 +122,8 @@ export function Launcher({
       {renderBody &&
         createPortal(
           <div
+            // Fundo: o clique fora fecha (atalho de mouse); no teclado, o Esc.
+            role="presentation"
             hidden={!mounted}
             className={cn(
               'fixed inset-0 z-50 flex items-center justify-center bg-ink/75 p-2 backdrop-blur-sm duration-200 sm:p-4',
@@ -153,7 +161,11 @@ export function Launcher({
                   <X className="size-4" aria-hidden />
                 </button>
               </div>
-              <div className="flex-1 space-y-4 overflow-y-auto p-5">{children}</div>
+              <div className="flex-1 space-y-4 overflow-y-auto p-5">
+                <ErrorBoundary variant="page" label={title}>
+                  {children}
+                </ErrorBoundary>
+              </div>
             </div>
           </div>,
           document.body,
@@ -176,7 +188,7 @@ export function LauncherGrid({
   children: ReactNode;
 }) {
   return (
-    <section className="space-y-3" aria-label={label}>
+    <section data-tour="launchers" className="space-y-3" aria-label={label}>
       <p className="eyebrow">— {label}</p>
       {intro}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{children}</div>

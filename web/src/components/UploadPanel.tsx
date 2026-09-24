@@ -67,7 +67,7 @@ export function UploadPanel() {
   };
 
   return (
-    <Card>
+    <Card data-tour="upload">
       <CardHeader className="pb-3">
         <SectionTitle
           title={t('upload_title')}

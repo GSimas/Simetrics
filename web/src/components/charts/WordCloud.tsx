@@ -7,6 +7,7 @@ import { ExportImageButton } from '@/components/charts/ExportImageButton';
 import { imageFromSvgElement } from '@/lib/export-image';
 import { cn } from '@/lib/utils';
 import { useLocale } from '@/state/locale.store';
+import { withChartBoundary } from '@/components/with-chart-boundary';
 
 /**
  * Paleta da nuvem: tons médios da família Scientata, legíveis sobre tinta e papel.
@@ -96,7 +97,7 @@ export interface WordCloudProps {
   expanded?: boolean;
 }
 
-export default function WordCloud(props: WordCloudProps) {
+function WordCloud(props: WordCloudProps) {
   const {
     words,
     width: fallbackWidth = 900,
@@ -322,3 +323,6 @@ export default function WordCloud(props: WordCloudProps) {
     </div>
   );
 }
+
+// Um gráfico que quebre com dado atípico não derruba a aba (ver with-chart-boundary).
+export default withChartBoundary(WordCloud);

@@ -182,10 +182,12 @@ export function AiSettingsModal({ open, onOpenChange }: AiSettingsModalProps) {
                 <button
                   type="button"
                   onClick={() => setShowKey((prev) => !prev)}
+                  // Alcançável por teclado e com nome: antes ficava fora do Tab e sem rótulo.
+                  aria-label={isEn ? 'Show API key' : 'Mostrar chave de API'}
+                  aria-pressed={showKey}
                   className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-colors"
-                  tabIndex={-1}
                 >
-                  {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  {showKey ? <EyeOff className="size-4" aria-hidden /> : <Eye className="size-4" aria-hidden />}
                 </button>
               </div>
             </div>

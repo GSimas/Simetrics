@@ -1,7 +1,7 @@
-import { useState, type ReactNode } from 'react';
+import { Suspense, useState, type ReactNode } from 'react';
 import { KeyRound, Settings } from 'lucide-react';
 
-import { AiSettingsModal } from '@/components/AiSettingsModal';
+import { lazyWithPreload } from '@/lib/lazy';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -15,6 +15,11 @@ import { cn } from '@/lib/utils';
 import { useAiConfig } from '@/state/ai-config.store';
 import { useLocale } from '@/state/locale.store';
 import { usePreferences, type FontScale, type Theme } from '@/state/preferences.store';
+
+// Só baixado quando alguém abre as configurações de IA.
+const AiSettingsModal = lazyWithPreload(() =>
+  import('@/components/AiSettingsModal').then((module) => ({ default: module.AiSettingsModal })),
+);
 
 const ICON_BUTTON =
   'inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-border text-foreground transition-colors hover:border-highlight hover:text-highlight focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring';
@@ -140,6 +145,8 @@ export function SettingsButton() {
 
   const [open, setOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
+  // Montado desde a primeira abertura, para a animação de fechar continuar funcionando.
+  const [aiMounted, setAiMounted] = useState(false);
 
   return (
     <>
@@ -147,6 +154,7 @@ export function SettingsButton() {
         type="button"
         onClick={() => setOpen(true)}
         className={ICON_BUTTON}
+        data-tour="settings"
         title={t('settings_btn')}
         aria-label={t('settings_btn')}
       >
@@ -217,7 +225,16 @@ export function SettingsButton() {
                   />
                   {isAiConfigured ? t('ai_configured') : t('settings_ai_missing')}
                 </span>
-                <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setAiOpen(true)}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={() => {
+                    setAiMounted(true);
+                    setAiOpen(true);
+                  }}
+                  onPointerEnter={() => void AiSettingsModal.preload()}
+                >
                   <KeyRound className="size-3.5" aria-hidden />
                   {t('settings_ai_configure')}
                 </Button>
@@ -227,7 +244,11 @@ export function SettingsButton() {
         </DialogContent>
       </Dialog>
 
-      <AiSettingsModal open={aiOpen} onOpenChange={setAiOpen} />
+      {aiMounted && (
+        <Suspense fallback={null}>
+          <AiSettingsModal open={aiOpen} onOpenChange={setAiOpen} />
+        </Suspense>
+      )}
     </>
   );
 }

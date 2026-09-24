@@ -19,7 +19,8 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+      // withChartBoundary envolve o export padrão de cada gráfico (error boundary).
+      'react-refresh/only-export-components': ['warn', { allowConstantExport: true, extraHOCs: ['withChartBoundary'] }],
       '@typescript-eslint/no-unused-vars': [
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },

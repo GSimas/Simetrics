@@ -9,6 +9,9 @@ import { ExpandChartButton, expandedHeight } from '@/components/charts/ExpandCha
 import { ExportImageButton } from '@/components/charts/ExportImageButton';
 import type { ChartImage } from '@/lib/export-image';
 import { cn } from '@/lib/utils';
+import { useLocale } from '@/state/locale.store';
+import { getGraphWorker } from '@/workers/client';
+import { withChartBoundary } from '@/components/with-chart-boundary';
 
 /**
  * Renderizador de rede com Sigma.js — substitui o `streamlit_agraph`.
@@ -30,12 +33,98 @@ export interface SigmaGraphProps {
   expanded?: boolean;
 }
 
-export default function SigmaGraph(props: SigmaGraphProps) {
+type Positions = Record<string, [number, number]>;
+
+/**
+ * Cor das arestas: tinta sobre o papel no tema claro, papel sobre a tinta no escuro, com
+ * contraste de ~2:1 contra o fundo. Translúcidas, a sobreposição ainda mostra onde a rede
+ * é densa.
+ *
+ * O WebGL do Sigma mistura esperando cor pré-multiplicada (ONE, ONE_MINUS_SRC_ALPHA), mas
+ * escreve a cor como a recebe: uma aresta escura translúcida saía mais clara que o papel
+ * (linhas brancas no tema claro) e uma clara saía quase opaca no escuro. Por isso o WebGL
+ * recebe a versão pré-multiplicada (rgb × alfa), que resulta exatamente na cor pretendida;
+ * o SVG exportado, que mistura do jeito normal, recebe a original.
+ */
+function edgeColors(isDark: boolean): { webgl: string; svg: string } {
+  const [r, g, b, alpha] = isDark ? [240, 238, 230, 0.3] : [7, 17, 15, 0.35];
+  const pre = (channel: number): number => Math.round(channel * alpha);
+  return {
+    webgl: `rgba(${pre(r)}, ${pre(g)}, ${pre(b)}, ${alpha})`,
+    svg: `rgba(${r}, ${g}, ${b}, ${alpha})`,
+  };
+}
+
+/** Resumo para leitores de tela: tamanho da rede e os nós mais conectados. */
+function describeGraph(nodes: readonly RenderNode[], edges: readonly RenderEdge[], template: string, mostConnected: string): string {
+  const top = [...nodes]
+    .sort((a, b) => b.degreeAbsolute - a.degreeAbsolute)
+    .slice(0, 5)
+    .map((node) => node.label);
+  const summary = template.replace('{nodes}', String(nodes.length)).replace('{edges}', String(edges.length));
+  if (top.length === 0) return summary;
+  const list = top.join(', ');
+  return `${summary} ${mostConnected}: ${list}${list.endsWith('.') ? '' : '.'}`;
+}
+
+/** Mesmas configurações do layout do worker — usadas só se o worker falhar. */
+function layoutOnMainThread(nodes: readonly RenderNode[], edges: readonly RenderEdge[]): Positions {
+  const graph = new Graph({ type: 'undirected', multi: false });
+  nodes.forEach((node, index) => {
+    const angle = (2 * Math.PI * index) / nodes.length;
+    graph.addNode(node.key, { x: Math.cos(angle), y: Math.sin(angle) });
+  });
+  for (const edge of edges) {
+    if (!graph.hasNode(edge.source) || !graph.hasNode(edge.target)) continue;
+    if (graph.hasEdge(edge.source, edge.target)) continue;
+    graph.addEdge(edge.source, edge.target);
+  }
+  if (graph.order > 1) {
+    forceAtlas2.assign(graph, {
+      iterations: 260,
+      settings: {
+        ...forceAtlas2.inferSettings(graph),
+        gravity: 1.1,
+        scalingRatio: 12,
+        barnesHutOptimize: graph.order > 200,
+      },
+    });
+  }
+  const positions: Positions = {};
+  graph.forEachNode((key, attributes) => {
+    positions[key] = [attributes['x'] as number, attributes['y'] as number];
+  });
+  return positions;
+}
+
+/**
+ * Layout por rede, calculado uma vez: trocar o tema ou abrir a janela ampliada reusa as
+ * posições em vez de rodar o ForceAtlas2 de novo.
+ */
+const layoutCache = new WeakMap<readonly RenderNode[], { edges: readonly RenderEdge[]; positions: Promise<Positions> }>();
+
+function requestLayout(nodes: readonly RenderNode[], edges: readonly RenderEdge[]): Promise<Positions> {
+  const cached = layoutCache.get(nodes);
+  if (cached && cached.edges === edges) return cached.positions;
+  const positions = getGraphWorker()
+    .layout(
+      nodes.map((node) => node.key),
+      edges.map((edge) => [edge.source, edge.target] as const),
+    )
+    .catch(() => layoutOnMainThread(nodes, edges));
+  layoutCache.set(nodes, { edges, positions });
+  return positions;
+}
+
+function SigmaGraph(props: SigmaGraphProps) {
   const { nodes, edges, height = 560, className, onNodeClick, exportName = 'rede', expanded } = props;
   const containerRef = useRef<HTMLDivElement>(null);
   const sigmaRef = useRef<Sigma | null>(null);
   const clickHandlerRef = useRef(onNodeClick);
   const [hovered, setHovered] = useState<RenderNode | null>(null);
+  const t = useLocale((state) => state.t);
+  const [layout, setLayout] = useState<{ nodes: readonly RenderNode[]; positions: Positions } | null>(null);
+  const positions = layout?.nodes === nodes ? layout.positions : null;
   const [isDark, setIsDark] = useState<boolean>(() =>
     typeof document !== 'undefined' ? document.documentElement.classList.contains('dark') : false,
   );
@@ -55,9 +144,21 @@ export default function SigmaGraph(props: SigmaGraphProps) {
     return () => observer.disconnect();
   }, []);
 
+  // O ForceAtlas2 roda no worker de grafo; a aba não trava enquanto ele calcula.
+  useEffect(() => {
+    if (nodes.length === 0) return;
+    let cancelled = false;
+    void requestLayout(nodes, edges).then((result) => {
+      if (!cancelled) setLayout({ nodes, positions: result });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [nodes, edges]);
+
   useEffect(() => {
     const container = containerRef.current;
-    if (!container || nodes.length === 0) return;
+    if (!container || nodes.length === 0 || !positions) return;
 
     const graph = new Graph({ type: 'undirected', multi: false });
 
@@ -68,20 +169,17 @@ export default function SigmaGraph(props: SigmaGraphProps) {
     // Rótulos sobre um fundo do tema: numa rede densa as arestas se somam num branco
     // quase sólido e engoliam o texto claro do modo escuro.
     const labelBackground = isDark ? 'rgba(7, 17, 15, 0.82)' : 'rgba(247, 246, 241, 0.88)';
-    // Arestas translúcidas: a sobreposição ainda mostra onde a rede é densa, sem virar
-    // uma mancha que esconde nós e rótulos.
-    const edgeColor = isDark ? 'rgba(156, 167, 162, 0.2)' : 'rgba(61, 72, 67, 0.22)';
+    const edgeColor = edgeColors(isDark).webgl;
 
-    // Posição inicial em círculo para o ForceAtlas2, que não sai do lugar se todos os nós
-    // começarem sobrepostos (com forças simétricas, o deslocamento resultante é zero).
-    nodes.forEach((node, index) => {
-      const angle = (2 * Math.PI * index) / nodes.length;
+    // Posições já calculadas pelo ForceAtlas2 (no worker).
+    nodes.forEach((node) => {
+      const [x, y] = positions[node.key] ?? [0, 0];
       graph.addNode(node.key, {
         label: node.label,
         size: Math.max(4, node.size / 4),
         color: communityColor(node.community),
-        x: Math.cos(angle),
-        y: Math.sin(angle),
+        x,
+        y,
       });
     });
 
@@ -91,20 +189,6 @@ export default function SigmaGraph(props: SigmaGraphProps) {
       graph.addEdge(edge.source, edge.target, {
         size: Math.max(1, Math.min(3.5, 0.6 + Math.log2(edge.weight + 1))),
         color: edgeColor,
-      });
-    }
-
-    // Layout síncrono: as redes visualizadas são recortadas por top-N (dezenas de nós),
-    // então algumas centenas de iterações levam milissegundos.
-    if (graph.order > 1) {
-      forceAtlas2.assign(graph, {
-        iterations: 260,
-        settings: {
-          ...forceAtlas2.inferSettings(graph),
-          gravity: 1.1,
-          scalingRatio: 12,
-          barnesHutOptimize: graph.order > 200,
-        },
       });
     }
 
@@ -168,7 +252,7 @@ export default function SigmaGraph(props: SigmaGraphProps) {
       renderer.kill();
       sigmaRef.current = null;
     };
-  }, [nodes, edges, isDark]);
+  }, [nodes, edges, isDark, positions]);
 
   /**
    * SVG montado a partir do grafo: o Sigma desenha em WebGL, sem SVG próprio. Posições
@@ -202,13 +286,14 @@ export default function SigmaGraph(props: SigmaGraphProps) {
     });
 
     const parts: string[] = [];
+    const edgeStroke = edgeColors(isDark).svg;
     graph.forEachEdge((edge, _attributes, source, target) => {
       const from = placed.get(source);
       const to = placed.get(target);
       const data = renderer.getEdgeDisplayData(edge);
       if (!from || !to || !data || data.hidden) return;
       parts.push(
-        `<line x1="${from.x.toFixed(1)}" y1="${from.y.toFixed(1)}" x2="${to.x.toFixed(1)}" y2="${to.y.toFixed(1)}" stroke="${data.color}" stroke-width="${renderer.scaleSize(data.size).toFixed(2)}"/>`,
+        `<line x1="${from.x.toFixed(1)}" y1="${from.y.toFixed(1)}" x2="${to.x.toFixed(1)}" y2="${to.y.toFixed(1)}" stroke="${edgeStroke}" stroke-width="${renderer.scaleSize(data.size).toFixed(2)}"/>`,
       );
     });
     for (const node of placed.values()) {
@@ -241,7 +326,14 @@ export default function SigmaGraph(props: SigmaGraphProps) {
         )}
         <ExportImageButton filename={exportName} getImage={getImage} />
       </div>
-      <div ref={containerRef} style={{ height }} />
+      {/* Canvas WebGL: sem texto próprio, então o resumo vai no nome acessível. */}
+      <div
+        ref={containerRef}
+        style={{ height }}
+        role="img"
+        aria-busy={nodes.length > 0 && !positions}
+        aria-label={describeGraph(nodes, edges, t('sigma_aria'), t('chart_most_connected'))}
+      />
 
       {nodes.length === 0 && (
         <div className="absolute inset-0 grid place-items-center text-sm text-muted-foreground">
@@ -270,3 +362,6 @@ export default function SigmaGraph(props: SigmaGraphProps) {
     </div>
   );
 }
+
+// Um gráfico que quebre com dado atípico não derruba a aba (ver with-chart-boundary).
+export default withChartBoundary(SigmaGraph);

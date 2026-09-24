@@ -11,6 +11,7 @@ import type { GeometryCollection, Topology } from 'topojson-specification';
 import world from 'world-atlas/countries-110m.json';
 
 import { PALETTE } from '@/features/overview/viz-shared';
+import { identityKey } from '@/lib/use-async-result';
 
 export { PALETTE };
 
@@ -89,9 +90,56 @@ function createCanvas(width: number, height: number): { canvas: HTMLCanvasElemen
   return { canvas, ctx: canvas.getContext('2d') };
 }
 
-export function renderProductionTimelineCanvas(
+// ---------------------------------------------------------------------------------------
+// Imagens já geradas
+//
+// A prévia do relatório e a exportação (PDF e DOCX) pedem os mesmos gráficos. Cada imagem
+// fica guardada pela entrada que a gerou — os dados (pela identidade do objeto, que o app
+// nunca altera no lugar; ou pelo conteúdo, nas listas curtas montadas na hora) e as
+// opções. A exportação reaproveita a imagem da prévia quando tudo coincide e desenha
+// normalmente quando não: o resultado é sempre o mesmo que seria desenhado.
+
+/** Os 7 gráficos da prévia, com folga para trocar de idioma ou de base. */
+const IMAGE_CACHE_SIZE = 12;
+const imageCache = new Map<string, string>();
+
+function cached(key: string, draw: () => string): string {
+  const hit = imageCache.get(key);
+  if (hit !== undefined) {
+    // Reinsere no fim: a ordem do Map vira a ordem de uso (LRU).
+    imageCache.delete(key);
+    imageCache.set(key, hit);
+    return hit;
+  }
+  const image = draw();
+  // Com alguma fonte ainda carregando, o canvas escreve na fonte de reserva: essa imagem
+  // serve à prévia, mas não fica guardada para a exportação.
+  if (image && document.fonts.status === 'loaded') {
+    imageCache.set(key, image);
+    if (imageCache.size > IMAGE_CACHE_SIZE) {
+      const oldest = imageCache.keys().next().value;
+      if (oldest !== undefined) imageCache.delete(oldest);
+    }
+  }
+  return image;
+}
+
+function optionsKey(options: ChartRenderOptions): string {
+  return `${options.width ?? ''}x${options.height ?? ''} ${options.locale ?? ''} ${options.isDark ? 'dark' : ''}`;
+}
+
+function renderProductionTimelineCanvas(
   data: { year: number; count: number }[],
   options: ChartRenderOptions = {},
+): string {
+  return cached(`production ${identityKey(data)} ${optionsKey(options)}`, () =>
+    drawProductionTimelineCanvas(data, options),
+  );
+}
+
+function drawProductionTimelineCanvas(
+  data: { year: number; count: number }[],
+  options: ChartRenderOptions,
 ): string {
   const isEn = options.locale === 'en';
   const width = options.width ?? 1000;
@@ -160,10 +208,20 @@ export function renderProductionTimelineCanvas(
   return canvas.toDataURL('image/png');
 }
 
-export function renderHorizontalBarChart(
+function renderHorizontalBarChart(
   title: string,
   items: { label: string; value: number; sub?: string }[],
   options: ChartRenderOptions = {},
+): string {
+  return cached(`bars ${JSON.stringify([title, items])} ${optionsKey(options)}`, () =>
+    drawHorizontalBarChart(title, items, options),
+  );
+}
+
+function drawHorizontalBarChart(
+  title: string,
+  items: { label: string; value: number; sub?: string }[],
+  options: ChartRenderOptions,
 ): string {
   const width = options.width ?? 1000;
   const height = options.height ?? Math.max(400, items.length * 36 + 100);
@@ -214,9 +272,18 @@ export function renderHorizontalBarChart(
   return canvas.toDataURL('image/png');
 }
 
-export function renderThemesPieChart(
+function renderThemesPieChart(
   clusters: { clusterId: number; name: string; docCount: number; share: number }[],
   options: ChartRenderOptions = {},
+): string {
+  return cached(`themes ${JSON.stringify(clusters)} ${optionsKey(options)}`, () =>
+    drawThemesPieChart(clusters, options),
+  );
+}
+
+function drawThemesPieChart(
+  clusters: { clusterId: number; name: string; docCount: number; share: number }[],
+  options: ChartRenderOptions,
 ): string {
   const isEn = options.locale === 'en';
   const width = options.width ?? 1000;
@@ -293,9 +360,18 @@ export function renderThemesPieChart(
   return canvas.toDataURL('image/png');
 }
 
-export function renderWordCloudCanvas(
+function renderWordCloudCanvas(
   terms: { entity: string; docCount: number; citations: number }[],
   options: ChartRenderOptions = {},
+): string {
+  return cached(`wordcloud ${identityKey(terms)} ${optionsKey(options)}`, () =>
+    drawWordCloudCanvas(terms, options),
+  );
+}
+
+function drawWordCloudCanvas(
+  terms: { entity: string; docCount: number; citations: number }[],
+  options: ChartRenderOptions,
 ): string {
   const isEn = options.locale === 'en';
   const width = options.width ?? 1000;
@@ -348,10 +424,20 @@ export function renderWordCloudCanvas(
 /**
  * Gráfico da Rede de Coocorrência & Grafos de Conhecimento (SNA).
  */
-export function renderNetworkGraphCanvas(
+function renderNetworkGraphCanvas(
   nodes: { label: string; count?: number; community?: number; degreeAbsolute?: number }[],
   edges: { source: string; target: string; weight?: number }[],
   options: ChartRenderOptions = {},
+): string {
+  return cached(`network ${identityKey(nodes)} ${identityKey(edges)} ${optionsKey(options)}`, () =>
+    drawNetworkGraphCanvas(nodes, edges, options),
+  );
+}
+
+function drawNetworkGraphCanvas(
+  nodes: { label: string; count?: number; community?: number; degreeAbsolute?: number }[],
+  edges: { source: string; target: string; weight?: number }[],
+  options: ChartRenderOptions,
 ): string {
   const isEn = options.locale === 'en';
   const width = options.width ?? 1000;
@@ -427,21 +513,39 @@ export function renderNetworkGraphCanvas(
   return canvas.toDataURL('image/png');
 }
 
-// Geometria dos países (world-atlas 1:110m): decodificada uma única vez por sessão.
-const COUNTRIES = feature(
-  world as unknown as Topology,
-  (world as unknown as Topology).objects.countries as GeometryCollection,
-) as FeatureCollection<Geometry>;
+// Geometria dos países (world-atlas 1:110m): decodificada uma única vez por sessão, na
+// primeira vez que o mapa é desenhado — não ao carregar o módulo (a aba Relatório é
+// pré-carregada no ócio, e isso gastaria CPU sem ninguém ter pedido o mapa).
+let countries: FeatureCollection<Geometry> | null = null;
+function worldCountries(): FeatureCollection<Geometry> {
+  countries ??= feature(
+    world as unknown as Topology,
+    (world as unknown as Topology).objects.countries as GeometryCollection,
+  ) as FeatureCollection<Geometry>;
+  return countries;
+}
 
 /**
  * Gráfico de Mapa Global de Colaboração Internacional.
  */
-export function renderWorldCollaborationMapCanvas(
+function renderWorldCollaborationMapCanvas(
   network: {
     nodes: { country: string; label: string; documents: number; latitude: number | null; longitude: number | null }[];
     edges: { source: string; target: string; documents: number }[];
   },
   options: ChartRenderOptions = {},
+): string {
+  return cached(`map ${identityKey(network)} ${optionsKey(options)}`, () =>
+    drawWorldCollaborationMapCanvas(network, options),
+  );
+}
+
+function drawWorldCollaborationMapCanvas(
+  network: {
+    nodes: { country: string; label: string; documents: number; latitude: number | null; longitude: number | null }[];
+    edges: { source: string; target: string; documents: number }[];
+  },
+  options: ChartRenderOptions,
 ): string {
   const isEn = options.locale === 'en';
   const width = options.width ?? 1000;
@@ -482,7 +586,7 @@ export function renderWorldCollaborationMapCanvas(
   ctx.globalAlpha = 1;
 
   ctx.beginPath();
-  path(COUNTRIES as GeoPermissibleObjects);
+  path(worldCountries() as GeoPermissibleObjects);
   ctx.fillStyle = BRAND.muted;
   ctx.fill();
   ctx.strokeStyle = BRAND.border;
@@ -546,4 +650,77 @@ export function renderWorldCollaborationMapCanvas(
   });
 
   return canvas.toDataURL('image/png');
+}
+
+// ---------------------------------------------------------------------------------------
+// Gráficos do relatório
+//
+// A prévia, o PDF e o DOCX pedem cada gráfico por aqui, com os mesmos dados, textos e
+// dimensões: as três saídas não divergem, e a exportação sempre reaproveita as imagens da
+// prévia (ver `cached`). As dimensões também reservam o espaço da prévia.
+
+type ReportLocale = 'pt' | 'en';
+
+export const REPORT_CHART_SIZE = {
+  production: { width: 1000, height: 420 },
+  bars: { width: 1000, height: 420 },
+  worldMap: { width: 1000, height: 500 },
+  wordCloud: { width: 1000, height: 420 },
+  themes: { width: 1000, height: 420 },
+  network: { width: 1000, height: 520 },
+} as const;
+
+export function reportProductionChart(docsPerYear: { year: number; count: number }[], locale: ReportLocale): string {
+  return renderProductionTimelineCanvas(docsPerYear, { ...REPORT_CHART_SIZE.production, locale });
+}
+
+export function reportAuthorsChart(
+  authors: readonly { entity: string; docCount: number; citations: number; h: number }[],
+  locale: ReportLocale,
+): string {
+  const items = authors.slice(0, 10).map((a) => ({ label: a.entity, value: a.docCount, sub: `${a.citations} cit. | h=${a.h}` }));
+  const title = locale === 'en' ? 'Top 10 Most Prolific Authors (Published Papers)' : 'Top 10 Autores Mais Produtivos (Artigos Publicados)';
+  return renderHorizontalBarChart(title, items, { ...REPORT_CHART_SIZE.bars, locale });
+}
+
+export function reportCountriesChart(
+  countries: readonly { entity: string; docCount: number; citations: number }[],
+  locale: ReportLocale,
+): string {
+  const items = countries.slice(0, 10).map((c) => ({ label: c.entity, value: c.docCount, sub: `${c.citations} cit.` }));
+  const title = locale === 'en' ? 'Top 10 Leading Countries by Scientific Output' : 'Top 10 Países com Maior Produção Científica';
+  return renderHorizontalBarChart(title, items, { ...REPORT_CHART_SIZE.bars, locale });
+}
+
+export function reportWorldMapChart(
+  collaboration: Parameters<typeof renderWorldCollaborationMapCanvas>[0],
+  locale: ReportLocale,
+): string {
+  return renderWorldCollaborationMapCanvas(collaboration, { ...REPORT_CHART_SIZE.worldMap, locale });
+}
+
+export function reportWordCloudChart(keywords: Parameters<typeof renderWordCloudCanvas>[0], locale: ReportLocale): string {
+  return renderWordCloudCanvas(keywords, { ...REPORT_CHART_SIZE.wordCloud, locale });
+}
+
+export function reportThemesChart(
+  clusters: readonly { clusterId: number; size: number }[],
+  totalDocs: number,
+  locale: ReportLocale,
+): string {
+  const items = clusters.map((c) => ({
+    clusterId: c.clusterId,
+    name: `Tema ${c.clusterId + 1}`,
+    docCount: c.size,
+    share: totalDocs > 0 ? (c.size / totalDocs) * 100 : 0,
+  }));
+  return renderThemesPieChart(items, { ...REPORT_CHART_SIZE.themes, locale });
+}
+
+export function reportNetworkChart(
+  nodes: Parameters<typeof renderNetworkGraphCanvas>[0],
+  edges: Parameters<typeof renderNetworkGraphCanvas>[1],
+  locale: ReportLocale,
+): string {
+  return renderNetworkGraphCanvas(nodes, edges, { ...REPORT_CHART_SIZE.network, locale });
 }

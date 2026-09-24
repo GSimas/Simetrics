@@ -1,4 +1,5 @@
 import * as Comlink from 'comlink';
+import { withDatasetCache } from './dataset-cache';
 
 import { topQuotientsByTheme, type QuotientEntry } from '@/core/locational-quotient';
 import { lotkaDistribution, type LotkaDistribution } from '@/core/scientometrics';
@@ -168,4 +169,5 @@ const api = {
 
 export type AnalyticsWorkerApi = typeof api;
 
-Comlink.expose(api);
+// A base chega uma vez por versão; as chamadas trazem só a referência.
+Comlink.expose(withDatasetCache(api));

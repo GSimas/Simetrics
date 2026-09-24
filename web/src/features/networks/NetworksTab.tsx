@@ -3,6 +3,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { ChevronDown } from 'lucide-react';
 
 import { Collapse } from '@/components/Collapse';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { DataTable } from '@/components/DataTable';
 import { EntityChip } from '@/components/EntityChip';
 import { InfoTip, SectionTitle } from '@/components/InfoTip';
@@ -163,10 +164,12 @@ function NetworkMetricCard({
 }) {
   return (
     <div className="border border-border bg-card p-4 transition-colors hover:border-highlight/60">
-      <div className="flex items-center justify-between gap-1.5">
-        <dt className="eyebrow truncate">{label}</dt>
+      {/* O `dt` é a própria linha flexível: um `dt` dentro de outra div invalida a
+          lista de definição para leitores de tela. */}
+      <dt className="flex items-center justify-between gap-1.5">
+        <span className="eyebrow truncate">{label}</span>
         <InfoTip label={label}>{hint}</InfoTip>
-      </div>
+      </dt>
       <dd className="mt-2 text-xl font-medium tabular-nums tracking-tight text-foreground">
         {formatMetric(value)}
       </dd>
@@ -198,7 +201,7 @@ function NetworkEcology({ global }: { global: GlobalMetrics }) {
   const hidden = cards.length - VISIBLE_METRICS;
 
   return (
-    <Card>
+    <Card data-tour="net-ecology">
       <CardHeader className="space-y-1.5">
         <SectionTitle
           title={t('network_deep_title')}
@@ -241,12 +244,48 @@ function NetworkEcology({ global }: { global: GlobalMetrics }) {
   );
 }
 
+/** Espaço do renderizador enquanto o chunk do grafo chega. */
+function GraphFallback() {
+  const t = useLocale((state) => state.t);
+  return (
+    <div className="grid h-[560px] place-items-center border text-sm text-muted-foreground" aria-busy="true">
+      {t('network_loading_renderer')}
+    </div>
+  );
+}
+
+/**
+ * Barra de progresso do cálculo de SNA. Componente próprio: o progresso muda a cada
+ * poucas centenas de linhas processadas, e assinado na raiz da aba cada tique
+ * re-renderizava o grafo radial, o mapa e a tabela de métricas.
+ */
+function SnaProgress() {
+  const t = useLocale((state) => state.t);
+  const snaProgress = useDataset((state) => state.snaProgress);
+  const shownProgress = useStickyValue(snaProgress).value;
+  return (
+    // Fechada, a barra zera a própria margem do space-y (mb-0 vence o :where do
+    // Tailwind) para não deixar um vão acima dos blocos.
+    <Collapse open={snaProgress !== null} className={snaProgress ? '' : 'mb-0'}>
+      {shownProgress && (
+        <Card>
+          <CardContent className="space-y-1.5 pt-6">
+            <div className="flex justify-between text-xs text-muted-foreground" aria-live="polite">
+              <span>{shownProgress.phase}</span>
+              <span className="tabular-nums">{Math.round(shownProgress.ratio * 100)}%</span>
+            </div>
+            <Progress value={shownProgress.ratio * 100} aria-label={`${t('network_progress_label')}: ${shownProgress.phase}`} />
+          </CardContent>
+        </Card>
+      )}
+    </Collapse>
+  );
+}
+
 export default function NetworksTab() {
   const active = useDataset((state) => state.active);
   const { value: sna } = useStickyValue(useDataset((state) => state.sna));
   const network = useDataset((state) => state.network);
-  const snaProgress = useDataset((state) => state.snaProgress);
-  const shownProgress = useStickyValue(snaProgress).value;
   const computeSna = useDataset((state) => state.computeSna);
   const computeNetwork = useDataset((state) => state.computeNetwork);
   const { t } = useLocale();
@@ -263,6 +302,30 @@ export default function NetworksTab() {
   useEffect(() => {
     if (active) void computeSna();
   }, [active, computeSna]);
+
+  // Memoizados: um array novo a cada render refazia o layout do diagrama de cordas.
+  const radialNodes = useMemo(
+    () =>
+      (network?.nodes ?? []).map((node) => ({
+        key: node.key,
+        label: node.label,
+        weight: node.count,
+        group: node.community,
+        color: communityColor(node.community),
+      })),
+    [network],
+  );
+  const radialLegend = useMemo(
+    () =>
+      // Com muitas comunidades a legenda viraria uma parede de rótulos.
+      network && network.communityCount <= 8
+        ? Array.from({ length: network.communityCount }, (_, index) => ({
+            label: `${t('radial_communities')} ${index + 1}`,
+            color: communityColor(index),
+          }))
+        : undefined,
+    [network, t],
+  );
 
   useEffect(() => {
     if (active) void computeNetwork(kind, topN, sizeMetric);
@@ -312,27 +375,13 @@ export default function NetworksTab() {
 
   return (
     <div className="space-y-6">
-      {/* Fechada, a barra zera a própria margem do space-y (mb-0 vence o :where do
-          Tailwind) para não deixar um vão acima dos blocos. */}
-      <Collapse open={snaProgress !== null} className={snaProgress ? '' : 'mb-0'}>
-        {shownProgress && (
-          <Card>
-            <CardContent className="space-y-1.5 pt-6">
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>{shownProgress.phase}</span>
-                <span className="tabular-nums">{Math.round(shownProgress.ratio * 100)}%</span>
-              </div>
-              <Progress value={shownProgress.ratio * 100} />
-            </CardContent>
-          </Card>
-        )}
-      </Collapse>
+      <SnaProgress />
 
         {sna && <NetworkEcology global={sna.global} />}
 
         {/* Coocorrência e colaboração lado a lado em telas largas. */}
         <div className="grid items-start gap-6 lg:grid-cols-2">
-          <Card>
+          <Card data-tour="net-cooccurrence">
             <CardHeader>
               <SectionTitle title={t('network_cooccurrence_title')} info={t('network_cooccurrence_desc')} />
             </CardHeader>
@@ -397,58 +446,50 @@ export default function NetworksTab() {
                   {network.nodes.length} {t('network_nodes')} · {network.edges.length}{' '}
                   {t('network_edges')} · {network.communityCount} comunidades
                 </p>
-                <Tabs value={graphLayout} onValueChange={(value) => setGraphLayout(value as 'force' | 'radial')}>
+                <Tabs
+                  data-tour="net-graph"
+                  value={graphLayout}
+                  onValueChange={(value) => setGraphLayout(value as 'force' | 'radial')}
+                >
                   <TabsList className="w-full justify-start">
                     <TabsTrigger value="force">{t('network_layout_force')}</TabsTrigger>
                     <TabsTrigger value="radial">{t('network_radial_tab')}</TabsTrigger>
                   </TabsList>
-                  <Suspense
-                    fallback={
-                      <div className="grid h-[560px] place-items-center border text-sm text-muted-foreground">
-                        Carregando renderizador…
-                      </div>
-                    }
-                  >
-                    <TabsContent value="force">
-                      <SigmaGraph
-                        nodes={network.nodes}
-                        edges={network.edges}
-                        onNodeClick={openNode}
-                        exportName={`rede-${kind}`}
-                      />
-                    </TabsContent>
-                    <TabsContent value="radial">
-                      <RadialGraph
-                        nodes={network.nodes.map((node) => ({
-                          key: node.key,
-                          label: node.label,
-                          weight: node.count,
-                          group: node.community,
-                          color: communityColor(node.community),
-                        }))}
-                        edges={network.edges}
-                        weightLabel={t('radial_documents')}
-                        legend={
-                          // Com muitas comunidades a legenda viraria uma parede de rótulos.
-                          network.communityCount <= 8
-                            ? Array.from({ length: network.communityCount }, (_, index) => ({
-                                label: `${t('radial_communities')} ${index + 1}`,
-                                color: communityColor(index),
-                              }))
-                            : undefined
-                        }
-                        onNodeClick={openNode}
-                        exportName={`rede-radial-${kind}`}
-                      />
-                    </TabsContent>
-                  </Suspense>
+                  {/* Suspense dentro de cada painel: fora, o painel ativo sumia do DOM enquanto o
+                      renderizador baixava e a aba apontava (aria-controls) para um id inexistente. */}
+                  <TabsContent value="force">
+                    <ErrorBoundary label={t('error_chart')} resetKeys={[network]}>
+                      <Suspense fallback={<GraphFallback />}>
+                        <SigmaGraph
+                          nodes={network.nodes}
+                          edges={network.edges}
+                          onNodeClick={openNode}
+                          exportName={`rede-${kind}`}
+                        />
+                      </Suspense>
+                    </ErrorBoundary>
+                  </TabsContent>
+                  <TabsContent value="radial">
+                    <ErrorBoundary label={t('error_chart')} resetKeys={[network]}>
+                      <Suspense fallback={<GraphFallback />}>
+                        <RadialGraph
+                          nodes={radialNodes}
+                          edges={network.edges}
+                          weightLabel={t('radial_documents')}
+                          legend={radialLegend}
+                          onNodeClick={openNode}
+                          exportName={`rede-radial-${kind}`}
+                        />
+                      </Suspense>
+                    </ErrorBoundary>
+                  </TabsContent>
                 </Tabs>
               </>
             )}
             </CardContent>
           </Card>
 
-          <Card>
+          <Card data-tour="net-collab">
             <CardHeader>
               <SectionTitle title={t('network_collab_title')} info={t('network_collab_desc')} />
             </CardHeader>
@@ -459,7 +500,7 @@ export default function NetworksTab() {
         </div>
 
         {sna && (
-          <Card>
+          <Card data-tour="net-metrics">
             <CardHeader>
               <SectionTitle title={t('network_nodes_metrics_title')} info={t('network_nodes_metrics_desc')} />
             </CardHeader>

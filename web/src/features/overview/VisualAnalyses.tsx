@@ -1,7 +1,11 @@
 import { lazy, Suspense, useState } from 'react';
 
-import type { Data, Trace } from '@/components/charts/plotly';
-
+import BoxPlotChart from '@/components/charts/BoxPlotChart';
+import SankeyChart from '@/components/charts/SankeyChart';
+import Scatter3DChart from '@/components/charts/Scatter3DChart';
+import ScatterChart from '@/components/charts/ScatterChart';
+import { TipRow } from '@/components/charts/svg/chart-kit';
+import { formatNumber, interpolateColor } from '@/components/charts/svg/scale';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
@@ -32,8 +36,8 @@ import { PALETTE, QUADRANT_NOTE, chartMessage } from './viz-shared';
 import { ReadingTip } from '@/components/InfoTip';
 import { openInSearch } from '@/state/navigation.store';
 import { useDataset } from '@/state/dataset.store';
+import { usePreferences } from '@/state/preferences.store';
 
-const PlotlyChart = lazy(() => import('@/components/charts/PlotlyChart'));
 const LotkaChart = lazy(() => import('@/components/charts/LotkaChart'));
 
 /**
@@ -108,6 +112,13 @@ const BOX_SEARCH_TYPES: Record<BoxplotDimension, SearchEntityType[]> = {
 };
 
 const KEYWORD: SearchEntityType[] = ['Palavra-chave'];
+
+/**
+ * Escala de cor das citações na genética dos termos — no lugar do "Teal" do Plotly. Mais
+ * citado = mais contraste com o fundo: escurece no tema claro e clareia no escuro.
+ */
+const CITATION_SCALE_LIGHT = ['#cdeee4', '#8fd3c1', '#3fae8f', '#236e5e', '#0f3b33'] as const;
+const CITATION_SCALE_DARK = ['#1d4a40', '#236e5e', '#3fae8f', '#8fd3c1', '#d9ffa0'] as const;
 
 /** Distribuição estatística comparativa. */
 function BoxplotPanel({ dataset }: { dataset: Dataset }) {
@@ -237,35 +248,19 @@ function BoxplotPanel({ dataset }: { dataset: Dataset }) {
           {(series ?? []).length === 0 ? (
             chartMessage('Selecione ao menos um item para comparar.')
           ) : (
-            <Suspense fallback={chartMessage('Carregando gráfico…')}>
-              <PlotlyChart
-                exportName="distribuicao-comparativa"
-                onPointClick={(point) => openInSearch(point.data?.name, BOX_SEARCH_TYPES[dimension])}
-                height={440}
-                data={(series ?? []).map((entry, index): Trace => ({
-                  type: 'box',
-                  name: entry.entity,
-                  y: entry.values,
-                  text: entry.labels,
-                  // Todos os pontos visíveis: com poucas entidades, ver cada observação
-                  // individual é o que revela os outliers que a caixa apenas resume.
-                  boxpoints: 'all',
-                  jitter: 0.4,
-                  pointpos: 0,
-                  marker: {
-                    color: PALETTE[index % PALETTE.length] as string,
-                    size: 4,
-                    opacity: 0.6,
-                  },
-                  line: { color: PALETTE[index % PALETTE.length] as string },
-                  hovertemplate: '%{text}<br>%{y}<extra>%{x}</extra>',
-                }))}
-                layout={{
-                  showlegend: false,
-                  yaxis: { title: { text: metric }, type: logScale ? 'log' : 'linear' },
-                }}
-              />
-            </Suspense>
+            <BoxPlotChart
+              exportName="distribuicao-comparativa"
+              onSeriesClick={(name) => openInSearch(name, BOX_SEARCH_TYPES[dimension])}
+              height={440}
+              log={logScale}
+              yLabel={metric}
+              series={(series ?? []).map((entry, index) => ({
+                name: entry.entity,
+                color: PALETTE[index % PALETTE.length] as string,
+                values: entry.values,
+                labels: entry.labels,
+              }))}
+            />
           )}
         </>
       )}
@@ -370,37 +365,24 @@ function SankeyPanel({ dataset }: { dataset: Dataset }) {
             : 'Nenhum fluxo para os períodos selecionados — tente um recorte mais amplo.',
         )
       ) : (
-        <Suspense fallback={chartMessage('Carregando gráfico…')}>
-          <PlotlyChart
-            exportName="evolucao-tematica"
-            onPointClick={(point) => openInSearch(point.label, KEYWORD)}
-            height={620}
-            data={[
-              {
-                type: 'sankey',
-                orientation: 'h',
-                node: {
-                  pad: 14,
-                  thickness: 18,
-                  line: { color: 'rgba(0,0,0,0.25)', width: 0.5 },
-                  label: sankey.nodes.map((node) => node.label),
-                  color: sankey.nodes.map((node) => PALETTE[node.period % PALETTE.length] as string),
-                },
-                link: {
-                  source: sankey.links.map((link) => link.source),
-                  target: sankey.links.map((link) => link.target),
-                  value: sankey.links.map((link) => link.value),
-                  color: sankey.links.map((link) =>
-                    link.kind === 'continuidade'
-                      ? 'rgba(63, 174, 143, 0.45)'
-                      : 'rgba(150, 160, 170, 0.25)',
-                  ),
-                },
-              } as never,
-            ]}
-            layout={{ margin: { l: 10, r: 10, t: 10, b: 10 } }}
-          />
-        </Suspense>
+        <SankeyChart
+          exportName="evolucao-tematica"
+          onNodeClick={(term) => openInSearch(term, KEYWORD)}
+          height={620}
+          columnLabels={activePeriods.map(([start, end]) => `${start}–${end}`)}
+          nodes={sankey.nodes.map((node) => ({
+            term: node.term,
+            column: node.period,
+            color: PALETTE[node.period % PALETTE.length] as string,
+          }))}
+          links={sankey.links.map((link) => ({
+            source: link.source,
+            target: link.target,
+            value: link.value,
+            kind: link.kind === 'continuidade' ? 'Continuidade' : 'Intersecção',
+            color: link.kind === 'continuidade' ? 'rgba(63, 174, 143, 0.45)' : 'rgba(150, 160, 170, 0.28)',
+          }))}
+        />
       )}
     </div>
   );
@@ -408,6 +390,9 @@ function SankeyPanel({ dataset }: { dataset: Dataset }) {
 
 /** Ciclo de vida das palavras-chave. */
 function GeneticsPanel({ dataset }: { dataset: Dataset }) {
+  const t = useLocale((state) => state.t);
+  const dark = usePreferences((state) => state.theme === 'dark');
+  const CITATION_SCALE = dark ? CITATION_SCALE_DARK : CITATION_SCALE_LIGHT;
   const { data } = useAsyncResult<KeywordGenetics[]>('genetics', () =>
     getAnalyticsWorker().genetics(dataset),
   );
@@ -420,6 +405,8 @@ function GeneticsPanel({ dataset }: { dataset: Dataset }) {
   // Só os termos mais replicados: a cauda longa é composta de termos que aparecem uma vez
   // e formaria uma nuvem indistinta na origem do gráfico.
   const top = data.slice(0, 150);
+  const minCitations = Math.min(...top.map((item) => item.citations));
+  const maxCitations = Math.max(...top.map((item) => item.citations));
 
   return (
     <div className="space-y-3">
@@ -430,45 +417,44 @@ function GeneticsPanel({ dataset }: { dataset: Dataset }) {
         fronteiras recentes.
       </ReadingTip>
 
-      <Suspense fallback={chartMessage('Carregando gráfico…')}>
-        <PlotlyChart
-          exportName="genetica-das-ideias"
-          onPointClick={(point) => openInSearch(point.text, KEYWORD)}
-          height={480}
-          data={[
-            {
-              type: 'scatter',
-              mode: 'markers',
-              x: top.map((item) => item.birthYear),
-              y: top.map((item) => item.lifespan),
-              text: top.map((item) => item.keyword),
-              customdata: top.map((item) => [item.occurrences, item.citations]) as never,
-              marker: {
-                size: top.map((item) => Math.min(46, 8 + Math.sqrt(item.occurrences) * 3)),
-                color: top.map((item) => item.citations),
-                colorscale: 'Teal',
-                showscale: true,
-                colorbar: { title: { text: 'Citações' }, thickness: 12 },
-                line: { width: 1, color: 'rgba(255,255,255,0.7)' },
-                opacity: 0.85,
-              },
-              hovertemplate:
-                '<b>%{text}</b><br>Nasceu em %{x}<br>Longevidade: %{y} anos' +
-                '<br>Replicações: %{customdata[0]}<br>Citações: %{customdata[1]}<extra></extra>',
-            },
-          ] as Data[]}
-          layout={{
-            xaxis: { title: { text: 'Ano de nascimento do termo' } },
-            yaxis: { title: { text: 'Longevidade (anos)' } },
-          }}
-        />
-      </Suspense>
+      <ScatterChart
+        exportName="genetica-das-ideias"
+        ariaLabel={t('visual_tab_genetics')}
+        height={480}
+        integerX
+        xLabel="Ano de nascimento do termo"
+        yLabel="Longevidade (anos)"
+        colorScale={{ label: 'Citações', min: minCitations, max: maxCitations, colors: CITATION_SCALE }}
+        points={top.map((item) => ({
+          id: item.keyword,
+          x: item.birthYear,
+          y: item.lifespan,
+          // O Plotly media o diâmetro (8 + √n × 3, até 46); aqui é o raio.
+          r: Math.min(23, 4 + Math.sqrt(item.occurrences) * 1.5),
+          color: interpolateColor(
+            CITATION_SCALE,
+            (item.citations - minCitations) / (maxCitations - minCitations || 1),
+          ),
+          label: item.keyword,
+          tooltip: (
+            <>
+              <p className="mb-1 font-semibold break-words">{item.keyword}</p>
+              <TipRow label="Nasceu em" value={item.birthYear} />
+              <TipRow label="Longevidade" value={`${item.lifespan} anos`} />
+              <TipRow label="Replicações" value={formatNumber(item.occurrences)} />
+              <TipRow label="Citações" value={formatNumber(item.citations)} />
+            </>
+          ),
+          onClick: () => openInSearch(item.keyword, KEYWORD),
+        }))}
+      />
     </div>
   );
 }
 
 /** Mapa conceitual por PCA, em 2D e 3D. */
 function ConceptPanel({ dataset }: { dataset: Dataset }) {
+  const t = useLocale((state) => state.t);
   const [dimensions, setDimensions] = useState<'2d' | '3d'>('2d');
   const [clusters, setClusters] = useState(4);
 
@@ -482,6 +468,29 @@ function ConceptPanel({ dataset }: { dataset: Dataset }) {
   }
 
   const groups = [...new Set(terms.map((term) => term.cluster))].sort((a, b) => a - b);
+  const colorOf = new Map(groups.map((group, index) => [group, PALETTE[index % PALETTE.length] as string]));
+  const legend = groups.map((group) => ({
+    key: String(group),
+    label: `Agrupamento ${group + 1}`,
+    color: colorOf.get(group) as string,
+  }));
+  const conceptPoint = (term: ConceptTerm) => ({
+    id: term.term,
+    x: term.x,
+    y: term.y,
+    r: Math.min(17, 4 + Math.sqrt(term.frequency) * 1.25),
+    color: colorOf.get(term.cluster) as string,
+    label: term.term,
+    group: String(term.cluster),
+    tooltip: (
+      <>
+        <p className="mb-1 font-semibold break-words">{term.term}</p>
+        <TipRow label="Agrupamento" value={term.cluster + 1} color={colorOf.get(term.cluster)} />
+        <TipRow label="Frequência" value={formatNumber(term.frequency)} />
+      </>
+    ),
+    onClick: () => openInSearch(term.term, KEYWORD),
+  });
 
   return (
     <div className="space-y-4">
@@ -524,55 +533,33 @@ function ConceptPanel({ dataset }: { dataset: Dataset }) {
         os termos entre elas são pontes conceituais.
       </ReadingTip>
 
-      <Suspense fallback={chartMessage('Carregando gráfico…')}>
-        <PlotlyChart
-          exportName={`mapa-conceitual-${dimensions}`}
-          onPointClick={(point) => openInSearch(point.text, KEYWORD)}
-          height={dimensions === '3d' ? 620 : 500}
-          data={groups.map((group, index) => {
-            const members = terms.filter((term) => term.cluster === group);
-            const base = {
-              name: `Agrupamento ${group + 1}`,
-              mode: 'text+markers' as const,
-              text: members.map((term) => term.term),
-              textposition: 'top center' as const,
-              textfont: { size: 9 },
-              marker: {
-                size: members.map((term) => Math.min(34, 8 + Math.sqrt(term.frequency) * 2.5)),
-                color: PALETTE[index % PALETTE.length] as string,
-                line: { width: 1, color: 'rgba(255,255,255,0.8)' },
-                opacity: 0.85,
-              },
-              x: members.map((term) => term.x),
-              y: members.map((term) => term.y),
-            };
-
-            return dimensions === '3d'
-              ? { ...base, type: 'scatter3d' as const, z: members.map((term) => term.z) }
-              : { ...base, type: 'scatter' as const };
-          }) as never}
-          layout={
-            dimensions === '3d'
-              ? {
-                  scene: {
-                    xaxis: { title: { text: 'Dimensão 1' } },
-                    yaxis: { title: { text: 'Dimensão 2' } },
-                    zaxis: { title: { text: 'Dimensão 3' } },
-                  },
-                }
-              : {
-                  xaxis: { title: { text: 'Dimensão 1' } },
-                  yaxis: { title: { text: 'Dimensão 2' } },
-                }
-          }
+      {dimensions === '3d' ? (
+        <Scatter3DChart
+          exportName="mapa-conceitual-3d"
+          ariaLabel={t('visual_tab_concept')}
+          height={620}
+          axisLabels={['Dimensão 1', 'Dimensão 2', 'Dimensão 3']}
+          legend={legend}
+          points={terms.map((term) => ({ ...conceptPoint(term), z: term.z }))}
         />
-      </Suspense>
+      ) : (
+        <ScatterChart
+          exportName="mapa-conceitual-2d"
+          ariaLabel={t('visual_tab_concept')}
+          height={500}
+          xLabel="Dimensão 1"
+          yLabel="Dimensão 2"
+          legend={legend}
+          points={terms.map(conceptPoint)}
+        />
+      )}
     </div>
   );
 }
 
 /** Mapa temático de centralidade × densidade. */
 function ThematicPanel({ dataset }: { dataset: Dataset }) {
+  const t = useLocale((state) => state.t);
   const [source, setSource] = useState<'abstract' | 'keywords'>('abstract');
 
   const { data: map, loading } = useAsyncResult<ThematicMap | null>(`thematic ${source}`, () =>
@@ -604,89 +591,48 @@ function ThematicPanel({ dataset }: { dataset: Dataset }) {
 
       <ReadingTip>{QUADRANT_NOTE}</ReadingTip>
 
-      <Suspense fallback={chartMessage('Carregando gráfico…')}>
-        <PlotlyChart
-          exportName="mapa-tematico"
-          onPointClick={(point) => openInSearch(point.text, ['Palavra-chave', 'Tema'])}
-          height={560}
-          data={map.clusters.map((cluster, index): Trace => ({
-            type: 'scatter',
-            mode: 'text+markers',
-            name: `Tema ${cluster.id}`,
-            x: [cluster.centrality],
-            y: [cluster.density],
-            text: [cluster.label],
-            textposition: 'middle center',
-            textfont: { size: 10 },
-            customdata: [[cluster.terms.join(', '), cluster.frequency]] as never,
-            marker: {
-              size: [Math.min(90, 20 + Math.sqrt(cluster.frequency) * 2)],
-              color: PALETTE[index % PALETTE.length] as string,
-              opacity: 0.55,
-              line: { width: 1.5, color: 'rgba(255,255,255,0.9)' },
-            },
-            hovertemplate:
-              '<b>Tema %{fullData.name}</b><br>%{customdata[0]}' +
-              '<br>Centralidade: %{x:.0f}<br>Densidade: %{y:.0f}' +
-              '<br>Frequência: %{customdata[1]}<extra></extra>',
-          }))}
-          layout={{
-            showlegend: false,
-            xaxis: { title: { text: 'Centralidade (relevância externa)' } },
-            yaxis: { title: { text: 'Densidade (desenvolvimento interno)' } },
-            shapes: [
-              {
-                type: 'line',
-                x0: map.meanCentrality,
-                x1: map.meanCentrality,
-                yref: 'paper',
-                y0: 0,
-                y1: 1,
-                line: { dash: 'dash', width: 1, color: 'rgba(128,128,128,0.5)' },
-              },
-              {
-                type: 'line',
-                xref: 'paper',
-                x0: 0,
-                x1: 1,
-                y0: map.meanDensity,
-                y1: map.meanDensity,
-                line: { dash: 'dash', width: 1, color: 'rgba(128,128,128,0.5)' },
-              },
-            ],
-            annotations: ([
-              { x: 0.99, y: 0.99, text: '<b>Motores</b>', xanchor: 'right', yanchor: 'top' },
-              { x: 0.01, y: 0.99, text: '<b>Nichos</b>', xanchor: 'left', yanchor: 'top' },
-              {
-                x: 0.99,
-                y: 0.01,
-                text: '<b>Básicos / transversais</b>',
-                xanchor: 'right',
-                yanchor: 'bottom',
-              },
-              {
-                x: 0.01,
-                y: 0.01,
-                text: '<b>Emergentes / em declínio</b>',
-                xanchor: 'left',
-                yanchor: 'bottom',
-              },
-            ] as const).map((annotation) => ({
-              ...annotation,
-              xref: 'paper' as const,
-              yref: 'paper' as const,
-              showarrow: false,
-              font: { size: 10, color: 'rgba(128,128,128,0.9)' },
-            })),
-          }}
-        />
-      </Suspense>
+      <ScatterChart
+        exportName="mapa-tematico"
+        ariaLabel={t('visual_tab_thematic')}
+        height={560}
+        labelPlacement="center"
+        xLabel="Centralidade (relevância externa)"
+        yLabel="Densidade (desenvolvimento interno)"
+        reference={{ x: map.meanCentrality, y: map.meanDensity }}
+        quadrants={{
+          topLeft: 'Nichos',
+          topRight: 'Motores',
+          bottomLeft: 'Emergentes / em declínio',
+          bottomRight: 'Básicos / transversais',
+        }}
+        points={map.clusters.map((cluster, index) => ({
+          id: String(cluster.id),
+          x: cluster.centrality,
+          y: cluster.density,
+          r: Math.min(45, 10 + Math.sqrt(cluster.frequency)),
+          color: PALETTE[index % PALETTE.length] as string,
+          opacity: 0.55,
+          // O núcleo monta o rótulo com "<br>" (herança do Plotly): vira quebra de linha.
+          label: cluster.label.split('<br>').join('\n'),
+          tooltip: (
+            <>
+              <p className="mb-1 font-semibold break-words">{cluster.terms.slice(0, 3).join(' · ')}</p>
+              <p className="mb-1 text-muted-foreground break-words">{cluster.terms.join(', ')}</p>
+              <TipRow label="Centralidade" value={formatNumber(cluster.centrality, 0)} />
+              <TipRow label="Densidade" value={formatNumber(cluster.density, 0)} />
+              <TipRow label="Frequência" value={formatNumber(cluster.frequency)} />
+            </>
+          ),
+          onClick: () => openInSearch(cluster.terms[0], ['Palavra-chave', 'Tema']),
+        }))}
+      />
     </div>
   );
 }
 
 /** Linha do tempo de citações diretas. */
 function HistoriographPanel({ dataset }: { dataset: Dataset }) {
+  const t = useLocale((state) => state.t);
   const [topN, setTopN] = useState(30);
 
   const { data, loading } = useAsyncResult<HistoriographData | null>(
@@ -702,22 +648,6 @@ function HistoriographPanel({ dataset }: { dataset: Dataset }) {
         'documentos citam quais. No Web of Science, exporte com "Full Record and Cited ' +
         'References"; no Scopus, marque "References" na exportação.',
     );
-  }
-
-  const positions = new Map(data.nodes.map((node) => [node.id, node]));
-
-  // Uma única série de linhas com `null` entre segmentos: o Plotly interpreta o nulo como
-  // quebra, o que desenha N arestas com um traço só em vez de N traços.
-  const edgeX: (number | null)[] = [];
-  const edgeY: (number | null)[] = [];
-
-  for (const edge of data.edges) {
-    const from = positions.get(edge.from);
-    const to = positions.get(edge.to);
-    if (!from || !to) continue;
-
-    edgeX.push(from.year, to.year, null);
-    edgeY.push(from.offset, to.offset, null);
   }
 
   return (
@@ -746,48 +676,31 @@ function HistoriographPanel({ dataset }: { dataset: Dataset }) {
         </ReadingTip>
       </div>
 
-      <Suspense fallback={chartMessage('Carregando gráfico…')}>
-        <PlotlyChart
-          exportName="historiograph"
-          onPointClick={(point) =>
-            openInSearch((point.customdata as unknown[] | undefined)?.[0], ['Documento'])
-          }
-          height={560}
-          data={[
-            {
-              type: 'scatter',
-              mode: 'lines',
-              x: edgeX,
-              y: edgeY,
-              line: { width: 1, color: 'rgba(130,140,150,0.55)' },
-              hoverinfo: 'skip',
-              showlegend: false,
-            },
-            {
-              type: 'scatter',
-              mode: 'text+markers',
-              x: data.nodes.map((node) => node.year),
-              y: data.nodes.map((node) => node.offset),
-              text: data.nodes.map((node) => node.id),
-              textposition: 'top center',
-              textfont: { size: 9 },
-              customdata: data.nodes.map((node) => [node.title, node.citations]) as never,
-              marker: {
-                size: data.nodes.map((node) => node.size / 2),
-                color: PALETTE[0],
-                opacity: 0.8,
-                line: { width: 1, color: 'white' },
-              },
-              hovertemplate: '<b>%{customdata[0]}</b><br>%{customdata[1]} citações<extra></extra>',
-              showlegend: false,
-            },
-          ] as Data[]}
-          layout={{
-            xaxis: { title: { text: 'Linha do tempo' }, dtick: 1 },
-            yaxis: { showticklabels: false, showgrid: false, zeroline: false },
-          }}
-        />
-      </Suspense>
+      <ScatterChart
+        exportName="historiograph"
+        ariaLabel={t('visual_tab_historiograph')}
+        height={560}
+        integerX
+        hideYAxis
+        xLabel="Linha do tempo"
+        edges={data.edges}
+        points={data.nodes.map((node) => ({
+          id: node.id,
+          x: node.year,
+          y: node.offset,
+          r: Math.max(4, node.size / 4),
+          color: PALETTE[0],
+          label: node.id,
+          tooltip: (
+            <>
+              <p className="mb-1 font-semibold break-words">{node.title}</p>
+              <TipRow label="Ano" value={node.year} />
+              <TipRow label="Citações" value={formatNumber(node.citations)} />
+            </>
+          ),
+          onClick: () => openInSearch(node.title, ['Documento']),
+        }))}
+      />
     </div>
   );
 }

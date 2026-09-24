@@ -1,22 +1,36 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
+  Award,
   BarChart3,
+  BookOpen,
   Bot,
   CheckCircle2,
+  Compass,
+  Copy,
+  Cpu,
   Database,
   Download,
   FileSpreadsheet,
   FileText,
+  FileUp,
+  FolderOpen,
   Globe2,
-  HelpCircle,
   KeyRound,
   Network,
+  Orbit,
+  Plug,
   Rocket,
   Search,
+  Share2,
+  ShieldCheck,
   Sparkles,
+  TrendingUp,
+  Upload,
+  Users,
   Zap,
+  type LucideIcon,
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -28,12 +42,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
 import { useLocale } from '@/state/locale.store';
+import { useTour } from '@/state/tour.store';
 
 interface TutorialStep {
   title: string;
   badge: string;
-  badgeVariant: 'blue' | 'purple' | 'success' | 'warning' | 'indigo' | 'cyan';
   subtitle: string;
   description: string;
   highlights: { icon: typeof Zap; label: string; text: string }[];
@@ -44,7 +59,6 @@ const TUTORIAL_STEPS_PT: TutorialStep[] = [
   {
     title: 'Bem-vindo ao Simetrics',
     badge: 'Visão Geral',
-    badgeVariant: 'blue',
     subtitle: 'Plataforma de Inteligência Bibliométrica e Mapeamento Científico',
     description:
       'O Simetrics transforma bases de dados brutas de exportações acadêmicas em visões estratégicas, redes de colaboração e clusters temáticos orientados por Inteligência Artificial.',
@@ -70,7 +84,6 @@ const TUTORIAL_STEPS_PT: TutorialStep[] = [
   {
     title: '1. Importação & Deduplicação',
     badge: 'Entrada de Dados',
-    badgeVariant: 'success',
     subtitle: 'Compatível com as principais bases acadêmicas do mundo',
     description:
       'Envie um ou múltiplos arquivos simultaneamente. O Simetrics identifica a origem e permite harmonizar bases heterogêneas sem conflito de metadados.',
@@ -96,7 +109,6 @@ const TUTORIAL_STEPS_PT: TutorialStep[] = [
   {
     title: '2. Indicadores & Análises Visuais',
     badge: 'Métricas Cientométricas',
-    badgeVariant: 'warning',
     subtitle: 'Estatística descritiva completa e modelos de impacto',
     description:
       'Acesse indicadores consolidados e tabelas analíticas para deep-dive em autores, países, fontes e termos com cálculo de índices clássicos.',
@@ -122,7 +134,6 @@ const TUTORIAL_STEPS_PT: TutorialStep[] = [
   {
     title: '3. Redes de Grafos & Colaboração',
     badge: 'Grafos & Comunidades',
-    badgeVariant: 'purple',
     subtitle: 'Descubra comunidades científicas e especializações temáticas',
     description:
       'Explore as conexões entre pesquisadores e descubra tópicos emergentes através de algoritmos de aprendizado não-supervisionado.',
@@ -148,7 +159,6 @@ const TUTORIAL_STEPS_PT: TutorialStep[] = [
   {
     title: '4. IA em Modo BYOK (Traga sua Chave)',
     badge: 'Bring Your Own Key',
-    badgeVariant: 'indigo',
     subtitle: 'Use sua chave de API própria com total privacidade e liberdade',
     description:
       'Configure sua chave de API preferida (Google Gemini, OpenAI ChatGPT, Anthropic Claude, OpenRouter ou endpoint local compatível). Sua chave nunca sai do seu navegador.',
@@ -174,7 +184,6 @@ const TUTORIAL_STEPS_PT: TutorialStep[] = [
   {
     title: '5. Motor de Busca & Dossiês',
     badge: 'Dossiê & Exploração',
-    badgeVariant: 'cyan',
     subtitle: 'Investigação profunda de autores, periódicos e termos',
     description:
       'Consulte dossiês detalhados de qualquer autor, instituição ou termo e descubra perfis com DNA acadêmico similar.',
@@ -200,7 +209,6 @@ const TUTORIAL_STEPS_PT: TutorialStep[] = [
   {
     title: '6. Relatório Executivo Personalizado',
     badge: 'Exportação & Síntese',
-    badgeVariant: 'blue',
     subtitle: 'Exporte relatórios científicos completos em PDF e DOCX',
     description:
       'Crie relatórios executivos sob medida escolhendo exatamente quais seções e tabelas incluir. Exporte diretamente sem passar pela janela de impressão.',
@@ -229,7 +237,6 @@ const TUTORIAL_STEPS_EN: TutorialStep[] = [
   {
     title: 'Welcome to Simetrics',
     badge: 'Overview',
-    badgeVariant: 'blue',
     subtitle: 'Bibliometric Intelligence & Scientific Mapping Platform',
     description:
       'Simetrics transforms raw export files from academic databases into strategic insights, collaboration networks, and AI-powered research clusters.',
@@ -255,7 +262,6 @@ const TUTORIAL_STEPS_EN: TutorialStep[] = [
   {
     title: '1. Ingestion & Deduplication',
     badge: 'Data Input',
-    badgeVariant: 'success',
     subtitle: 'Compatible with major academic bibliographic databases',
     description:
       'Upload one or multiple files at once. Simetrics identifies the source schema and integrates heterogeneous files without metadata conflicts.',
@@ -281,7 +287,6 @@ const TUTORIAL_STEPS_EN: TutorialStep[] = [
   {
     title: '2. Indicators & Visual Analyses',
     badge: 'Scientometrics',
-    badgeVariant: 'warning',
     subtitle: 'Comprehensive descriptive statistics and impact metrics',
     description:
       'Access consolidated KPIs and deep-dive tables for authors, countries, venues, and keywords with classical scientometric indices.',
@@ -307,7 +312,6 @@ const TUTORIAL_STEPS_EN: TutorialStep[] = [
   {
     title: '3. Knowledge Networks & Graphs',
     badge: 'Graphs & Communities',
-    badgeVariant: 'purple',
     subtitle: 'Uncover scientific communities and research clusters',
     description:
       'Explore co-authorship and keyword co-occurrence through unsupervised community detection and topological projections.',
@@ -333,7 +337,6 @@ const TUTORIAL_STEPS_EN: TutorialStep[] = [
   {
     title: '4. AI in BYOK Mode (Bring Your Own Key)',
     badge: 'Bring Your Own Key',
-    badgeVariant: 'indigo',
     subtitle: 'Use your favorite AI provider with maximum privacy and freedom',
     description:
       'Bring your own API key (Google Gemini, OpenAI ChatGPT, Anthropic Claude, OpenRouter, or local models). Your key is stored strictly in your browser.',
@@ -359,7 +362,6 @@ const TUTORIAL_STEPS_EN: TutorialStep[] = [
   {
     title: '5. Search Engine & Academic Dossiers',
     badge: 'Dossier & Exploration',
-    badgeVariant: 'cyan',
     subtitle: 'Deep investigation of authors, venues, and keywords',
     description:
       'Look up comprehensive profiles for any author or journal and discover peers with matching academic DNA.',
@@ -385,7 +387,6 @@ const TUTORIAL_STEPS_EN: TutorialStep[] = [
   {
     title: '6. Custom Executive Report',
     badge: 'Synthesis & Export',
-    badgeVariant: 'blue',
     subtitle: 'Export comprehensive scientometric dossiers in PDF and DOCX',
     description:
       'Generate tailor-made research reports by choosing exactly which sections to include. Download directly without opening browser print dialogs.',
@@ -424,6 +425,13 @@ export function TutorialModal({ open: isOpen, onOpenChange: handleOpenChange }: 
   const locale = useLocale((state) => state.locale);
   const steps = locale === 'en' ? TUTORIAL_STEPS_EN : TUTORIAL_STEPS_PT;
   const [stepIndex, setStepIndex] = useState(0);
+  const startTour = useTour((state) => state.start);
+
+  // O tour percorre a tela de verdade: o modal sai da frente antes de ele começar.
+  const launchTour = (): void => {
+    handleOpenChange(false);
+    startTour();
+  };
 
   const currentStep: TutorialStep = steps[stepIndex] ?? steps[0]!;
   const isFirst = stepIndex === 0;
@@ -460,7 +468,7 @@ export function TutorialModal({ open: isOpen, onOpenChange: handleOpenChange }: 
           {/* Header do Passo */}
           <DialogHeader className="space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <Badge variant={currentStep.badgeVariant} className="text-xs font-semibold uppercase tracking-wider">
+              <Badge variant="outline" className="border-highlight/50 text-highlight">
                 {currentStep.badge} · {locale === 'en' ? 'Step' : 'Etapa'} {stepIndex + 1} / {steps.length}
               </Badge>
               <span className="text-xs text-muted-foreground font-medium">
@@ -502,12 +510,37 @@ export function TutorialModal({ open: isOpen, onOpenChange: handleOpenChange }: 
                 </div>
               ))}
             </div>
+
+            {(isFirst || isLast) && (
+              <div className="flex flex-col gap-3 border border-highlight/40 bg-highlight/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-3">
+                  <span className="grid size-8 shrink-0 place-items-center border border-highlight/50 text-highlight">
+                    <Compass className="size-4" aria-hidden />
+                  </span>
+                  <div className="space-y-0.5">
+                    <p className="text-sm font-semibold text-foreground">
+                      {locale === 'en' ? 'Prefer to see it in practice?' : 'Prefere ver na prática?'}
+                    </p>
+                    <p className="text-xs leading-snug text-muted-foreground">
+                      {locale === 'en'
+                        ? 'The guided tour walks through every block, chart and table on the real screen.'
+                        : 'O tour guiado percorre cada bloco, gráfico e tabela na tela de verdade.'}
+                    </p>
+                  </div>
+                </div>
+                <Button size="sm" onClick={launchTour} className="shrink-0 gap-1.5">
+                  <Compass className="size-3.5" aria-hidden />
+                  {locale === 'en' ? 'Start guided tour' : 'Iniciar tour guiado'}
+                </Button>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Rodapé de Navegação */}
         <div className="border-t border-border/80 bg-muted/30 px-6 py-4 flex flex-wrap items-center justify-between gap-3">
           {/* Indicadores de bolinha */}
+          <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-1.5">
             {steps.map((_, index) => (
               <button
@@ -523,6 +556,17 @@ export function TutorialModal({ open: isOpen, onOpenChange: handleOpenChange }: 
                 aria-label={`Etapa ${index + 1}`}
               />
             ))}
+          </div>
+          {!isFirst && !isLast && (
+            <button
+              type="button"
+              onClick={launchTour}
+              className="eyebrow flex cursor-pointer items-center gap-1.5 transition-colors hover:text-highlight"
+            >
+              <Compass className="size-3.5" aria-hidden />
+              {locale === 'en' ? 'Guided tour' : 'Tour guiado'}
+            </button>
+          )}
           </div>
 
           <div className="flex items-center gap-2">
@@ -558,6 +602,76 @@ export function TutorialModal({ open: isOpen, onOpenChange: handleOpenChange }: 
   );
 }
 
+/** Nó do diagrama de fluxo da etapa de boas-vindas. */
+function FlowNode({
+  Icon,
+  title,
+  caption,
+  accent,
+}: {
+  Icon: LucideIcon;
+  title: string;
+  caption: string;
+  accent?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        'flex min-w-0 flex-1 flex-col items-center gap-1.5 border p-3 text-center',
+        accent ? 'border-highlight/60' : 'border-border',
+      )}
+    >
+      <span
+        className={cn(
+          'grid size-8 place-items-center border',
+          accent ? 'border-highlight/50 text-highlight' : 'border-border text-foreground',
+        )}
+      >
+        <Icon className="size-4" aria-hidden />
+      </span>
+      <span className={cn('text-[11px] font-semibold', accent ? 'text-highlight' : 'text-foreground')}>
+        {title}
+      </span>
+      <span className="eyebrow text-[9.5px]">{caption}</span>
+    </div>
+  );
+}
+
+/** Etiqueta com ícone — no lugar dos emojis das prévias. */
+function Tag({ Icon, children }: { Icon: LucideIcon; children: ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 border border-border px-2 py-1 font-mono text-[10.5px] uppercase tracking-[0.08em] text-muted-foreground">
+      <Icon className="size-3.5 text-highlight" aria-hidden />
+      {children}
+    </span>
+  );
+}
+
+function PreviewFrame({
+  Icon,
+  title,
+  aside,
+  children,
+}: {
+  Icon: LucideIcon;
+  title: string;
+  aside?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div className="border border-border border-l-2 border-l-highlight bg-card p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <span className="flex items-center gap-2 text-xs font-semibold text-foreground">
+          <Icon className="size-4 text-highlight" aria-hidden />
+          {title}
+        </span>
+        {aside}
+      </div>
+      {children}
+    </div>
+  );
+}
+
 /** Componente visual representativo de cada etapa do Simetrics */
 function TutorialStepPreview({
   type,
@@ -570,33 +684,21 @@ function TutorialStepPreview({
 
   if (type === 'overview') {
     return (
-      <div className="border border-border border-l-2 border-l-blue-500 bg-card p-4">
-        <div className="flex flex-wrap items-center justify-around gap-2 text-center">
-          <div className="flex flex-col items-center p-2 rounded-lg bg-card/80 border border-border/60 shadow-2xs">
-            <span className="text-xl">📂</span>
-            <span className="mt-1 text-[11px] font-bold text-foreground">
-              {isEn ? 'RIS / CSV Datasets' : 'Bases RIS / CSV'}
-            </span>
-            <span className="text-[10px] text-muted-foreground">Scopus, WoS, SciELO</span>
-          </div>
-          <span className="text-muted-foreground font-bold text-sm">➔</span>
-          <div className="flex flex-col items-center p-2 rounded-lg bg-card/80 border border-blue-200 shadow-2xs">
-            <span className="text-xl">⚡</span>
-            <span className="mt-1 text-[11px] font-bold text-primary">Web Workers</span>
-            <span className="text-[10px] text-muted-foreground">
-              {isEn ? 'Local Compute' : 'Processamento Local'}
-            </span>
-          </div>
-          <span className="text-muted-foreground font-bold text-sm">➔</span>
-          <div className="flex flex-col items-center p-2 rounded-lg bg-card/80 border border-border/60 shadow-2xs">
-            <span className="text-xl">📊</span>
-            <span className="mt-1 text-[11px] font-bold text-foreground">
-              {isEn ? 'Graphs & BYOK AI' : 'Grafos & IA (BYOK)'}
-            </span>
-            <span className="text-[10px] text-muted-foreground">
-              {isEn ? 'Visual Scientometrics' : 'Epistemologia Visual'}
-            </span>
-          </div>
+      <div className="border border-border border-l-2 border-l-highlight bg-card p-4">
+        <div className="flex items-stretch gap-2">
+          <FlowNode
+            Icon={FolderOpen}
+            title={isEn ? 'RIS / CSV datasets' : 'Bases RIS / CSV'}
+            caption="Scopus · WoS · SciELO"
+          />
+          <ArrowRight className="size-4 shrink-0 self-center text-muted-foreground" aria-hidden />
+          <FlowNode Icon={Cpu} title="Web Workers" caption={isEn ? 'Local compute' : 'Processamento local'} accent />
+          <ArrowRight className="size-4 shrink-0 self-center text-muted-foreground" aria-hidden />
+          <FlowNode
+            Icon={Share2}
+            title={isEn ? 'Graphs & BYOK AI' : 'Grafos & IA (BYOK)'}
+            caption={isEn ? 'Visual scientometrics' : 'Epistemologia visual'}
+          />
         </div>
       </div>
     );
@@ -604,131 +706,96 @@ function TutorialStepPreview({
 
   if (type === 'upload') {
     return (
-      <div className="border border-border border-l-2 border-l-emerald-500 bg-card p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-          <div className="flex items-center gap-2">
-            <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="font-bold text-foreground">
-              {isEn ? 'Unified Upload & Parser' : 'Painel de Upload Unificado'}
-            </span>
-          </div>
-          <div className="flex gap-1.5">
-            <Badge variant="success" className="text-[10px]">
-              {isEn ? 'Demo Ready (973 docs)' : 'Exemplo Pronto (973 docs)'}
-            </Badge>
-            <Badge variant="blue" className="text-[10px]">
-              {isEn ? 'DOI Deduplication' : 'Deduplicação DOI'}
-            </Badge>
-          </div>
+      <PreviewFrame
+        Icon={Upload}
+        title={isEn ? 'Unified upload & parser' : 'Painel de upload unificado'}
+        aside={
+          <span className="flex flex-wrap gap-1.5">
+            <Tag Icon={Rocket}>{isEn ? 'Demo · 973 docs' : 'Exemplo · 973 docs'}</Tag>
+            <Tag Icon={Copy}>{isEn ? 'DOI dedup' : 'Deduplicação DOI'}</Tag>
+          </span>
+        }
+      >
+        <div className="flex items-center justify-center gap-2 border border-dashed border-highlight/40 px-3 py-3 text-center text-xs text-muted-foreground">
+          <FileUp className="size-4 shrink-0 text-highlight" aria-hidden />
+          {isEn
+            ? 'Drop RIS, CSV or Excel files, or click "Load demo"'
+            : 'Arraste arquivos RIS, CSV ou Excel ou use "Carregar exemplo"'}
         </div>
-        <div className="mt-3 flex items-center justify-center rounded-lg border-2 border-dashed border-emerald-300 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20 py-3 text-center">
-          <p className="text-xs text-emerald-800 dark:text-emerald-300 font-medium">
-            {isEn
-              ? 'Drag & drop RIS, CSV or Excel files or click "Load Demo Dataset"'
-              : 'Arraste arquivos RIS, CSV ou Excel ou use "Carregar Exemplo"'}
-          </p>
-        </div>
-      </div>
+      </PreviewFrame>
     );
   }
 
   if (type === 'kpis') {
+    const kpis = [
+      { Icon: BookOpen, label: 'Docs', value: '973' },
+      { Icon: Users, label: isEn ? 'Authors' : 'Autores', value: '1.630' },
+      { Icon: TrendingUp, label: isEn ? 'Growth' : 'Crescimento', value: '6,82%' },
+      { Icon: Award, label: isEn ? 'h-index' : 'Índice h', value: '38' },
+    ];
     return (
-      <div className="border border-border border-l-2 border-l-amber-500 bg-card p-3">
-        <div className="grid grid-cols-4 gap-2">
-          <div className="rounded-lg border border-blue-200 bg-card p-2 text-center shadow-2xs">
-            <p className="text-[10px] text-muted-foreground font-semibold">{isEn ? 'Docs' : 'Docs'}</p>
-            <p className="text-sm font-bold text-blue-600">973</p>
+      <div className="grid grid-cols-2 gap-2 border border-border border-l-2 border-l-highlight bg-card p-3 sm:grid-cols-4">
+        {kpis.map(({ Icon, label, value }) => (
+          <div key={label} className="border border-border p-2.5">
+            <div className="flex items-center justify-between gap-1">
+              <span className="eyebrow text-[9.5px]">{label}</span>
+              <Icon className="size-3.5 text-highlight" aria-hidden />
+            </div>
+            <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">{value}</p>
           </div>
-          <div className="rounded-lg border border-purple-200 bg-card p-2 text-center shadow-2xs">
-            <p className="text-[10px] text-muted-foreground font-semibold">{isEn ? 'Authors' : 'Autores'}</p>
-            <p className="text-sm font-bold text-purple-600">1.629</p>
-          </div>
-          <div className="rounded-lg border border-emerald-200 bg-card p-2 text-center shadow-2xs">
-            <p className="text-[10px] text-muted-foreground font-semibold">{isEn ? 'Growth' : 'Crescimento'}</p>
-            <p className="text-sm font-bold text-emerald-600">+14.2%</p>
-          </div>
-          <div className="rounded-lg border border-amber-200 bg-card p-2 text-center shadow-2xs">
-            <p className="text-[10px] text-muted-foreground font-semibold">{isEn ? 'h-index' : 'Índice h'}</p>
-            <p className="text-sm font-bold text-amber-600">38</p>
-          </div>
-        </div>
+        ))}
       </div>
     );
   }
 
   if (type === 'networks') {
     return (
-      <div className="border border-border border-l-2 border-l-purple-500 bg-card p-3.5">
-        <div className="flex items-center justify-between text-xs">
-          <span className="font-bold text-foreground">
-            {isEn ? 'Heterogeneous Graph & Communities' : 'Grafo Heterogêneo & Clusters'}
-          </span>
-          <span className="text-[11px] text-purple-700 dark:text-purple-300 font-medium">Louvain + PCA</span>
+      <PreviewFrame
+        Icon={Network}
+        title={isEn ? 'Heterogeneous graph & communities' : 'Grafo heterogêneo & comunidades'}
+        aside={<span className="eyebrow text-highlight">Louvain + PCA</span>}
+      >
+        <div className="flex flex-wrap gap-1.5">
+          <Tag Icon={Users}>{isEn ? 'Co-authorship' : 'Coautoria'}</Tag>
+          <Tag Icon={Globe2}>{isEn ? 'International collab' : 'Parcerias internacionais'}</Tag>
+          <Tag Icon={Orbit}>{isEn ? '2D/3D concept PCA' : 'Mapa conceitual PCA'}</Tag>
         </div>
-        <div className="mt-2.5 flex flex-wrap gap-1.5">
-          <Badge variant="purple" className="text-[10px]">
-            {isEn ? '🟣 Co-authorship Networks' : '🟣 Redes de Coautoria'}
-          </Badge>
-          <Badge variant="indigo" className="text-[10px]">
-            {isEn ? '🌐 International Collab' : '🌐 Parcerias Internacionais'}
-          </Badge>
-          <Badge variant="cyan" className="text-[10px]">
-            {isEn ? '🧬 2D/3D Concept PCA' : '🧬 Mapa Conceitual PCA'}
-          </Badge>
-        </div>
-      </div>
+      </PreviewFrame>
     );
   }
 
   if (type === 'byok') {
     return (
-      <div className="border border-border border-l-2 border-l-indigo-500 bg-card p-3.5">
-        <div className="flex items-center justify-between text-xs">
-          <span className="font-bold text-foreground">
-            {isEn ? 'Bring Your Own Key (BYOK)' : 'Traga sua Chave de IA (BYOK)'}
-          </span>
-          <Badge variant="indigo" className="text-[10px]">
-            {isEn ? 'Direct Browser Connection' : 'Conexão Direta'}
-          </Badge>
+      <PreviewFrame
+        Icon={KeyRound}
+        title={isEn ? 'Bring your own key (BYOK)' : 'Traga sua chave de IA (BYOK)'}
+        aside={<Tag Icon={ShieldCheck}>{isEn ? 'Direct connection' : 'Conexão direta'}</Tag>}
+      >
+        <div className="flex flex-wrap gap-1.5">
+          {['Google Gemini', 'OpenAI ChatGPT', 'Anthropic Claude', 'OpenRouter / Ollama'].map((provider) => (
+            <Tag key={provider} Icon={Plug}>
+              {provider}
+            </Tag>
+          ))}
         </div>
-        <div className="mt-2.5 flex flex-wrap gap-1.5 text-xs">
-          <Badge variant="blue" className="text-[10px]">Google Gemini</Badge>
-          <Badge variant="success" className="text-[10px]">OpenAI ChatGPT</Badge>
-          <Badge variant="purple" className="text-[10px]">Anthropic Claude</Badge>
-          <Badge variant="warning" className="text-[10px]">OpenRouter / Ollama</Badge>
-        </div>
-      </div>
+      </PreviewFrame>
     );
   }
 
   return (
-    <div className="border border-border border-l-2 border-l-cyan-500 bg-card p-3.5">
-      <div className="flex items-center justify-between text-xs">
-        <span className="font-bold text-foreground">
-          {isEn ? 'Search Dossiers & AI Assistant' : 'Busca de Dossiês & Assistente IA'}
-        </span>
-        <Badge variant="cyan" className="text-[10px]">BM25 + Streaming RAG</Badge>
-      </div>
-      <div className="mt-2.5 rounded-lg border border-border/80 bg-card p-2 text-xs text-muted-foreground flex items-center gap-2">
-        <Bot className="size-4 text-emerald-600 shrink-0" />
+    <PreviewFrame
+      Icon={Search}
+      title={isEn ? 'Search dossiers & AI assistant' : 'Dossiês de busca & assistente IA'}
+      aside={<span className="eyebrow text-highlight">BM25 + streaming RAG</span>}
+    >
+      <div className="flex items-center gap-2 border border-border p-2.5 text-xs text-muted-foreground">
+        <Bot className="size-4 shrink-0 text-highlight" aria-hidden />
         <span>
           {isEn
             ? '"What are the foundational papers and leading authors on this topic?"'
             : '"Quais são os documentos e autores mais influentes desta base?"'}
         </span>
       </div>
-    </div>
-  );
-}
-
-export function TutorialTriggerButton({ onClick }: { onClick: () => void }) {
-  const t = useLocale((state) => state.t);
-
-  return (
-    <button type="button" onClick={onClick} className="header-chip cursor-pointer">
-      <HelpCircle className="size-3.5" aria-hidden />
-      <span className="hidden sm:inline">{t('tutorial_btn')}</span>
-    </button>
+    </PreviewFrame>
   );
 }

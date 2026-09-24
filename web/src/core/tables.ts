@@ -25,6 +25,9 @@ export interface EntityRow {
   meanCitations: number;
   medianCitations: number;
   stdCitations: number;
+  /** Documentos por autor dentro do grupo — média e mediana entre os autores do grupo. */
+  meanDocsPerAuthor: number;
+  medianDocsPerAuthor: number;
   /** Especialização por Quociente Locacional, quando há temas categorizados. */
   topSpecialization: string;
   /** "2024: Título (12 citações) | 2023: ..." */
@@ -212,10 +215,15 @@ function buildRow(
 
   const authors = new Set<string>();
   const countries = new Set<string>();
+  const docsPerAuthor = new Map<string, number>();
   for (const doc of group.docs) {
-    for (const author of splitTokens(doc[FIELD.AUTHORS], 'title')) authors.add(author);
+    for (const author of new Set(splitTokens(doc[FIELD.AUTHORS], 'title'))) {
+      authors.add(author);
+      docsPerAuthor.set(author, (docsPerAuthor.get(author) ?? 0) + 1);
+    }
     for (const country of splitTokens(doc[FIELD.COUNTRY], 'title')) countries.add(country);
   }
+  const authorCounts = [...docsPerAuthor.values()];
 
   const coauthors = new Set(authors);
   coauthors.delete(group.entity);
@@ -229,6 +237,8 @@ function buildRow(
     medianCitations: pyRound(median(citations), 2),
     // O Python zera o desvio para grupos de um único documento, onde o std amostral é NaN.
     stdCitations: group.docs.length > 1 ? pyRound(std(citations), 2) : 0,
+    meanDocsPerAuthor: authorCounts.length > 0 ? pyRound(mean(authorCounts), 2) : 0,
+    medianDocsPerAuthor: authorCounts.length > 0 ? pyRound(median(authorCounts), 2) : 0,
     topSpecialization: topSpecialization(group.docs, context),
     timeline: formatTimeline(group.docs, titleColumn),
     topDocument: topDocument(group.docs, titleColumn),

@@ -303,6 +303,12 @@
   html {
     color-scheme: light;
   }
+  /* Nada pode alargar a página além da tela: no celular isso vira rolagem lateral.
+     `clip` (e não `hidden`) não cria contêiner de rolagem e mantém o `sticky`. */
+  html,
+  body {
+    overflow-x: clip;
+  }
   html.dark {
     color-scheme: dark;
   }
@@ -353,12 +359,14 @@
   color: var(--highlight);
 }
 
-/* Logotipo monocromático: a máscara herda a cor do texto e acompanha o tema. */
+/* Logotipo monocromático: a máscara herda a cor do texto e acompanha o tema. O SVG é a
+   vetorização de simetrics-mark.png (mesmo enquadramento, 2130 × 928): ~5 KB em vez de
+   45 KB, e nítido em qualquer tamanho. */
 @utility brand-mark {
   display: inline-block;
   aspect-ratio: 2130 / 928;
   background-color: currentColor;
-  mask: url('/simetrics-mark.png') center / contain no-repeat;
+  mask: url('/simetrics-mark.svg') center / contain no-repeat;
 }
 
 /* Controles do cabeçalho — "EXPLORAR ECOSSISTEMA": DM Mono caixa-alta, contorno fino. */

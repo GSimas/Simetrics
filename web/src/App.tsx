@@ -1,24 +1,41 @@
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { BarChart3, FileText, FolderOpen, Network, Search } from 'lucide-react';
 
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { GithubButton, SettingsButton } from '@/components/HeaderActions';
 import { KpiTicker } from '@/components/KpiTicker';
-import { TutorialModal, TutorialTriggerButton } from '@/components/TutorialModal';
+import { TutorialTriggerButton } from '@/components/TutorialTriggerButton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import OverviewTab from '@/features/overview/OverviewTab';
-import NetworksTab from '@/features/networks/NetworksTab';
-import SearchTab from '@/features/search/SearchTab';
-import ReportTab from '@/features/report/ReportTab';
-import { ChatWidget } from '@/features/chat/ChatWidget';
 import { BuyMeCoffeeButton } from '@/components/BuyMeCoffeeButton';
 import { LandingScreen } from '@/features/landing/LandingScreen';
 import { type TranslationKey } from '@/lib/i18n/translations';
+import { lazyWithPreload, whenIdle } from '@/lib/lazy';
 import { useHashRoute } from '@/lib/use-hash-route';
 import { cn } from '@/lib/utils';
 import { useDataset } from '@/state/dataset.store';
 import { useLocale } from '@/state/locale.store';
 import { useNavigation } from '@/state/navigation.store';
 import { useProjectStore } from '@/state/project.store';
+import { useTour } from '@/state/tour.store';
+
+// Cada aba é um chunk próprio: a landing (o primeiro paint) não baixa nem executa o
+// código do workspace. Ao entrar no workspace, as abas são pré-carregadas no ócio, então a
+// troca de aba não passa pelo fallback do Suspense.
+const OverviewTab = lazyWithPreload(() => import('@/features/overview/OverviewTab'));
+const NetworksTab = lazyWithPreload(() => import('@/features/networks/NetworksTab'));
+const SearchTab = lazyWithPreload(() => import('@/features/search/SearchTab'));
+const ReportTab = lazyWithPreload(() => import('@/features/report/ReportTab'));
+// Modal do tutorial e tour: só quando alguém os abre.
+const TutorialModal = lazyWithPreload(() =>
+  import('@/components/TutorialModal').then((module) => ({ default: module.TutorialModal })),
+);
+// Assistente (cliente de IA, ferramentas, markdown): só no workspace, baixado no ócio.
+const ChatWidget = lazyWithPreload(() =>
+  import('@/features/chat/ChatWidget').then((module) => ({ default: module.ChatWidget })),
+);
+const GuidedTour = lazyWithPreload(() =>
+  import('@/features/tour/GuidedTour').then((module) => ({ default: module.GuidedTour })),
+);
 
 const TABS = [
   {
@@ -57,23 +74,42 @@ export default function App() {
   const activeTab = useNavigation((state) => state.activeTab);
   const setActiveTab = useNavigation((state) => state.setActiveTab);
   const [tutorialOpen, setTutorialOpen] = useState(false);
+  // Montado desde a primeira abertura: fechar precisa do componente para a animação.
+  const [tutorialMounted, setTutorialMounted] = useState(false);
   const [route, navigate] = useHashRoute();
-  const saveStatus = useProjectStore((state) => state.saveStatus);
-  const lastSavedAt = useProjectStore((state) => state.lastSavedAt);
+  const tourActive = useTour((state) => state.active);
+
+  const openTutorial = (): void => {
+    setTutorialMounted(true);
+    setTutorialOpen(true);
+  };
+
+  // O tour percorre o workspace: iniciado na landing, entra nele primeiro.
+  useEffect(() => {
+    if (tourActive && route.view === 'landing') navigate('workspace');
+  }, [tourActive, route.view, navigate]);
+
+  // No workspace, as abas são baixadas no ócio — a primeira troca de aba já as encontra.
+  useEffect(() => {
+    if (route.view !== 'workspace') return;
+    return whenIdle(() => {
+      void OverviewTab.preload();
+      void NetworksTab.preload();
+      void SearchTab.preload();
+      void ReportTab.preload();
+      void ChatWidget.preload();
+    });
+  }, [route.view]);
 
   // Com uma base carregada, os gráficos virão: baixa seus bundles em segundo plano para
   // que o primeiro gráfico aberto não pisque em "Carregando gráfico…".
   useEffect(() => {
     if (documentCount === 0) return;
-    const preload = (): void => {
-      void import('@/components/charts/PlotlyChart');
+    return whenIdle(() => {
       void import('@/components/charts/SigmaGraph');
       void import('@/components/charts/RadialGraph');
       void import('@/components/charts/WordCloud');
-    };
-    // Safari não tem requestIdleCallback; um atraso curto cumpre o mesmo papel.
-    const timer = setTimeout(preload, 800);
-    return () => clearTimeout(timer);
+    });
   }, [documentCount]);
 
   // Recuperação de `#/workspace/<id>` — recarregar a página, ou navegar via
@@ -94,11 +130,15 @@ export default function App() {
   if (route.view === 'landing') {
     return (
       <>
-        <LandingScreen navigate={navigate} onOpenTutorial={() => setTutorialOpen(true)} />
+        <LandingScreen navigate={navigate} onOpenTutorial={openTutorial} />
         {/* Montado aqui também: sem isso, abrir o tutorial a partir da landing não
             renderizaria nada, já que este early-return substitui a árvore inteira do
             workspace (onde o modal normalmente vive, mais abaixo). */}
-        <TutorialModal open={tutorialOpen} onOpenChange={setTutorialOpen} />
+        {tutorialMounted && (
+          <Suspense fallback={null}>
+            <TutorialModal open={tutorialOpen} onOpenChange={setTutorialOpen} />
+          </Suspense>
+        )}
       </>
     );
   }
@@ -126,7 +166,14 @@ export default function App() {
             </button>
 
             <div className="flex flex-wrap items-center gap-2">
-              <button type="button" onClick={() => navigate('landing')} className="header-chip cursor-pointer">
+              <button
+                type="button"
+                data-tour="projects"
+                onClick={() => navigate('landing')}
+                // No celular o texto some; o nome acessível não pode sumir junto.
+                aria-label={t('nav_projects_btn')}
+                className="header-chip cursor-pointer"
+              >
                 <FolderOpen className="size-3.5" aria-hidden />
                 <span className="hidden sm:inline">{t('nav_projects_btn')}</span>
               </button>
@@ -139,37 +186,21 @@ export default function App() {
                 </div>
               )}
 
-              {saveStatus !== 'idle' && (
-                <div
-                  className="eyebrow hidden h-9 items-center px-2 animate-in fade-in-0 xl:flex"
-                  title={saveStatus === 'error' ? (useProjectStore.getState().error ?? undefined) : undefined}
-                >
-                  {saveStatus === 'saving' && <span>{t('project_save_status_saving')}</span>}
-                  {saveStatus === 'saved' && lastSavedAt && (
-                    <span>
-                      {t('project_save_status_saved').replace(
-                        '{time}',
-                        new Date(lastSavedAt).toLocaleTimeString(),
-                      )}
-                    </span>
-                  )}
-                  {saveStatus === 'error' && (
-                    <span className="text-destructive">{t('project_save_status_error')}</span>
-                  )}
-                </div>
-              )}
+              <SaveStatus />
 
-              <TutorialTriggerButton onClick={() => setTutorialOpen(true)} />
+              <TutorialTriggerButton onClick={openTutorial} />
               <SettingsButton />
               <GithubButton />
             </div>
           </div>
-          <KpiTicker />
+          <div data-tour="ticker">
+            <KpiTicker />
+          </div>
         </header>
 
         <main className="container py-6">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="h-auto w-full flex-wrap justify-start gap-x-2">
+            <TabsList data-tour="tabs" className="h-auto w-full flex-wrap justify-start gap-x-2">
               {TABS.map(({ value, labelKey, Icon, iconColor }, index) => (
                 <TabsTrigger
                   key={value}
@@ -185,17 +216,27 @@ export default function App() {
               ))}
             </TabsList>
 
-            {TABS.map(({ value, Panel }) => (
+            {TABS.map(({ value, labelKey, Panel }) => (
               <TabsContent key={value} value={value} className="mt-5">
-                <Panel />
+                {/* Uma aba que quebre (ou cujo chunk não baixe) não leva as outras junto. */}
+                <ErrorBoundary variant="page" label={t(labelKey)}>
+                  <Suspense fallback={<TabFallback />}>
+                    <Panel />
+                  </Suspense>
+                </ErrorBoundary>
               </TabsContent>
             ))}
           </Tabs>
         </main>
       </div>
 
-      {/* Widget Flutuante da Simi - Assistente Científica (FAB - Canto Inferior Direito) */}
-      <ChatWidget />
+      {/* Widget Flutuante da Simi - Assistente Científica (FAB - Canto Inferior Direito).
+          Se quebrar, some sozinho em vez de derrubar o workspace. */}
+      <ErrorBoundary label="Simi" className="hidden">
+        <Suspense fallback={null}>
+          <ChatWidget />
+        </Suspense>
+      </ErrorBoundary>
 
       {/* Botão Flutuante de Café Luminoso (Pague-me um café - Canto Inferior Esquerdo) */}
       <BuyMeCoffeeButton />
@@ -230,7 +271,56 @@ export default function App() {
       </footer>
 
       {/* Modal do tutorial */}
-      <TutorialModal open={tutorialOpen} onOpenChange={setTutorialOpen} />
+      {tutorialMounted && (
+        <Suspense fallback={null}>
+          <TutorialModal open={tutorialOpen} onOpenChange={setTutorialOpen} />
+        </Suspense>
+      )}
+
+      {/* Tour guiado — iniciado pelo modal do tutorial */}
+      {tourActive && (
+        <ErrorBoundary label="tour" className="hidden">
+          <Suspense fallback={null}>
+            <GuidedTour />
+          </Suspense>
+        </ErrorBoundary>
+      )}
+    </div>
+  );
+}
+
+/** Espaço da aba enquanto o chunk chega — ocupa a altura para o rodapé não pular. */
+function TabFallback() {
+  const t = useLocale((state) => state.t);
+  return (
+    <div className="min-h-[60vh]" aria-busy="true">
+      <span className="sr-only">{t('loading')}</span>
+    </div>
+  );
+}
+
+/**
+ * Estado do salvamento automático. Componente próprio (e não estado do `App`): cada
+ * checkpoint muda esse estado duas ou três vezes, e no `App` isso re-renderizava a aba
+ * aberta inteira a cada salvamento.
+ */
+function SaveStatus() {
+  const t = useLocale((state) => state.t);
+  const saveStatus = useProjectStore((state) => state.saveStatus);
+  const lastSavedAt = useProjectStore((state) => state.lastSavedAt);
+  const error = useProjectStore((state) => state.error);
+  if (saveStatus === 'idle') return null;
+  return (
+    <div
+      className="eyebrow hidden h-9 items-center px-2 animate-in fade-in-0 xl:flex"
+      title={saveStatus === 'error' ? (error ?? undefined) : undefined}
+      role="status"
+    >
+      {saveStatus === 'saving' && <span>{t('project_save_status_saving')}</span>}
+      {saveStatus === 'saved' && lastSavedAt && (
+        <span>{t('project_save_status_saved').replace('{time}', new Date(lastSavedAt).toLocaleTimeString())}</span>
+      )}
+      {saveStatus === 'error' && <span className="text-destructive">{t('project_save_status_error')}</span>}
     </div>
   );
 }

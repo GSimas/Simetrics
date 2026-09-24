@@ -2,9 +2,8 @@ import { downloadBlob, timestampedFilename } from '@/core/export';
 
 /**
  * Exportação de gráficos como imagem: SVG (vetorial), JPG (com o fundo do tema) ou PNG
- * (fundo transparente). Todo gráfico entrega um SVG — nativo (nuvem, cordas, mapa),
- * gerado pelo Plotly ou montado a partir do grafo (Sigma) — e os formatos raster saem
- * dele por um canvas.
+ * (fundo transparente). Todo gráfico entrega um SVG — desenhado pelo próprio Simetrics
+ * ou montado a partir do grafo (Sigma) — e os formatos raster saem dele por um canvas.
  */
 export type ImageFormat = 'svg' | 'jpg' | 'png';
 

@@ -224,8 +224,9 @@ empilhá-las dispararia sete varreduras completas da base de uma vez.
 | Historiograph | Quem cita quem dentro da própria base |
 | Colaboração internacional | Geografia das parcerias, no mapa e em grafo circular |
 
-O código é dividido por rota de carregamento — Plotly, Sigma e a nuvem de palavras entram
-em `React.lazy`, então quem abre o app sem carregar base baixa apenas o chunk principal.
+O código é dividido por rota de carregamento — Sigma, o mapa-múndi e a nuvem de palavras
+entram em `React.lazy`, então quem abre o app sem carregar base baixa apenas o chunk
+principal.
 
 ## Notas de dependências
 
@@ -235,14 +236,16 @@ em `React.lazy`, então quem abre o app sem carregar base baixa apenas o chunk p
 - **Nuvem de palavras** usa `d3-cloud` para o layout em vez de `echarts-wordcloud`, cujo
   peer é preso ao ECharts 5 — e o ECharts 5 tem um advisory de XSS aberto. A renderização
   é em SVG, então o texto continua selecionável e a exportação sai vetorial.
-- **Plotly** é montado sob medida em `src/components/charts/plotly.ts`, registrando apenas
-  os traços usados. O `plotly.js-dist-min` pré-empacotado traz todos e pesa 4,6 MB
-  (1,38 MB comprimido); o bundle atual tem 1,1 MB (372 kB). Ao adicionar uma visualização,
-  registre o traço lá — sem registro o Plotly desenha um gráfico vazio, em silêncio.
+- **Gráficos sem biblioteca**: barras/linhas por ano, boxplot, Sankey, dispersões (2D e
+  3D), Lotka, cordas e mapa-múndi são SVG desenhado em TypeScript, sobre as peças comuns
+  de `src/components/charts/svg/` (escalas, dica, legenda, zoom por seleção, moldura com
+  ampliar e exportar). O Plotly saiu: pesava ~1,9 MB e não seguia a estética nem a
+  exportação padrão. Todo gráfico novo deve usar `ChartFrame`, para ganhar a exportação
+  em SVG, JPG e PNG.
 - **`@tanstack/react-table` fica na v8**, e não na v9. A v9 reescreveu a API em torno de
   features opt-in (`useTable`, `tableFeatures`, `createCoreRowModel`), e a tabela aqui é
   componente de apoio: não vale trocar uma API estável e documentada por outra que
   exigiria engenharia reversa dos tipos.
-- **`global: 'globalThis'`** no `vite.config.ts` é obrigatório. O `plotly.js` de
-  código-fonte arrasta dependências que referenciam o `global` do Node; sem o mapeamento a
-  aplicação quebra em execução, e apenas em execução — o build conclui sem reclamar.
+- **`global: 'globalThis'`** no `vite.config.ts` é obrigatório. PapaParse, html2canvas, o
+  SDK de IA e a lib dos workers de grafo referenciam o `global` do Node; sem o mapeamento
+  a aplicação quebra em execução, e apenas em execução — o build conclui sem reclamar.

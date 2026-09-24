@@ -28,12 +28,13 @@ import { collectColumns, pickColumn, toNumeric } from '@/core/text';
 import type { ReportSectionsSelection } from './pdf-generator';
 import {
   BRAND,
-  renderHorizontalBarChart,
-  renderNetworkGraphCanvas,
-  renderProductionTimelineCanvas,
-  renderThemesPieChart,
-  renderWordCloudCanvas,
-  renderWorldCollaborationMapCanvas,
+  reportAuthorsChart,
+  reportCountriesChart,
+  reportNetworkChart,
+  reportProductionChart,
+  reportThemesChart,
+  reportWordCloudChart,
+  reportWorldMapChart,
 } from './chart-renderer';
 
 export interface DocxReportData {
@@ -260,7 +261,7 @@ export async function generateDocxReport({
 
   // --- GRÁFICO 1: EVOLUÇÃO TEMPORAL DA PRODUÇÃO ---
   if (selection.chartProduction && overview && overview.docsPerYear.length > 0) {
-    const chartPng = renderProductionTimelineCanvas(overview.docsPerYear, { width: 1000, height: 420, locale });
+    const chartPng = reportProductionChart(overview.docsPerYear, locale);
     if (chartPng) {
       sectionsChildren.push(
         new Paragraph({
@@ -306,17 +307,7 @@ export async function generateDocxReport({
 
   // --- GRÁFICO 2: TOP AUTORES ---
   if (selection.chartAuthors && tables && tables.authors.length > 0) {
-    const authorItems = tables.authors.slice(0, 10).map((a) => ({
-      label: a.entity,
-      value: a.docCount,
-      sub: `${a.citations} ${isEn ? 'cit.' : 'cit.'}`,
-    }));
-    const chartTitle = isEn ? 'Top 10 Most Prolific Authors (Published Papers)' : 'Top 10 Autores Mais Produtivos';
-    const chartPng = renderHorizontalBarChart(chartTitle, authorItems, {
-      width: 1000,
-      height: 420,
-      locale,
-    });
+    const chartPng = reportAuthorsChart(tables.authors, locale);
     if (chartPng) {
       sectionsChildren.push(
         new Paragraph({
@@ -359,17 +350,7 @@ export async function generateDocxReport({
 
   // --- GRÁFICO 3: TOP PAÍSES ---
   if (selection.chartCountries && tables && tables.countries.length > 0) {
-    const countryItems = tables.countries.slice(0, 10).map((c) => ({
-      label: c.entity,
-      value: c.docCount,
-      sub: `${c.citations} ${isEn ? 'cit.' : 'cit.'}`,
-    }));
-    const chartTitle = isEn ? 'Top 10 Leading Countries by Scientific Output' : 'Top 10 Países com Maior Produção Científica';
-    const chartPng = renderHorizontalBarChart(chartTitle, countryItems, {
-      width: 1000,
-      height: 420,
-      locale,
-    });
+    const chartPng = reportCountriesChart(tables.countries, locale);
     if (chartPng) {
       sectionsChildren.push(
         new Paragraph({
@@ -388,11 +369,7 @@ export async function generateDocxReport({
 
   // --- GRÁFICO 4: MAPA-MÚNDI DE COLABORAÇÃO INTERNACIONAL ---
   if (selection.chartWorldMap && collaboration && collaboration.nodes.length > 0) {
-    const mapPng = renderWorldCollaborationMapCanvas(collaboration, {
-      width: 1000,
-      height: 500,
-      locale,
-    });
+    const mapPng = reportWorldMapChart(collaboration, locale);
     if (mapPng) {
       sectionsChildren.push(
         new Paragraph({
@@ -459,7 +436,7 @@ export async function generateDocxReport({
 
   // --- GRÁFICO 5: NUVEM DE PALAVRAS-CHAVE ---
   if (selection.chartKeywords && tables && tables.keywords.length > 0) {
-    const chartPng = renderWordCloudCanvas(tables.keywords, { width: 1000, height: 420, locale });
+    const chartPng = reportWordCloudChart(tables.keywords, locale);
     if (chartPng) {
       sectionsChildren.push(
         new Paragraph({
@@ -506,13 +483,7 @@ export async function generateDocxReport({
 
   // --- GRÁFICO 6: DISTRIBUIÇÃO DE TEMAS ---
   if (selection.chartThemes && clustering && clustering.clusters.length > 0) {
-    const themeItems = clustering.clusters.map((c) => ({
-      clusterId: c.clusterId,
-      name: `Tema ${c.clusterId + 1}`,
-      docCount: c.size,
-      share: dataset.length > 0 ? (c.size / dataset.length) * 100 : 0,
-    }));
-    const chartPng = renderThemesPieChart(themeItems, { width: 1000, height: 420, locale });
+    const chartPng = reportThemesChart(clustering.clusters, dataset.length, locale);
     if (chartPng) {
       sectionsChildren.push(
         new Paragraph({
@@ -551,11 +522,7 @@ export async function generateDocxReport({
 
   // --- GRÁFICO 7: REDE DE COOCORRÊNCIA (GRAFOS) ---
   if (selection.chartNetwork && network && network.nodes.length > 0) {
-    const netPng = renderNetworkGraphCanvas(network.nodes, network.edges, {
-      width: 1000,
-      height: 520,
-      locale,
-    });
+    const netPng = reportNetworkChart(network.nodes, network.edges, locale);
     if (netPng) {
       sectionsChildren.push(
         new Paragraph({

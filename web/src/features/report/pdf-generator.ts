@@ -10,12 +10,13 @@ import { FIELD, FIELD_CANDIDATES } from '@/lib/schema';
 import { collectColumns, pickColumn, toNumeric } from '@/core/text';
 import {
   BRAND,
-  renderHorizontalBarChart,
-  renderNetworkGraphCanvas,
-  renderProductionTimelineCanvas,
-  renderThemesPieChart,
-  renderWordCloudCanvas,
-  renderWorldCollaborationMapCanvas,
+  reportAuthorsChart,
+  reportCountriesChart,
+  reportNetworkChart,
+  reportProductionChart,
+  reportThemesChart,
+  reportWordCloudChart,
+  reportWorldMapChart,
 } from './chart-renderer';
 
 export interface ReportSectionsSelection {
@@ -271,7 +272,7 @@ export function generatePdfReport({
   // --- GRÁFICO 1: EVOLUÇÃO TEMPORAL DA PRODUÇÃO ---
   if (selection.chartProduction && overview && overview.docsPerYear.length > 0) {
     checkPageBreak(210);
-    const chartImg = renderProductionTimelineCanvas(overview.docsPerYear, { width: 1000, height: 420, locale });
+    const chartImg = reportProductionChart(overview.docsPerYear, locale);
     if (chartImg) {
       doc.addImage(chartImg, 'PNG', margin, cursorY, contentWidth, 200);
       cursorY += 215;
@@ -324,17 +325,7 @@ export function generatePdfReport({
   // --- GRÁFICO 2: TOP AUTORES ---
   if (selection.chartAuthors && tables && tables.authors.length > 0) {
     checkPageBreak(210);
-    const authorItems = tables.authors.slice(0, 10).map((a) => ({
-      label: a.entity,
-      value: a.docCount,
-      sub: `${a.citations} cit. | h=${a.h}`,
-    }));
-    const chartTitle = isEn ? 'Top 10 Most Prolific Authors (Published Papers)' : 'Top 10 Autores Mais Produtivos (Artigos Publicados)';
-    const chartImg = renderHorizontalBarChart(chartTitle, authorItems, {
-      width: 1000,
-      height: 420,
-      locale,
-    });
+    const chartImg = reportAuthorsChart(tables.authors, locale);
     if (chartImg) {
       doc.addImage(chartImg, 'PNG', margin, cursorY, contentWidth, 200);
       cursorY += 215;
@@ -384,17 +375,7 @@ export function generatePdfReport({
   // --- GRÁFICO 3: TOP PAÍSES ---
   if (selection.chartCountries && tables && tables.countries.length > 0) {
     checkPageBreak(210);
-    const countryItems = tables.countries.slice(0, 10).map((c) => ({
-      label: c.entity,
-      value: c.docCount,
-      sub: `${c.citations} cit.`,
-    }));
-    const chartTitle = isEn ? 'Top 10 Leading Countries by Scientific Output' : 'Top 10 Países com Maior Produção Científica';
-    const chartImg = renderHorizontalBarChart(chartTitle, countryItems, {
-      width: 1000,
-      height: 420,
-      locale,
-    });
+    const chartImg = reportCountriesChart(tables.countries, locale);
     if (chartImg) {
       doc.addImage(chartImg, 'PNG', margin, cursorY, contentWidth, 200);
       cursorY += 215;
@@ -404,11 +385,7 @@ export function generatePdfReport({
   // --- GRÁFICO 4: MAPA-MÚNDI DE COLABORAÇÃO INTERNACIONAL ---
   if (selection.chartWorldMap && collaboration && collaboration.nodes.length > 0) {
     checkPageBreak(250);
-    const mapImg = renderWorldCollaborationMapCanvas(collaboration, {
-      width: 1000,
-      height: 500,
-      locale,
-    });
+    const mapImg = reportWorldMapChart(collaboration, locale);
     if (mapImg) {
       doc.addImage(mapImg, 'PNG', margin, cursorY, contentWidth, 230);
       cursorY += 245;
@@ -492,7 +469,7 @@ export function generatePdfReport({
   // --- GRÁFICO 5: NUVEM DE PALAVRAS-CHAVE ---
   if (selection.chartKeywords && tables && tables.keywords.length > 0) {
     checkPageBreak(210);
-    const chartImg = renderWordCloudCanvas(tables.keywords, { width: 1000, height: 420, locale });
+    const chartImg = reportWordCloudChart(tables.keywords, locale);
     if (chartImg) {
       doc.addImage(chartImg, 'PNG', margin, cursorY, contentWidth, 200);
       cursorY += 215;
@@ -548,13 +525,7 @@ export function generatePdfReport({
   // --- GRÁFICO 6: DISTRIBUIÇÃO DE TEMAS ---
   if (selection.chartThemes && clustering && clustering.clusters.length > 0) {
     checkPageBreak(210);
-    const themeItems = clustering.clusters.map((c) => ({
-      clusterId: c.clusterId,
-      name: `Tema ${c.clusterId + 1}`,
-      docCount: c.size,
-      share: dataset.length > 0 ? (c.size / dataset.length) * 100 : 0,
-    }));
-    const chartImg = renderThemesPieChart(themeItems, { width: 1000, height: 420, locale });
+    const chartImg = reportThemesChart(clustering.clusters, dataset.length, locale);
     if (chartImg) {
       doc.addImage(chartImg, 'PNG', margin, cursorY, contentWidth, 200);
       cursorY += 215;
@@ -621,11 +592,7 @@ export function generatePdfReport({
   // --- GRÁFICO 7: REDE DE COOCORRÊNCIA (GRAFOS) ---
   if (selection.chartNetwork && network && network.nodes.length > 0) {
     checkPageBreak(260);
-    const netImg = renderNetworkGraphCanvas(network.nodes, network.edges, {
-      width: 1000,
-      height: 520,
-      locale,
-    });
+    const netImg = reportNetworkChart(network.nodes, network.edges, locale);
     if (netImg) {
       doc.addImage(netImg, 'PNG', margin, cursorY, contentWidth, 240);
       cursorY += 255;

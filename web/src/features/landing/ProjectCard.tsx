@@ -59,7 +59,9 @@ export function ProjectCard({
         {isEditing ? (
           <div className="flex items-center gap-1.5">
             <Input
-              autoFocus
+              // Foco ao entrar em edição — foi o próprio usuário quem pediu para renomear.
+              ref={(node) => node?.focus()}
+              aria-label={t('project_card_rename')}
               value={draftName}
               onChange={(event) => setDraftName(event.target.value)}
               onKeyDown={(event) => {

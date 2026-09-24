@@ -1,4 +1,5 @@
 import * as Comlink from 'comlink';
+import { withDatasetCache } from './dataset-cache';
 
 import { clusterDocuments, type ClusteringResult } from '@/core/clustering';
 import {
@@ -180,4 +181,5 @@ const api = {
 
 export type AiWorkerApi = typeof api;
 
-Comlink.expose(api);
+// A base chega uma vez por versão; as chamadas trazem só a referência.
+Comlink.expose(withDatasetCache(api));

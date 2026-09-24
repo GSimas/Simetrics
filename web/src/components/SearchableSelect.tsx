@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { Check, ChevronDown, Search, X } from 'lucide-react';
 
 import { Input } from '@/components/ui/input';
@@ -29,6 +29,8 @@ export function SearchableSelect({
   const [search, setSearch] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const listId = useId();
 
   // Fecha ao clicar fora
   useEffect(() => {
@@ -71,18 +73,32 @@ export function SearchableSelect({
     });
   };
 
-  const handleClear = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleClear = () => {
     onChange(null);
+    triggerRef.current?.focus();
+  };
+
+  // Esc fecha a lista e devolve o foco ao seletor, como num select nativo.
+  const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (event.key !== 'Escape' || !isOpen) return;
+    event.preventDefault();
+    setIsOpen(false);
+    setSearch('');
+    triggerRef.current?.focus();
   };
 
   return (
     <div ref={containerRef} className={cn('relative w-full', className)}>
       {/* Botão do Seletor Dropdown */}
       <button
+        ref={triggerRef}
         type="button"
         disabled={disabled}
         onClick={handleToggle}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-controls={isOpen ? listId : undefined}
+        onKeyDown={handleKeyDown}
         className={cn(
           'flex h-10 w-full items-center justify-between rounded-xl border border-border/80 bg-card px-3 py-2 text-left text-xs sm:text-sm shadow-2xs transition-all hover:bg-muted/40 focus:outline-hidden focus:ring-2 focus:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50',
           isOpen && 'border-primary/60 ring-2 ring-primary/20',
@@ -92,22 +108,27 @@ export function SearchableSelect({
           {value || placeholder}
         </span>
         <div className="flex items-center gap-1.5 pl-2 text-muted-foreground">
-          {value && (
-            <span
-              role="button"
-              tabIndex={0}
-              onClick={handleClear}
-              className="rounded-full p-0.5 hover:bg-muted hover:text-foreground"
-              title="Limpar seleção"
-            >
-              <X className="size-3.5" />
-            </span>
-          )}
+          {/* Reserva o lugar do botão de limpar, que fica fora do seletor (abaixo): um
+              botão dentro de outro é inacessível por teclado e leitor de tela. */}
+          {value && <span className="block size-[18px]" aria-hidden />}
           <ChevronDown
             className={cn('size-4 transition-transform duration-200', isOpen && 'rotate-180 text-primary')}
+            aria-hidden
           />
         </div>
       </button>
+
+      {value && !disabled && (
+        <button
+          type="button"
+          onClick={handleClear}
+          aria-label="Limpar seleção"
+          title="Limpar seleção"
+          className="absolute right-[34px] top-1/2 -translate-y-1/2 rounded-full p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+        >
+          <X className="size-3.5" aria-hidden />
+        </button>
+      )}
 
       {/* Lista Suspensa Flutuante */}
       {isOpen && (
@@ -120,12 +141,15 @@ export function SearchableSelect({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={searchPlaceholder}
+              aria-label={searchPlaceholder}
+              aria-controls={listId}
+              onKeyDown={handleKeyDown}
               className="h-8 pl-8 pr-3 text-xs bg-muted/30 rounded-lg"
             />
           </div>
 
           {/* Opções Roláveis */}
-          <div className="max-h-60 overflow-y-auto space-y-0.5 pr-1">
+          <div id={listId} role="listbox" tabIndex={-1} onKeyDown={handleKeyDown} className="max-h-60 overflow-y-auto space-y-0.5 pr-1">
             {filteredOptions.length === 0 ? (
               <p className="p-3 text-center text-xs text-muted-foreground">{emptyText}</p>
             ) : (
@@ -135,6 +159,8 @@ export function SearchableSelect({
                   <button
                     key={option}
                     type="button"
+                    role="option"
+                    aria-selected={isSelected}
                     onClick={() => handleSelect(option)}
                     className={cn(
                       'flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-xs font-medium transition-colors',
@@ -145,7 +171,7 @@ export function SearchableSelect({
                     title={option}
                   >
                     <span className="truncate pr-2">{option}</span>
-                    {isSelected && <Check className="size-3.5 shrink-0" />}
+                    {isSelected && <Check className="size-3.5 shrink-0" aria-hidden />}
                   </button>
                 );
               })

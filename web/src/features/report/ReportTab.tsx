@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   BarChart3,
   BookOpen,
@@ -38,16 +38,20 @@ import { useDataset } from '@/state/dataset.store';
 import { useLocale } from '@/state/locale.store';
 import { EmptyState } from '@/features/EmptyState';
 import { getAnalyticsWorker } from '@/workers/client';
+import { useIdleRender } from '@/lib/use-idle-render';
 import type { CollaborationNetwork } from '@/core/viz/collaboration';
-import { generatePdfReport, type ReportSectionsSelection } from './pdf-generator';
-import { generateDocxReport } from './docx-generator';
+// Os geradores (jsPDF, docx) pesam ~1,2 MB: entram só no clique de exportar.
+import type { ReportSectionsSelection } from './pdf-generator';
+import { ReportChartImage } from './ReportChartImage';
 import {
-  renderHorizontalBarChart,
-  renderNetworkGraphCanvas,
-  renderProductionTimelineCanvas,
-  renderThemesPieChart,
-  renderWordCloudCanvas,
-  renderWorldCollaborationMapCanvas,
+  REPORT_CHART_SIZE,
+  reportAuthorsChart,
+  reportCountriesChart,
+  reportNetworkChart,
+  reportProductionChart,
+  reportThemesChart,
+  reportWordCloudChart,
+  reportWorldMapChart,
 } from './chart-renderer';
 
 const DEFAULT_SELECTION: ReportSectionsSelection = {
@@ -90,102 +94,71 @@ export default function ReportTab() {
   const [collaboration, setCollaboration] = useState<CollaborationNetwork | null>(null);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingDocx, setIsExportingDocx] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (active) {
-      if (!overview) void computeOverview();
-      if (!tables) void computeTables();
-      if (!sna) void computeSna();
-      if (!network) void computeNetwork('Palavras-chave', 40, 'Grau Absoluto');
-
-      getAnalyticsWorker()
-        .collaboration(active, 30)
-        .then((res) => setCollaboration(res))
-        .catch(() => setCollaboration(null));
-    }
+    if (!active) return;
+    if (!overview) void computeOverview();
+    if (!tables) void computeTables();
+    if (!sna) void computeSna();
+    if (!network) void computeNetwork('Palavras-chave', 40, 'Grau Absoluto');
   }, [active, overview, tables, sna, network, computeOverview, computeTables, computeSna, computeNetwork]);
 
-  // Gera as imagens dos gráficos sob demanda com suporte a internacionalização
-  const productionChartImg = useMemo(() => {
-    if (!overview || overview.docsPerYear.length === 0) return null;
-    try {
-      return renderProductionTimelineCanvas(overview.docsPerYear, { width: 1000, height: 400, locale });
-    } catch {
-      return null;
-    }
-  }, [overview, locale]);
+  // Efeito próprio: antes ele dependia de overview/tables/sna/network e pedia a mesma
+  // rede de colaboração ao worker a cada um que chegava (até cinco vezes por visita).
+  useEffect(() => {
+    if (!active) return;
+    let cancelled = false;
+    getAnalyticsWorker()
+      .collaboration(active, 30)
+      .then((res) => {
+        if (!cancelled) setCollaboration(res);
+      })
+      .catch(() => {
+        if (!cancelled) setCollaboration(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [active]);
 
-  const authorsChartImg = useMemo(() => {
-    if (!tables || tables.authors.length === 0) return null;
-    try {
-      const items = tables.authors.slice(0, 10).map((a) => ({
-        label: a.entity,
-        value: a.docCount,
-        sub: `${a.citations} ${isEn ? 'cit.' : 'cit.'} | h=${a.h}`,
-      }));
-      const title = isEn ? 'Top 10 Most Prolific Authors (Published Papers)' : 'Top 10 Autores Mais Produtivos';
-      return renderHorizontalBarChart(title, items, { width: 1000, height: 420, locale });
-    } catch {
-      return null;
-    }
-  }, [tables, locale, isEn]);
+  // Gera as imagens dos gráficos sob demanda — as mesmas que a exportação reaproveita.
+  const productionChartImg = useIdleRender(
+    !overview || overview.docsPerYear.length === 0 ? null : () => reportProductionChart(overview.docsPerYear, locale),
+    [overview, locale],
+  );
 
-  const countriesChartImg = useMemo(() => {
-    if (!tables || tables.countries.length === 0) return null;
-    try {
-      const items = tables.countries.slice(0, 10).map((c) => ({
-        label: c.entity,
-        value: c.docCount,
-        sub: `${c.citations} ${isEn ? 'cit.' : 'cit.'}`,
-      }));
-      const title = isEn ? 'Top 10 Leading Countries by Scientific Output' : 'Top 10 Países com Maior Produção Científica';
-      return renderHorizontalBarChart(title, items, { width: 1000, height: 420, locale });
-    } catch {
-      return null;
-    }
-  }, [tables, locale, isEn]);
+  const authorsChartImg = useIdleRender(
+    !tables || tables.authors.length === 0 ? null : () => reportAuthorsChart(tables.authors, locale),
+    [tables, locale],
+  );
 
-  const worldMapChartImg = useMemo(() => {
-    if (!collaboration || collaboration.nodes.length === 0) return null;
-    try {
-      return renderWorldCollaborationMapCanvas(collaboration, { width: 1000, height: 500, locale });
-    } catch {
-      return null;
-    }
-  }, [collaboration, locale]);
+  const countriesChartImg = useIdleRender(
+    !tables || tables.countries.length === 0 ? null : () => reportCountriesChart(tables.countries, locale),
+    [tables, locale],
+  );
 
-  const networkChartImg = useMemo(() => {
-    if (!network || network.nodes.length === 0) return null;
-    try {
-      return renderNetworkGraphCanvas(network.nodes, network.edges, { width: 1000, height: 520, locale });
-    } catch {
-      return null;
-    }
-  }, [network, locale]);
+  const worldMapChartImg = useIdleRender(
+    !collaboration || collaboration.nodes.length === 0 ? null : () => reportWorldMapChart(collaboration, locale),
+    [collaboration, locale],
+  );
 
-  const themesChartImg = useMemo(() => {
-    if (!clustering || clustering.clusters.length === 0) return null;
-    try {
-      const items = clustering.clusters.map((c) => ({
-        clusterId: c.clusterId,
-        name: `Tema ${c.clusterId + 1}`,
-        docCount: c.size,
-        share: active ? (c.size / active.length) * 100 : 0,
-      }));
-      return renderThemesPieChart(items, { width: 1000, height: 420, locale });
-    } catch {
-      return null;
-    }
-  }, [clustering, active, locale]);
+  const networkChartImg = useIdleRender(
+    !network || network.nodes.length === 0 ? null : () => reportNetworkChart(network.nodes, network.edges, locale),
+    [network, locale],
+  );
 
-  const wordCloudChartImg = useMemo(() => {
-    if (!tables || tables.keywords.length === 0) return null;
-    try {
-      return renderWordCloudCanvas(tables.keywords, { width: 1000, height: 420, locale });
-    } catch {
-      return null;
-    }
-  }, [tables, locale]);
+  const themesChartImg = useIdleRender(
+    !clustering || clustering.clusters.length === 0
+      ? null
+      : () => reportThemesChart(clustering.clusters, active?.length ?? 0, locale),
+    [clustering, active, locale],
+  );
+
+  const wordCloudChartImg = useIdleRender(
+    !tables || tables.keywords.length === 0 ? null : () => reportWordCloudChart(tables.keywords, locale),
+    [tables, locale],
+  );
 
   if (!active) {
     return <EmptyState title={isEn ? 'Scientific Report' : 'Relatório Científico'} />;
@@ -237,9 +210,16 @@ export default function ReportTab() {
     });
   };
 
-  const handleExportPdf = () => {
+  // Um frame para o botão mostrar "Gerando…" antes do trabalho pesado ocupar a página.
+  const nextPaint = (): Promise<void> =>
+    new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+
+  const handleExportPdf = async () => {
+    setIsExportingPdf(true);
+    setExportError(null);
     try {
-      setIsExportingPdf(true);
+      await nextPaint();
+      const { generatePdfReport } = await import('./pdf-generator');
       generatePdfReport({
         dataset: active,
         overview,
@@ -252,14 +232,20 @@ export default function ReportTab() {
         topN,
         locale,
       });
+    } catch (error) {
+      console.error(error);
+      setExportError(isEn ? 'Could not generate the PDF.' : 'Não foi possível gerar o PDF.');
     } finally {
       setIsExportingPdf(false);
     }
   };
 
   const handleExportDocx = async () => {
+    setIsExportingDocx(true);
+    setExportError(null);
     try {
-      setIsExportingDocx(true);
+      await nextPaint();
+      const { generateDocxReport } = await import('./docx-generator');
       await generateDocxReport({
         dataset: active,
         overview,
@@ -272,6 +258,9 @@ export default function ReportTab() {
         topN,
         locale,
       });
+    } catch (error) {
+      console.error(error);
+      setExportError(isEn ? 'Could not generate the DOCX file.' : 'Não foi possível gerar o DOCX.');
     } finally {
       setIsExportingDocx(false);
     }
@@ -448,7 +437,7 @@ export default function ReportTab() {
   return (
     <div className="space-y-6">
       {/* 1. Painel de Controle de Exportação */}
-      <Card>
+      <Card data-tour="report-builder">
         <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="space-y-1">
@@ -462,8 +451,9 @@ export default function ReportTab() {
             <div className="flex flex-wrap items-center gap-2.5">
               <Button
                 variant="default"
-                onClick={handleExportPdf}
+                onClick={() => void handleExportPdf()}
                 disabled={isExportingPdf}
+                aria-busy={isExportingPdf}
                 className="gap-2 cursor-pointer"
               >
                 <Download className="size-4" />
@@ -472,13 +462,19 @@ export default function ReportTab() {
 
               <Button
                 variant="outline"
-                onClick={handleExportDocx}
+                onClick={() => void handleExportDocx()}
                 disabled={isExportingDocx}
+                aria-busy={isExportingDocx}
                 className="gap-2 cursor-pointer"
               >
                 <FileCheck className="size-4" />
                 {isExportingDocx ? (isEn ? 'Building DOCX...' : 'Gerando DOCX...') : isEn ? 'Export DOCX (Word)' : 'Baixar DOCX (Word)'}
               </Button>
+              {exportError && (
+                <p role="alert" className="basis-full text-sm text-destructive">
+                  {exportError}
+                </p>
+              )}
             </div>
           </div>
         </CardHeader>
@@ -573,7 +569,7 @@ export default function ReportTab() {
       </Card>
 
       {/* 2. Pré-Visualização Ao Vivo do Documento (A4 Executive Styling com Gráficos) */}
-      <div className="space-y-3">
+      <div data-tour="report-preview" className="space-y-3">
         <SectionTitle
           title={isEn ? 'Report preview' : 'Pré-visualização do relatório'}
           info={
@@ -679,14 +675,8 @@ export default function ReportTab() {
           )}
 
           {/* Gráfico 1: Produção Anual */}
-          {selection.chartProduction && productionChartImg && (
-            <div className="rounded-xl border border-border/80 overflow-hidden shadow-xs">
-              <img
-                src={productionChartImg}
-                alt="Gráfico de Evolução da Produção Científica"
-                className="w-full h-auto object-contain"
-              />
-            </div>
+          {selection.chartProduction && (
+            <ReportChartImage image={productionChartImg} {...REPORT_CHART_SIZE.production} alt="Gráfico de Evolução da Produção Científica" />
           )}
 
           {/* 3. Top Autores */}
@@ -729,14 +719,8 @@ export default function ReportTab() {
           )}
 
           {/* Gráfico 2: Top Autores */}
-          {selection.chartAuthors && authorsChartImg && (
-            <div className="rounded-xl border border-border/80 overflow-hidden shadow-xs">
-              <img
-                src={authorsChartImg}
-                alt="Gráfico dos Top Autores"
-                className="w-full h-auto object-contain"
-              />
-            </div>
+          {selection.chartAuthors && (
+            <ReportChartImage image={authorsChartImg} {...REPORT_CHART_SIZE.bars} alt="Gráfico dos Top Autores" />
           )}
 
           {/* 4. Top Países */}
@@ -775,25 +759,13 @@ export default function ReportTab() {
           )}
 
           {/* Gráfico 3: Top Países */}
-          {selection.chartCountries && countriesChartImg && (
-            <div className="rounded-xl border border-border/80 overflow-hidden shadow-xs">
-              <img
-                src={countriesChartImg}
-                alt="Gráfico dos Top Países"
-                className="w-full h-auto object-contain"
-              />
-            </div>
+          {selection.chartCountries && (
+            <ReportChartImage image={countriesChartImg} {...REPORT_CHART_SIZE.bars} alt="Gráfico dos Top Países" />
           )}
 
           {/* Gráfico 4: Mapa-Múndi de Colaboração Internacional */}
-          {selection.chartWorldMap && worldMapChartImg && (
-            <div className="rounded-xl border border-border/80 overflow-hidden shadow-xs">
-              <img
-                src={worldMapChartImg}
-                alt="Mapa Global de Colaboração Internacional"
-                className="w-full h-auto object-contain"
-              />
-            </div>
+          {selection.chartWorldMap && (
+            <ReportChartImage image={worldMapChartImg} {...REPORT_CHART_SIZE.worldMap} alt="Mapa Global de Colaboração Internacional" />
           )}
 
           {/* 5. Top Venues */}
@@ -865,14 +837,8 @@ export default function ReportTab() {
           )}
 
           {/* Gráfico 5: Nuvem de Palavras-Chave */}
-          {selection.chartKeywords && wordCloudChartImg && (
-            <div className="rounded-xl border border-border/80 overflow-hidden shadow-xs">
-              <img
-                src={wordCloudChartImg}
-                alt="Nuvem de Palavras-Chave"
-                className="w-full h-auto object-contain"
-              />
-            </div>
+          {selection.chartKeywords && (
+            <ReportChartImage image={wordCloudChartImg} {...REPORT_CHART_SIZE.wordCloud} alt="Nuvem de Palavras-Chave" />
           )}
 
           {/* 7. Mapeamento Temático por IA */}
@@ -908,14 +874,8 @@ export default function ReportTab() {
           )}
 
           {/* Gráfico 6: Distribuição de Temas por IA */}
-          {selection.chartThemes && themesChartImg && (
-            <div className="rounded-xl border border-border/80 overflow-hidden shadow-xs">
-              <img
-                src={themesChartImg}
-                alt="Distribuição Temática por IA"
-                className="w-full h-auto object-contain"
-              />
-            </div>
+          {selection.chartThemes && (
+            <ReportChartImage image={themesChartImg} {...REPORT_CHART_SIZE.themes} alt="Distribuição Temática por IA" />
           )}
 
           {/* 8. Topologia da Rede */}
@@ -956,14 +916,8 @@ export default function ReportTab() {
           )}
 
           {/* Gráfico 7: Rede de Coocorrência (Louvain) */}
-          {selection.chartNetwork && networkChartImg && (
-            <div className="rounded-xl border border-border/80 overflow-hidden shadow-xs">
-              <img
-                src={networkChartImg}
-                alt="Rede de Coocorrência e Comunidades"
-                className="w-full h-auto object-contain"
-              />
-            </div>
+          {selection.chartNetwork && (
+            <ReportChartImage image={networkChartImg} {...REPORT_CHART_SIZE.network} alt="Rede de Coocorrência e Comunidades" />
           )}
 
           {/* 9. Top Documentos Mais Citados */}

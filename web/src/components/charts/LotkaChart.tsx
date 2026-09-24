@@ -7,6 +7,7 @@ import { PALETTE } from '@/features/overview/viz-shared';
 import { imageFromSvgElement } from '@/lib/export-image';
 import { cn } from '@/lib/utils';
 import { useLocale } from '@/state/locale.store';
+import { withChartBoundary } from '@/components/with-chart-boundary';
 
 /**
  * Lei de Lotka em SVG: proporção de autores (eixo Y) por número de artigos publicados
@@ -44,7 +45,7 @@ const ticks = (max: number, step: number, start = 0): number[] => {
 const percent = (value: number): string =>
   `${(value * 100).toLocaleString('pt-BR', { maximumFractionDigits: value < 0.01 ? 2 : 1 })}%`;
 
-export default function LotkaChart(props: LotkaChartProps) {
+function LotkaChart(props: LotkaChartProps) {
   const { lotka, exportName = 'lei-de-lotka', className, expanded } = props;
   const t = useLocale((state) => state.t);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -204,3 +205,6 @@ export default function LotkaChart(props: LotkaChartProps) {
     </div>
   );
 }
+
+// Um gráfico que quebre com dado atípico não derruba a aba (ver with-chart-boundary).
+export default withChartBoundary(LotkaChart);

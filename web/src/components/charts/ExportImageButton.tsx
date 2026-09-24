@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils';
 import { useLocale } from '@/state/locale.store';
 
 export interface ExportImageButtonProps {
-  /** Produz o SVG do gráfico no momento do clique (pode ser assíncrono, como no Plotly). */
+  /** Produz o SVG do gráfico no momento do clique (pode ser assíncrono). */
   getImage: () => ChartImage | null | Promise<ChartImage | null>;
   filename: string;
   className?: string;

@@ -24,13 +24,19 @@ const BUTTON_STEP = 1.6;
 /** Pixels de movimento até um clique virar arraste. */
 const DRAG_THRESHOLD = 4;
 
-// Fora do zoom 1× o conteúdo não pode sair do quadro: o pan para nas bordas.
+/** Fração do quadro que o conteúdo precisa continuar cobrindo ao ser arrastado. */
+const MIN_VISIBLE = 0.2;
+
+// O pan é livre em qualquer zoom, inclusive 1×, mas para antes de o conteúdo sair do
+// quadro: sempre sobra ao menos MIN_VISIBLE dele à vista.
 function clamp(next: View, width: number, height: number): View {
   const k = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, next.k));
+  const marginX = width * MIN_VISIBLE;
+  const marginY = height * MIN_VISIBLE;
   return {
     k,
-    x: Math.min(0, Math.max(width - width * k, next.x)),
-    y: Math.min(0, Math.max(height - height * k, next.y)),
+    x: Math.min(width - marginX, Math.max(marginX - width * k, next.x)),
+    y: Math.min(height - marginY, Math.max(marginY - height * k, next.y)),
   };
 }
 
@@ -127,7 +133,8 @@ export function useSvgZoom(ref: RefObject<SVGSVGElement | null>, width: number, 
     transition: dragging ? 'none' : 'transform 200ms ease-out',
   };
 
-  const cursor = dragging ? 'grabbing' : view.k > MIN_ZOOM ? 'grab' : undefined;
+  const cursor = dragging ? 'grabbing' : 'grab';
+  const moved = view.k > MIN_ZOOM || view.x !== 0 || view.y !== 0;
 
   return {
     /** Fator de zoom atual — para afinar traços e marcadores, que senão engrossariam. */
@@ -139,6 +146,8 @@ export function useSvgZoom(ref: RefObject<SVGSVGElement | null>, width: number, 
     reset: () => setView({ k: 1, x: 0, y: 0 }),
     canZoomIn: view.k < MAX_ZOOM,
     canZoomOut: view.k > MIN_ZOOM,
+    /** Há zoom ou deslocamento a desfazer. */
+    canReset: moved,
   };
 }
 
@@ -150,7 +159,7 @@ export function ZoomControls({ zoom }: { zoom: SvgZoom }) {
   const buttons = [
     { Icon: ZoomIn, label: t('chart_zoom_in'), onClick: zoom.zoomIn, disabled: !zoom.canZoomIn },
     { Icon: ZoomOut, label: t('chart_zoom_out'), onClick: zoom.zoomOut, disabled: !zoom.canZoomOut },
-    { Icon: RotateCcw, label: t('chart_zoom_reset'), onClick: zoom.reset, disabled: !zoom.canZoomOut },
+    { Icon: RotateCcw, label: t('chart_zoom_reset'), onClick: zoom.reset, disabled: !zoom.canReset },
   ];
   return (
     <div className="absolute bottom-2 right-2 z-10 flex flex-col gap-1" title={t('chart_zoom_hint')}>

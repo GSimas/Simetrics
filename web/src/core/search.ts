@@ -2,6 +2,9 @@ import { FIELD, FIELD_CANDIDATES } from '@/lib/schema';
 import type { Dataset, SearchEntityType, SimetricsDoc } from '@/lib/types';
 import { collectColumns, isNullLike, pickColumn, splitTokens } from './text';
 
+/** Ordem alfabética do português, com um único comparador para a lista inteira. */
+const PT_BR_COLLATOR = new Intl.Collator('pt-BR');
+
 /**
  * Motor de busca por entidade — ⇄ `preparar_opcoes_busca` e `filtrar_por_entidade`
  * (utils.py:722 e 759).
@@ -62,8 +65,9 @@ export function buildSearchOptions(rows: Dataset): SearchOptions {
     }
   }
 
-  const sorted = (values: Set<string>): string[] =>
-    [...values].sort((left, right) => left.localeCompare(right, 'pt-BR'));
+  // Um Collator só: `localeCompare(x, 'pt-BR')` monta um comparador de idioma a cada
+  // comparação — era a maior tarefa da thread principal ao carregar uma base. Mesma ordem.
+  const sorted = (values: Set<string>): string[] => [...values].sort(PT_BR_COLLATOR.compare);
 
   return {
     documents: sorted(documents),

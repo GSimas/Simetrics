@@ -11,6 +11,7 @@ import { useSvgZoom, ZoomControls } from '@/components/charts/svg-zoom';
 import { imageFromSvgElement } from '@/lib/export-image';
 import { cn } from '@/lib/utils';
 import { useLocale } from '@/state/locale.store';
+import { withChartBoundary } from '@/components/with-chart-boundary';
 
 /**
  * Mapa-múndi de colaboração em SVG (d3-geo + world-atlas 1:110m).
@@ -114,7 +115,7 @@ const normalize = (name: string): string => {
   return ALIASES[lower] ?? lower;
 };
 
-export default function WorldMap(props: WorldMapProps) {
+function WorldMap(props: WorldMapProps) {
   const { nodes, edges, focus, onOpenProfile, exportName = 'mapa-mundi', className, expanded } = props;
   const t = useLocale((state) => state.t);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -300,3 +301,6 @@ export default function WorldMap(props: WorldMapProps) {
     </div>
   );
 }
+
+// Um gráfico que quebre com dado atípico não derruba a aba (ver with-chart-boundary).
+export default withChartBoundary(WorldMap);

@@ -10,8 +10,9 @@
     />
     <link rel="canonical" href="https://simetrics.app/" />
 
-    <!-- Ícones — ver web/README para a origem (recorte da marca, sem SVG vetorial de
-         origem disponível, por isso não há favicon.svg). -->
+    <!-- Ícones — marca redesenhada em vetor (public/favicon.svg): sinal #b8ff4a sobre a
+         tinta #07110f da estética Scientata. Os PNG e o .ico são rasterizações dela. -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="any" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
@@ -19,12 +20,15 @@
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#07110f" />
 
-    <!-- Tipografia Scientata: Manrope (texto), Instrument Serif (destaques), DM Mono (rótulos) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Tipografia Scientata: Manrope (texto), Instrument Serif (destaques), DM Mono (rótulos).
+         Servida pelo próprio app (src/fonts.css). O subconjunto latino da Manrope é
+         pré-carregado: ele chega junto com o JavaScript e o texto já aparece na fonte certa. -->
     <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;500;600;700;800&display=swap"
+      rel="preload"
+      href="/node_modules/@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
     />
 
     <!-- Aplica as preferências antes do primeiro paint (tema escuro por padrão, como o

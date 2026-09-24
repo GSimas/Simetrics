@@ -16,18 +16,47 @@
   to     = "/index.html"
   status = 200
 
+# Compressão: o Netlify já serve Brotli/Gzip automaticamente conforme o Accept-Encoding —
+# não há o que configurar aqui.
+
 [[headers]]
   for = "/*"
   [headers.values]
-    X-Content-Type-Options = "nosniff"
-    Referrer-Policy        = "strict-origin-when-cross-origin"
-    X-Frame-Options        = "SAMEORIGIN"
+    X-Content-Type-Options  = "nosniff"
+    Referrer-Policy         = "strict-origin-when-cross-origin"
+    # O app não é embutido em iframe nenhum (nem por si mesmo): DENY fecha o clickjacking.
+    # `frame-ancestors` é o equivalente moderno, respeitado quando os dois divergem.
+    X-Frame-Options         = "DENY"
+    Content-Security-Policy = "frame-ancestors 'none'"
+
+# O HTML sempre revalida: depois de um deploy ele passa a apontar para os chunks novos, e
+# um HTML velho em cache pediria chunks que não existem mais.
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
 
 # Assets com hash no nome podem ser cacheados indefinidamente.
 [[headers]]
   for = "/assets/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
+
+# Ícones e imagens públicas não têm hash no nome: cache curto, revalidado em segundo plano.
+[[headers]]
+  for = "/*.png"
+  [headers.values]
+    Cache-Control = "public, max-age=604800, stale-while-revalidate=86400"
+
+[[headers]]
+  for = "/*.svg"
+  [headers.values]
+    Cache-Control = "public, max-age=604800, stale-while-revalidate=86400"
+
+[[headers]]
+  for = "/*.ico"
+  [headers.values]
+    Cache-Control = "public, max-age=604800, stale-while-revalidate=86400"
 
 [functions]
   node_bundler = "esbuild"

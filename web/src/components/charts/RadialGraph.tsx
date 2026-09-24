@@ -7,13 +7,13 @@ import { chordLayout } from '@/core/graph/chord';
 import { imageFromSvgElement } from '@/lib/export-image';
 import { cn } from '@/lib/utils';
 import { useLocale } from '@/state/locale.store';
+import { withChartBoundary } from '@/components/with-chart-boundary';
 
 /**
  * Grafo radial em diagrama de cordas: nós num círculo, agrupados por comunidade, rótulos
  * girados para fora e as ligações como cordas curvas pelo centro.
  *
- * SVG próprio porque nem o Sigma nem o Plotly giram rótulos ao longo do raio nem desenham
- * cordas curvas. Passar o mouse sobre um nó mostra suas ligações; o primeiro clique fixa
+ * SVG próprio porque o Sigma não gira rótulos ao longo do raio nem desenha cordas curvas. Passar o mouse sobre um nó mostra suas ligações; o primeiro clique fixa
  * o destaque, o segundo no mesmo nó chama `onNodeClick` (abrir o perfil no Motor de
  * Busca). Clicar no fundo desfaz o destaque. Roda do mouse ou botões aproximam; arrastar
  * move o diagrama.
@@ -58,7 +58,7 @@ function truncate(text: string): string {
   return text.length > MAX_LABEL ? `${text.slice(0, MAX_LABEL - 1)}…` : text;
 }
 
-export default function RadialGraph(props: RadialGraphProps) {
+function RadialGraph(props: RadialGraphProps) {
   const { nodes, edges, weightLabel, legend, onNodeClick, exportName = 'grafo-radial', className, expanded } = props;
   const t = useLocale((state) => state.t);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -260,3 +260,6 @@ export default function RadialGraph(props: RadialGraphProps) {
     </div>
   );
 }
+
+// Um gráfico que quebre com dado atípico não derruba a aba (ver with-chart-boundary).
+export default withChartBoundary(RadialGraph);

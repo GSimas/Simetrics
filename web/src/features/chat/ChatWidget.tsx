@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Bot, Database, KeyRound, MessageSquare, Send, Sparkles, Square, Trash2, User, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,12 @@ import { cn } from '@/lib/utils';
 import { AiSettingsModal } from '@/components/AiSettingsModal';
 import { MarkdownContent } from '@/components/MarkdownContent';
 import { usePresence } from '@/lib/use-presence';
+
+/**
+ * Markdown memoizado: durante o streaming o chat re-renderiza a cada trecho, e sem isso
+ * todas as respostas anteriores eram re-parseadas a cada vez (custo quadrático na conversa).
+ */
+const MessageMarkdown = memo(MarkdownContent);
 
 /** Quantos documentos o BM25 seleciona por pergunta. */
 const CONTEXT_SIZE = 40;
@@ -40,13 +46,23 @@ export function ChatWidget() {
     return [{ role: 'assistant', content: t('chat_greeting') }, ...messages];
   }, [messages, t]);
 
+  // Rolagem acompanha cada trecho da resposta; o foco vai para o campo só ao abrir (antes
+  // era devolvido a cada trecho recebido, com um timer por trecho que ninguém limpava).
   useEffect(() => {
-    if (isOpen) {
-      const container = scrollRef.current;
-      if (container) container.scrollTop = container.scrollHeight;
-      setTimeout(() => inputRef.current?.focus(), 100);
-    }
+    if (!isOpen) return;
+    const container = scrollRef.current;
+    if (container) container.scrollTop = container.scrollHeight;
   }, [isOpen, displayedMessages, currentStatus]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const timer = setTimeout(() => inputRef.current?.focus(), 100);
+    return () => clearTimeout(timer);
+  }, [isOpen]);
+
+  // Uma resposta em andamento não sobrevive à troca de base nem à saída do workspace:
+  // continuaria gastando a chave de API e rodando ferramentas sobre a base antiga.
+  useEffect(() => () => abortRef.current?.abort(), [active]);
 
   const suggestions = [
     t('chat_sugg_1'),
@@ -134,7 +150,7 @@ export function ChatWidget() {
   return (
     <>
       {/* Botão de Ação Flutuante (FAB) no Canto Inferior Direito (acima do café) */}
-      <div className="fixed bottom-[60px] right-5 z-50 flex items-center justify-end gap-2">
+      <div data-tour="chat" className="fixed bottom-[60px] right-5 z-50 flex items-center justify-end gap-2">
         <button
           type="button"
           onClick={() => setIsOpen((prev) => !prev)}
@@ -146,6 +162,7 @@ export function ChatWidget() {
           )}
           title={isOpen ? (isEn ? 'Close Assistant' : 'Fechar Assistente') : t('chat_title')}
           aria-label={t('chat_title')}
+          aria-expanded={isOpen}
         >
           {isOpen ? (
             <X className="size-5 transition-transform duration-200 group-hover:rotate-90" />
@@ -238,8 +255,14 @@ export function ChatWidget() {
           </div>
 
           {/* Área de Mensagens */}
+          {/* role="log": leitores de tela anunciam mensagens novas; aria-busy segura o
+              anúncio até a resposta terminar de chegar, em vez de ler trecho por trecho. */}
           <div
             ref={scrollRef}
+            role="log"
+            aria-live="polite"
+            aria-busy={streaming}
+            aria-label={t('chat_title')}
             className="flex-1 space-y-3 overflow-y-auto p-3.5 text-xs bg-slate-50/50 dark:bg-slate-900/30"
           >
             {!active ? (
@@ -321,7 +344,7 @@ export function ChatWidget() {
                       {message.role === 'user' ? (
                         <p className="whitespace-pre-wrap">{message.content}</p>
                       ) : message.content ? (
-                        <MarkdownContent content={message.content} />
+                        <MessageMarkdown content={message.content} />
                       ) : streaming && index === displayedMessages.length - 1 ? (
                         <span className="flex items-center gap-1.5 text-muted-foreground text-[11px]">
                           <span className="size-1.5 animate-bounce rounded-full bg-emerald-500" />
@@ -397,6 +420,8 @@ export function ChatWidget() {
                   variant="gradient"
                   size="sm"
                   disabled={!draft.trim() || !active}
+                  aria-label={t('chat_send')}
+                  title={t('chat_send')}
                   className="h-9 px-3 text-xs font-semibold shadow-xs"
                 >
                   <Send className="size-3.5" aria-hidden />

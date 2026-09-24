@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 
 import { Collapse } from '@/components/Collapse';
+import TimeSeriesChart from '@/components/charts/TimeSeriesChart';
 
 import { SectionTitle } from '@/components/InfoTip';
 import { KpiCard } from '@/components/KpiCard';
@@ -53,22 +54,16 @@ import { openInSearch, resolveEntity, useNavigation } from '@/state/navigation.s
 import { EmptyState } from '@/features/EmptyState';
 import { collaborationNetwork } from '@/core/viz/collaboration';
 import { cn } from '@/lib/utils';
+import { PALETTE } from '@/features/overview/viz-shared';
+
+import { cleanDoiUrl } from './doi';
+import { DossierDocuments } from './DossierDocuments';
 
 const WordCloud = lazy(() => import('@/components/charts/WordCloud'));
-const PlotlyChart = lazy(() => import('@/components/charts/PlotlyChart'));
 const WorldMap = lazy(() => import('@/components/charts/WorldMap'));
 
 /** Coautores à vista antes do "ver todos". */
 const VISIBLE_COAUTHORS = 12;
-
-function cleanDoiUrl(rawDoi: unknown): string | null {
-  if (!rawDoi || typeof rawDoi !== 'string') return null;
-  const trimmed = rawDoi.trim();
-  if (!trimmed || isNullLike(trimmed)) return null;
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
-  const clean = trimmed.replace(/^doi:\s*/i, '');
-  return `https://doi.org/${clean}`;
-}
 
 export default function SearchTab() {
   const active = useDataset((state) => state.active);
@@ -81,7 +76,6 @@ export default function SearchTab() {
   const term = useNavigation((state) => state.searchTerm);
   const setType = (searchType: SearchEntityType): void => useNavigation.setState({ searchType });
   const setTerm = (searchTerm: string | null): void => useNavigation.setState({ searchTerm });
-  const [expandedAbstracts, setExpandedAbstracts] = useState<Set<number>>(new Set());
   const [showAllCoauthors, setShowAllCoauthors] = useState(false);
 
   const renderAuthorChip = ({ author, count }: { author: string; count: number }) => (
@@ -101,15 +95,6 @@ export default function SearchTab() {
       <span className="tabular-nums text-muted-foreground">{count}</span>
     </button>
   );
-
-  const toggleAbstract = (index: number): void => {
-    setExpandedAbstracts((prev) => {
-      const next = new Set(prev);
-      if (next.has(index)) next.delete(index);
-      else next.add(index);
-      return next;
-    });
-  };
 
   const types = useMemo(
     () => (searchOptions ? availableTypes(searchOptions) : []),
@@ -271,7 +256,7 @@ export default function SearchTab() {
 
   return (
     <div className="space-y-6">
-      <Card>
+      <Card data-tour="search-picker">
         <CardHeader>
           <SectionTitle title={t('search_title')} info={t('search_desc')} />
         </CardHeader>
@@ -285,7 +270,6 @@ export default function SearchTab() {
                 onValueChange={(value) => {
                   setType(value as SearchEntityType);
                   setTerm(null);
-                  setExpandedAbstracts(new Set());
                 }}
               >
                 <SelectTrigger id="search-type" className="h-10 rounded-xl">
@@ -308,7 +292,6 @@ export default function SearchTab() {
                 value={term}
                 onChange={(val) => {
                   setTerm(val);
-                  setExpandedAbstracts(new Set());
                 }}
                 placeholder={
                   locale === 'en'
@@ -334,7 +317,7 @@ export default function SearchTab() {
       {term && dossier && (
         // Chave por perfil: trocar de entidade remonta o dossiê, que entra com um fade curto.
         <div key={`${type}:${term}`} className="space-y-4 duration-300 animate-in fade-in-0 slide-in-from-bottom-2">
-          <Card className="border-t-2 border-t-highlight shadow-xs">
+          <Card data-tour="search-dossier" className="border-t-2 border-t-highlight shadow-xs">
             <CardHeader>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <CardTitle className="text-lg font-bold text-foreground break-words">{term}</CardTitle>
@@ -615,7 +598,7 @@ export default function SearchTab() {
                 </CardContent>
               </Card>
             ) : (
-              <Card>
+              <Card data-tour="search-similar">
                 <CardHeader>
                   <SectionTitle title={t('search_similar_title')} info={t('search_similar_desc')} />
                 </CardHeader>
@@ -671,7 +654,7 @@ export default function SearchTab() {
             )}
 
             {/* Lado Direito: Tabs com Lexicometria (Nuvem de Palavras) e Produção Histórica */}
-            <Card>
+            <Card data-tour="search-lexico">
               <CardHeader>
                 <SectionTitle title={t('search_lexico_title')} info={t('search_lexico_desc')} />
               </CardHeader>
@@ -725,33 +708,21 @@ export default function SearchTab() {
                           : 'Anos de publicação não disponíveis para estes documentos.'}
                       </p>
                     ) : (
-                      <Suspense
-                        fallback={
-                          <div className="grid h-72 place-items-center text-sm text-muted-foreground">
-                            {locale === 'en' ? 'Rendering chart...' : 'Carregando gráfico…'}
-                          </div>
-                        }
-                      >
-                        <PlotlyChart
-                          data={[
-                            {
-                              x: timelineData.x,
-                              y: timelineData.y,
-                              type: 'bar',
-                              marker: { color: '#3FAE8F' },
-                              name: t('search_timeline_docs'),
-                            },
-                          ]}
-                          layout={{
-                            title: { text: t('search_timeline_title'), font: { size: 13 } },
-                            xaxis: { title: { text: locale === 'en' ? 'Year' : 'Ano' }, dtick: 1 },
-                            yaxis: { title: { text: t('search_timeline_docs') }, rangemode: 'tozero' },
-                            margin: { l: 45, r: 20, t: 35, b: 40 },
-                          }}
-                          height={320}
-                          exportName={`producao-historica-${term}`}
-                        />
-                      </Suspense>
+                      <TimeSeriesChart
+                        mode="bars-grouped"
+                        series={[
+                          {
+                            name: t('search_timeline_docs'),
+                            color: PALETTE[0],
+                            points: timelineData.x.map((year, index) => ({ x: year, y: timelineData.y[index] ?? 0 })),
+                          },
+                        ]}
+                        xLabel={locale === 'en' ? 'Year' : 'Ano'}
+                        yLabel={t('search_timeline_docs')}
+                        unit={t('prod_unit_docs')}
+                        height={320}
+                        exportName={`producao-historica-${term}`}
+                      />
                     )}
                   </TabsContent>
 
@@ -796,125 +767,19 @@ export default function SearchTab() {
 
           {/* Documento já mostra autores e palavras-chave no topo; as demais entidades listam seus documentos. */}
           {type !== 'Documento' && (
-            <Card className="lg:col-span-2">
+            <Card data-tour="search-docs" className="lg:col-span-2">
               <CardHeader>
                 <SectionTitle title={t('search_docs_title')} info={t('search_docs_desc')} />
               </CardHeader>
               <CardContent>
-                <div className="max-h-[36rem] overflow-auto rounded-xl border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>{locale === 'en' ? 'Title & Details' : 'Título e Detalhes'}</TableHead>
-                        <TableHead className="w-24 text-center">{locale === 'en' ? 'Year' : 'Ano'}</TableHead>
-                        <TableHead className="w-24 text-center">{locale === 'en' ? 'Citations' : 'Citações'}</TableHead>
-                        <TableHead className="w-48">Venue</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {[...documents]
-                        .sort(
-                          (left, right) =>
-                            (toNumeric(right[FIELD.TOTAL_CITATIONS]) ?? 0) -
-                            (toNumeric(left[FIELD.TOTAL_CITATIONS]) ?? 0),
-                        )
-                        .map((doc, index) => {
-                          const title = titleColumn ? String(doc[titleColumn] ?? '').trim() : '';
-                          const keywords = keywordsColumn ? String(doc[keywordsColumn] ?? '').trim() : '';
-                          const abstract = abstractColumn ? String(doc[abstractColumn] ?? '').trim() : '';
-                          const rawDoi = doiColumn ? doc[doiColumn] : doc[FIELD.DOI];
-                          const doiUrl = cleanDoiUrl(rawDoi);
-                          const isExpanded = expandedAbstracts.has(index);
-
-                          return (
-                            <TableRow key={`${title}-${index}`} className="align-top">
-                              <TableCell className="space-y-2 py-3">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <button
-                                    type="button"
-                                    className="text-left font-semibold text-primary hover:underline cursor-pointer break-words leading-snug"
-                                    title={title}
-                                    onClick={() => {
-                                      setType('Documento');
-                                      setTerm(title);
-                                    }}
-                                  >
-                                    {title || '—'}
-                                  </button>
-
-                                  {doiUrl && (
-                                    <a
-                                      href={doiUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="inline-flex items-center gap-1 rounded-md border border-cyan-300 bg-cyan-50 px-2 py-0.5 text-[11px] font-medium text-cyan-800 hover:bg-cyan-100 dark:border-cyan-800 dark:bg-cyan-950/60 dark:text-cyan-300"
-                                      title={doiUrl}
-                                    >
-                                      <ExternalLink className="size-3" />
-                                      {t('search_doi_link')}
-                                    </a>
-                                  )}
-                                </div>
-
-                                {keywords && !isNullLike(keywords) && (
-                                  <div className="flex flex-wrap items-center gap-1.5">
-                                    <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
-                                      <BookOpen className="size-3" />
-                                      {t('search_keywords')}:
-                                    </span>
-                                    {[...new Set(splitTokens(keywords))].slice(0, 6).map((kw) => (
-                                      <Badge key={kw} variant="secondary" className="text-[10px] px-1.5 py-0">
-                                        {kw}
-                                      </Badge>
-                                    ))}
-                                  </div>
-                                )}
-
-                                {abstract && !isNullLike(abstract) && (
-                                  <div className="pt-1">
-                                    <button
-                                      type="button"
-                                      onClick={() => toggleAbstract(index)}
-                                      aria-expanded={isExpanded}
-                                      className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground cursor-pointer"
-                                    >
-                                      <FileText className="size-3" />
-                                      <span>{t('search_abstract')}</span>
-                                      <ChevronDown
-                                        className={cn(
-                                          'size-3 transition-transform duration-300',
-                                          isExpanded && 'rotate-180',
-                                        )}
-                                      />
-                                    </button>
-
-                                    {/* Abre animando a altura, sem saltar o conteúdo abaixo. */}
-                                    <Collapse open={isExpanded} delayOpen={false}>
-                                      <p className="mt-1.5 border border-border/60 bg-muted/40 p-2.5 text-xs text-muted-foreground leading-relaxed">
-                                        {abstract}
-                                      </p>
-                                    </Collapse>
-                                  </div>
-                                )}
-                              </TableCell>
-                              <TableCell className="text-center tabular-nums font-medium py-3">
-                                {toNumeric(doc[FIELD.YEAR_CLEAN]) ?? '—'}
-                              </TableCell>
-                              <TableCell className="text-center tabular-nums font-semibold text-foreground py-3">
-                                {toNumeric(doc[FIELD.TOTAL_CITATIONS]) ?? 0}
-                              </TableCell>
-                              <TableCell
-                                className="max-w-48 truncate text-xs text-muted-foreground py-3"
-                                title={String(doc[FIELD.SECONDARY_TITLE] ?? '')}
-                              >
-                                {String(doc[FIELD.SECONDARY_TITLE] ?? '—')}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                    </TableBody>
-                  </Table>
-                </div>
+                <DossierDocuments
+                  documents={documents}
+                  columns={{ title: titleColumn, keywords: keywordsColumn, abstract: abstractColumn, doi: doiColumn }}
+                  onOpenDocument={(title) => {
+                    setType('Documento');
+                    setTerm(title);
+                  }}
+                />
               </CardContent>
             </Card>
           )}

@@ -1,6 +1,5 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  BarChart3,
   BookOpen,
   Building2,
   CalendarRange,
@@ -14,7 +13,7 @@ import {
   Users,
 } from 'lucide-react';
 
-import type { Trace } from '@/components/charts/plotly';
+import TimeSeriesChart from '@/components/charts/TimeSeriesChart';
 import { SectionTitle } from '@/components/InfoTip';
 import { Collapse } from '@/components/Collapse';
 import { KpiCard } from '@/components/KpiCard';
@@ -41,7 +40,7 @@ import {
 } from '@/components/ui/table';
 import type { ProductionCategory, ProductionSeries } from '@/core/viz/production-timeline';
 import type { Dataset, MetadataCompleteness, SearchEntityType } from '@/lib/types';
-import { useAsyncResult } from '@/lib/use-async-result';
+import { identityKey, useAsyncResult } from '@/lib/use-async-result';
 import { useStickyValue } from '@/lib/use-sticky-value';
 import { cn } from '@/lib/utils';
 import { useDataset, type DedupStrategy } from '@/state/dataset.store';
@@ -50,10 +49,9 @@ import { getAnalyticsWorker } from '@/workers/client';
 import { openInSearch } from '@/state/navigation.store';
 import { EntityTables } from './EntityTables';
 import { ThemePanel } from './ThemePanel';
+import { TopRankings } from './TopRankings';
 import { VisualAnalyses } from './VisualAnalyses';
 import { PALETTE, chartMessage } from './viz-shared';
-
-const PlotlyChart = lazy(() => import('@/components/charts/PlotlyChart'));
 
 const PRODUCTION_CATEGORIES: readonly ProductionCategory[] = [
   'Total',
@@ -100,9 +98,13 @@ export default function OverviewTab() {
 
   const [selectedStrategy, setSelectedStrategy] = useState<DedupStrategy>(dedupStrategy);
 
-  useEffect(() => {
+  // A estratégia aplicada mudou (outra base, outro projeto): o seletor acompanha. Ajuste
+  // durante o render, e não num efeito — o efeito renderizava duas vezes a cada troca.
+  const [appliedStrategy, setAppliedStrategy] = useState(dedupStrategy);
+  if (appliedStrategy !== dedupStrategy) {
+    setAppliedStrategy(dedupStrategy);
     setSelectedStrategy(dedupStrategy);
-  }, [dedupStrategy]);
+  }
 
   const dedupLabels: Record<DedupStrategy, string> = {
     none: t('dedup_none'),
@@ -141,7 +143,7 @@ export default function OverviewTab() {
   const metrics = summary?.bibliometrix;
 
   const dedupCard = (
-    <Card>
+    <Card data-tour="dedup">
       <CardHeader className="pb-3">
         <SectionTitle title={t('dedup_title')} info={t('dedup_description')} />
       </CardHeader>
@@ -153,7 +155,7 @@ export default function OverviewTab() {
               onValueChange={(val) => setSelectedStrategy(val as DedupStrategy)}
               disabled={busy}
             >
-              <SelectTrigger className="h-9">
+              <SelectTrigger className="h-9" aria-label={t('dedup_strategy_aria')}>
                 <SelectValue placeholder={t('dedup_strategy_label')} />
               </SelectTrigger>
               <SelectContent>
@@ -231,8 +233,11 @@ export default function OverviewTab() {
     <div className="space-y-6">
       <UploadPanel />
 
+      {dedupCard}
+
       {summary && metrics && (
         <div
+          data-tour="kpis"
           aria-busy={overviewStale}
           className={cn(
             'grid grid-cols-2 gap-3 transition-opacity duration-300 animate-in fade-in-0 sm:gap-4 lg:grid-cols-4',
@@ -298,9 +303,30 @@ export default function OverviewTab() {
         </div>
       )}
 
-      <LauncherGrid label={t('launcher_section')} intro={dedupCard}>
+      {overview && (
+        <Card data-tour="production">
+          <CardHeader className="pb-3">
+            <SectionTitle title={t('prod_title')} info={t('prod_description')} />
+          </CardHeader>
+          <CardContent>
+            <ProductionTimeline dataset={active} />
+          </CardContent>
+        </Card>
+      )}
+
+      {tables && (
+        <TopRankings
+          data-tour="top10"
+          dataset={active}
+          tables={tables}
+          className={cn('transition-opacity duration-300', overviewStale && 'opacity-60')}
+        />
+      )}
+
+      <LauncherGrid label={t('launcher_section')}>
         {overview && (
           <Launcher
+            tour="launcher-meta"
             Icon={ShieldCheck}
             title={t('meta_quality_title')}
             summary={t('sum_meta')}
@@ -341,36 +367,22 @@ export default function OverviewTab() {
           </Launcher>
         )}
 
-        {overview && (
-          <Launcher Icon={BarChart3} title={t('prod_title')} summary={t('sum_prod')} info={t('prod_description')}>
-            <ProductionTimeline dataset={active} />
-          </Launcher>
-        )}
-
-        <Launcher Icon={Layers} title={t('visual_title')} summary={t('sum_visual')} info={t('visual_description')}>
+        <Launcher tour="launcher-visual" Icon={Layers} title={t('visual_title')} summary={t('sum_visual')} info={t('visual_description')}>
           <VisualAnalyses dataset={active} />
         </Launcher>
 
-        <Launcher Icon={Sparkles} title={t('theme_title')} summary={t('sum_theme')} info={t('theme_description')}>
+        <Launcher tour="launcher-theme" Icon={Sparkles} title={t('theme_title')} summary={t('sum_theme')} info={t('theme_description')}>
           <ThemePanel />
         </Launcher>
 
         {tables && (
-          <Launcher Icon={Table2} title={t('tables_title')} summary={t('sum_tables')} info={t('tables_description')}>
+          <Launcher tour="launcher-tables" Icon={Table2} title={t('tables_title')} summary={t('sum_tables')} info={t('tables_description')}>
             <EntityTables tables={tables} />
           </Launcher>
         )}
 
 
       </LauncherGrid>
-    </div>
-  );
-}
-
-function ChartSkeleton() {
-  return (
-    <div className="grid h-80 place-items-center text-sm text-muted-foreground">
-      Carregando gráfico…
     </div>
   );
 }
@@ -386,12 +398,11 @@ function ProductionTimeline({ dataset }: { dataset: Dataset }) {
   const [category, setCategory] = useState<ProductionCategory>('Total');
   const [mode, setMode] = useState<ProductionChartMode>('bars-grouped');
 
-  const { data: series } = useAsyncResult<ProductionSeries[]>(`production ${category}`, () =>
+  const { data: series } = useAsyncResult<ProductionSeries[]>(`production ${identityKey(dataset)} ${category}`, () =>
     getAnalyticsWorker().productionTimeline(dataset, category),
   );
 
   const resolvedSeries = series ?? [];
-  const isLine = mode === 'line';
 
   const categoryLabels: Record<ProductionCategory, string> = {
     Total: t('prod_category_total'),
@@ -448,49 +459,24 @@ function ProductionTimeline({ dataset }: { dataset: Dataset }) {
             category === 'Temas (IA)' && !hasThemes ? t('prod_empty_no_themes') : t('prod_empty_generic'),
           )
         ) : (
-          <Suspense fallback={<ChartSkeleton />}>
-            <PlotlyChart
-              exportName="producao-por-ano"
-              onPointClick={
-                PRODUCTION_SEARCH_TYPES[category]
-                  ? (point) => openInSearch(point.data?.name, PRODUCTION_SEARCH_TYPES[category] ?? [])
-                  : undefined
-              }
-              height={440}
-              data={resolvedSeries.map((entry, index): Trace => {
-                const color = PALETTE[index % PALETTE.length] as string;
-                const x = entry.points.map((point) => point.year);
-                const y = entry.points.map((point) => point.count);
-
-                return isLine
-                  ? {
-                      type: 'scatter',
-                      mode: 'lines+markers',
-                      name: entry.category,
-                      x,
-                      y,
-                      line: { color, width: 2 },
-                      marker: { color, size: 5 },
-                      hovertemplate: `${entry.category} — %{x}: %{y} documentos<extra></extra>`,
-                    }
-                  : {
-                      type: 'bar',
-                      name: entry.category,
-                      x,
-                      y,
-                      marker: { color },
-                      hovertemplate: `${entry.category} — %{x}: %{y} documentos<extra></extra>`,
-                    };
-              })}
-              layout={{
-                xaxis: { title: { text: 'Ano' } },
-                yaxis: { title: { text: 'Documentos' } },
-                barmode: mode === 'bars-stacked' ? 'stack' : 'group',
-                showlegend: resolvedSeries.length > 1,
-                legend: { orientation: 'h', y: -0.2 },
-              }}
-            />
-          </Suspense>
+          <TimeSeriesChart
+            exportName="producao-por-ano"
+            mode={mode}
+            xLabel={t('prod_axis_year')}
+            yLabel={t('prod_axis_docs')}
+            unit={t('prod_unit_docs')}
+            height={440}
+            onSeriesClick={
+              PRODUCTION_SEARCH_TYPES[category]
+                ? (name) => openInSearch(name, PRODUCTION_SEARCH_TYPES[category] ?? [])
+                : undefined
+            }
+            series={resolvedSeries.map((entry, index) => ({
+              name: entry.category,
+              color: PALETTE[index % PALETTE.length] as string,
+              points: entry.points.map((point) => ({ x: point.year, y: point.count })),
+            }))}
+          />
         )}
     </div>
   );
