@@ -18,10 +18,13 @@ import { useDataset } from '@/state/dataset.store';
 import { useLocale } from '@/state/locale.store';
 import { AiSettingsModal } from '@/components/AiSettingsModal';
 import { ReadingTip } from '@/components/InfoTip';
+import { HybridPanel } from './hybrid/HybridPanel';
 
 export function ThemePanel() {
   const active = useDataset((state) => state.active);
   const clustering = useDataset((state) => state.clustering);
+  const hybridRun = useDataset((state) => state.hybridRun);
+  const hasThemes = clustering !== null || hybridRun !== null;
   const categorize = useDataset((state) => state.categorizeThemes);
   const isCategorizingThemes = useDataset((state) => state.isCategorizingThemes);
   const busy = isCategorizingThemes;
@@ -30,7 +33,7 @@ export function ThemePanel() {
   const [aiModalOpen, setAiModalOpen] = useState(false);
 
   const themes = useMemo(() => {
-    if (!active || !clustering) return [];
+    if (!active || !hasThemes) return [];
 
     const counts = new Map<string, number>();
     for (const doc of active) {
@@ -41,11 +44,11 @@ export function ThemePanel() {
     return [...counts.entries()]
       .map(([name, documents]) => ({ name, documents }))
       .sort((left, right) => right.documents - left.documents);
-  }, [active, clustering]);
+  }, [active, hasThemes]);
 
   const quotients = useMemo(
-    () => (active && clustering ? topQuotientsByTheme(active) : null),
-    [active, clustering],
+    () => (active && hasThemes ? topQuotientsByTheme(active) : null),
+    [active, hasThemes],
   );
 
   if (!active) return null;
@@ -148,7 +151,9 @@ export function ThemePanel() {
             </div>
           )}
 
-          {clustering && <ReadingTip>{t('theme_ql_explanation')}</ReadingTip>}
+          {hasThemes && <ReadingTip>{t('theme_ql_explanation')}</ReadingTip>}
+
+          <HybridPanel />
       </div>
 
       <AiSettingsModal open={aiModalOpen} onOpenChange={setAiModalOpen} />

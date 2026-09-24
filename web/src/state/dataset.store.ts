@@ -6,6 +6,7 @@ import type { CooccurrenceReport, SnaReport } from '@/core/graph';
 import type { UploadedFile } from '@/core/parsers';
 import type { RisSource } from '@/core/parsers/pipeline-ris';
 import type { ClusteringResult } from '@/core/clustering';
+import type { HybridRun } from '@/core/hybrid/types';
 import { applyThemes, fallbackThemeName } from '@/core/theme-assignment';
 import { buildSearchOptions, type SearchOptions } from '@/core/search';
 import { labelCluster } from '@/lib/ai-client';
@@ -60,6 +61,8 @@ interface DatasetState {
   searchOptions: SearchOptions | null;
   /** Resultado da categorização temática, quando já executada. */
   clustering: ClusteringResult | null;
+  /** Registro da classificação híbrida (DeepSeek + Jev), quando foi ela que definiu os temas. */
+  hybridRun: HybridRun | null;
 
   isIngesting: boolean;
   isDeduplicating: boolean;
@@ -93,6 +96,7 @@ export const DERIVED_RESET = {
   network: null,
   searchOptions: null,
   clustering: null,
+  hybridRun: null,
 } as const;
 
 function describeError(cause: unknown): string {

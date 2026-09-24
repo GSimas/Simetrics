@@ -394,7 +394,7 @@ export default function OverviewTab() {
  */
 function ProductionTimeline({ dataset }: { dataset: Dataset }) {
   const t = useLocale((state) => state.t);
-  const hasThemes = useDataset((state) => state.clustering !== null);
+  const hasThemes = useDataset((state) => state.clustering !== null || state.hybridRun !== null);
   const [category, setCategory] = useState<ProductionCategory>('Total');
   const [mode, setMode] = useState<ProductionChartMode>('bars-grouped');
 

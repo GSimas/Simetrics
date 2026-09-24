@@ -21,8 +21,12 @@ export function applyThemes(
   assignments: readonly number[],
   names: ReadonlyMap<number, string>,
 ): Dataset {
-  return rows.map((doc, index) => ({
-    ...doc,
-    [FIELD.THEME]: names.get(assignments[index] ?? -1) ?? 'Outros/Não Categorizado',
-  }));
+  return rows.map((doc, index) => {
+    // Campos da classificação híbrida não valem para temas do k-means: saem junto.
+    const { [FIELD.THEME_CONFIDENCE]: _confidence, [FIELD.THEME_STATUS]: _status, ...rest } = doc;
+    return {
+      ...rest,
+      [FIELD.THEME]: names.get(assignments[index] ?? -1) ?? 'Outros/Não Categorizado',
+    };
+  });
 }

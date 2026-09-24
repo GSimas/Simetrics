@@ -5,6 +5,9 @@ import type { AnalyticsBundle, EntityTables } from '@/workers/analytics.worker';
 import type { CooccurrenceReport, SnaReport } from '@/core/graph';
 import type { CollaborationNetwork } from '@/core/viz/collaboration';
 import type { ClusteringResult } from '@/core/clustering';
+import type { HybridRun } from '@/core/hybrid/types';
+import { hybridMethodsText } from '@/core/hybrid/report';
+import { hybridReportRows, hybridReportTitle } from '@/core/hybrid/report-rows';
 import type { Dataset } from '@/lib/types';
 import { FIELD, FIELD_CANDIDATES } from '@/lib/schema';
 import { collectColumns, pickColumn, toNumeric } from '@/core/text';
@@ -14,6 +17,7 @@ import {
   reportCountriesChart,
   reportNetworkChart,
   reportProductionChart,
+  reportNamedThemesChart,
   reportThemesChart,
   reportWordCloudChart,
   reportWorldMapChart,
@@ -46,6 +50,8 @@ export interface PdfReportData {
   network: CooccurrenceReport | null;
   collaboration: CollaborationNetwork | null;
   clustering: ClusteringResult | null;
+  /** Quando presente, é a classificação híbrida que define os temas da base. */
+  hybridRun?: HybridRun | null;
   selection: ReportSectionsSelection;
   topN: number;
   locale: 'pt' | 'en';
@@ -84,6 +90,7 @@ export function generatePdfReport({
   network,
   collaboration,
   clustering,
+  hybridRun = null,
   selection,
   topN = 15,
   locale = 'pt',
@@ -522,10 +529,56 @@ export function generatePdfReport({
     cursorY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 16;
   }
 
+  // --- 7b. CLASSIFICAÇÃO TEMÁTICA HÍBRIDA (DeepSeek + Jev) ---
+  if (selection.themes && hybridRun) {
+    checkPageBreak(160);
+    sectionHeading(6, hybridReportTitle(hybridRun, locale));
+
+    const loc = isEn ? 'en-US' : 'pt-BR';
+    autoTable(doc, {
+      startY: cursorY,
+      ...tableBase,
+      head: [['#', isEn ? 'Category' : 'Categoria', 'Docs', '% Share', isEn ? 'Mean confidence' : 'Confiança média']],
+      body: hybridReportRows(hybridRun).map((row, index) => [
+        String(index + 1),
+        row.name,
+        row.documents.toLocaleString(loc),
+        `${row.share.toFixed(1)}%`,
+        row.meanConfidence.toFixed(2),
+      ]),
+      styles: cellStyles(7.5, 4),
+      columnStyles: {
+        0: { cellWidth: 20 },
+        1: { cellWidth: 'auto' },
+        2: { cellWidth: 45 },
+        3: { cellWidth: 50 },
+        4: { cellWidth: 80 },
+      },
+    });
+    cursorY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 12;
+
+    // Texto de métodos: o que um revisor precisa para reproduzir a classificação.
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(...C.inkMuted);
+    const methodLines = doc.splitTextToSize(hybridMethodsText(hybridRun, locale), contentWidth) as string[];
+    checkPageBreak(methodLines.length * 10.5 + 16);
+    doc.text(methodLines, margin, cursorY + 8);
+    cursorY += methodLines.length * 10.5 + 16;
+  }
+
   // --- GRÁFICO 6: DISTRIBUIÇÃO DE TEMAS ---
   if (selection.chartThemes && clustering && clustering.clusters.length > 0) {
     checkPageBreak(210);
     const chartImg = reportThemesChart(clustering.clusters, dataset.length, locale);
+    if (chartImg) {
+      doc.addImage(chartImg, 'PNG', margin, cursorY, contentWidth, 200);
+      cursorY += 215;
+    }
+  }
+  if (selection.chartThemes && hybridRun) {
+    checkPageBreak(210);
+    const chartImg = reportNamedThemesChart(hybridReportRows(hybridRun), dataset.length, locale);
     if (chartImg) {
       doc.addImage(chartImg, 'PNG', margin, cursorY, contentWidth, 200);
       cursorY += 215;

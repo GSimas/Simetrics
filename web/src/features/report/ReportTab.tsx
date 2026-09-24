@@ -40,6 +40,8 @@ import { EmptyState } from '@/features/EmptyState';
 import { getAnalyticsWorker } from '@/workers/client';
 import { useIdleRender } from '@/lib/use-idle-render';
 import type { CollaborationNetwork } from '@/core/viz/collaboration';
+import { hybridMethodsText } from '@/core/hybrid/report';
+import { hybridReportRows, hybridReportTitle } from '@/core/hybrid/report-rows';
 // Os geradores (jsPDF, docx) pesam ~1,2 MB: entram só no clique de exportar.
 import type { ReportSectionsSelection } from './pdf-generator';
 import { ReportChartImage } from './ReportChartImage';
@@ -49,6 +51,7 @@ import {
   reportCountriesChart,
   reportNetworkChart,
   reportProductionChart,
+  reportNamedThemesChart,
   reportThemesChart,
   reportWordCloudChart,
   reportWorldMapChart,
@@ -82,6 +85,7 @@ export default function ReportTab() {
   const sna = useDataset((state) => state.sna);
   const network = useDataset((state) => state.network);
   const clustering = useDataset((state) => state.clustering);
+  const hybridRun = useDataset((state) => state.hybridRun);
   const computeOverview = useDataset((state) => state.computeOverview);
   const computeTables = useDataset((state) => state.computeTables);
   const computeSna = useDataset((state) => state.computeSna);
@@ -149,10 +153,12 @@ export default function ReportTab() {
   );
 
   const themesChartImg = useIdleRender(
-    !clustering || clustering.clusters.length === 0
-      ? null
-      : () => reportThemesChart(clustering.clusters, active?.length ?? 0, locale),
-    [clustering, active, locale],
+    hybridRun
+      ? () => reportNamedThemesChart(hybridReportRows(hybridRun), active?.length ?? 0, locale)
+      : !clustering || clustering.clusters.length === 0
+        ? null
+        : () => reportThemesChart(clustering.clusters, active?.length ?? 0, locale),
+    [clustering, hybridRun, active, locale],
   );
 
   const wordCloudChartImg = useIdleRender(
@@ -228,6 +234,7 @@ export default function ReportTab() {
         network,
         collaboration,
         clustering,
+        hybridRun,
         selection,
         topN,
         locale,
@@ -254,6 +261,7 @@ export default function ReportTab() {
         network,
         collaboration,
         clustering,
+        hybridRun,
         selection,
         topN,
         locale,
@@ -384,7 +392,11 @@ export default function ReportTab() {
       desc: 'Clusters semânticos descobertos, score de silhueta e termos característicos.',
       descEn: 'Semantic research themes, silhouette score, and representative terms.',
       icon: Sparkles,
-      count: clustering ? `${clustering.clusters.length} temas` : undefined,
+      count: hybridRun
+        ? `${hybridRun.finalTaxonomy.length} ${isEn ? 'categories' : 'categorias'}`
+        : clustering
+          ? `${clustering.clusters.length} temas`
+          : undefined,
     },
     {
       key: 'chartThemes',
@@ -870,6 +882,32 @@ export default function ReportTab() {
                   );
                 })}
               </div>
+            </div>
+          )}
+
+          {/* 7b. Classificação temática híbrida */}
+          {selection.themes && hybridRun && (
+            <div className="space-y-3">
+              <h2 className="text-sm font-bold text-foreground border-b border-border/60 pb-1.5">
+                6. {hybridReportTitle(hybridRun, locale)}
+              </h2>
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                {hybridReportRows(hybridRun).map((row) => (
+                  <div key={row.name} className="rounded-xl border border-border/80 bg-card p-3.5 shadow-2xs space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-bold text-foreground truncate">{row.name}</p>
+                      <Badge variant="purple" className="text-[10px]">
+                        {row.share.toFixed(1)}%
+                      </Badge>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      <strong>{row.documents}</strong> {isEn ? 'documents' : 'artigos'} ·{' '}
+                      {isEn ? 'mean confidence' : 'confiança média'} {row.meanConfidence.toFixed(2)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[11px] leading-relaxed text-muted-foreground">{hybridMethodsText(hybridRun, locale)}</p>
             </div>
           )}
 
