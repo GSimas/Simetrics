@@ -16,3 +16,6 @@ web/*.tsbuildinfo
 .DS_Store
 *.DS_Store
 
+
+# Saída gerada localmente pela ferramenta de grafo de conhecimento (graphify).
+graphify-out/
