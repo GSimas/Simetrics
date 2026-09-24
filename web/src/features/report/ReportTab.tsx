@@ -18,15 +18,11 @@ import {
   Users,
 } from 'lucide-react';
 
+import { SectionTitle } from '@/components/InfoTip';
+
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -86,7 +82,7 @@ export default function ReportTab() {
   const computeTables = useDataset((state) => state.computeTables);
   const computeSna = useDataset((state) => state.computeSna);
   const computeNetwork = useDataset((state) => state.computeNetwork);
-  const { locale } = useLocale();
+  const { locale, t } = useLocale();
   const isEn = locale === 'en';
 
   const [selection, setSelection] = useState<ReportSectionsSelection>(DEFAULT_SELECTION);
@@ -439,6 +435,8 @@ export default function ReportTab() {
     },
   ];
 
+  const selectedCount = sectionsList.filter(({ key }) => selection[key]).length;
+
   const columns = collectColumns(active);
   const titleCol = pickColumn(columns, FIELD_CANDIDATES.title);
   const authCol = pickColumn(columns, FIELD_CANDIDATES.authors);
@@ -450,18 +448,14 @@ export default function ReportTab() {
   return (
     <div className="space-y-6">
       {/* 1. Painel de Controle de Exportação */}
-      <Card className="border-t-4 border-t-blue-600 shadow-sm">
+      <Card>
         <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <CardTitle className="text-xl font-bold text-foreground">
-                {isEn ? 'Custom Scientometric Report Generator' : 'Gerador de Relatório Cientométrico Personalizado'}
-              </CardTitle>
-              <CardDescription className="mt-1">
-                {isEn
-                  ? 'Select the specific tables, KPIs, and charts to include in your executive report. Export in high-resolution PDF or Microsoft Word DOCX.'
-                  : 'Escolha as tabelas, indicadores e gráficos a incluir no relatório. Exporte diretamente em PDF diagramado em alta resolução ou Microsoft Word DOCX.'}
-              </CardDescription>
+            <div className="space-y-1">
+              <SectionTitle title={t('report_title')} info={t('report_info')} />
+              <p className="eyebrow">
+                {selectedCount} / {sectionsList.length} {t('report_selected')} · Top {topN}
+              </p>
             </div>
 
             {/* Botões de Ação de Download */}
@@ -470,7 +464,7 @@ export default function ReportTab() {
                 variant="default"
                 onClick={handleExportPdf}
                 disabled={isExportingPdf}
-                className="gap-2 bg-gradient-to-r from-red-600 to-rose-600 font-bold text-white shadow-sm hover:from-red-700 hover:to-rose-700 cursor-pointer"
+                className="gap-2 cursor-pointer"
               >
                 <Download className="size-4" />
                 {isExportingPdf ? (isEn ? 'Building PDF...' : 'Gerando PDF...') : isEn ? 'Export PDF' : 'Baixar PDF'}
@@ -480,9 +474,9 @@ export default function ReportTab() {
                 variant="outline"
                 onClick={handleExportDocx}
                 disabled={isExportingDocx}
-                className="gap-2 border-blue-300 font-bold text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/40 cursor-pointer"
+                className="gap-2 cursor-pointer"
               >
-                <FileCheck className="size-4 text-blue-600" />
+                <FileCheck className="size-4" />
                 {isExportingDocx ? (isEn ? 'Building DOCX...' : 'Gerando DOCX...') : isEn ? 'Export DOCX (Word)' : 'Baixar DOCX (Word)'}
               </Button>
             </div>
@@ -580,21 +574,21 @@ export default function ReportTab() {
 
       {/* 2. Pré-Visualização Ao Vivo do Documento (A4 Executive Styling com Gráficos) */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between px-1">
-          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-            {isEn ? 'Live Document Preview (with Embedded Charts & Tables)' : 'Pré-visualização do Relatório (com Gráficos e Tabelas)'}
-          </p>
-          <span className="text-xs text-muted-foreground">
-            {isEn ? 'Formatted according to selected sections' : 'Diagramado conforme as seções e gráficos selecionados acima'}
-          </span>
-        </div>
+        <SectionTitle
+          title={isEn ? 'Report preview' : 'Pré-visualização do relatório'}
+          info={
+            isEn
+              ? 'Laid out according to the sections and charts selected above.'
+              : 'Diagramado conforme as seções e gráficos selecionados acima.'
+          }
+        />
 
         <div className="mx-auto max-w-4xl rounded-2xl border border-border/90 bg-card p-6 sm:p-10 shadow-lg space-y-8 text-foreground transition-all">
           {/* Header do Relatório */}
           <div className="border-b border-border/80 pb-6">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="grid size-11 place-items-center rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-sm">
+                <div className="grid size-11 place-items-center border border-border text-highlight">
                   <FileText className="size-6" />
                 </div>
                 <div>

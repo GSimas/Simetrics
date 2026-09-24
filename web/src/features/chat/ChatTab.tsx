@@ -136,7 +136,7 @@ export default function ChatTab() {
 
   return (
     <>
-      <Card className="border-t-4 border-t-emerald-500 shadow-xs">
+      <Card className="border-t-2 border-t-highlight shadow-xs">
         <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <CardTitle className="flex items-center gap-2.5 text-base font-bold text-foreground">
@@ -199,7 +199,7 @@ export default function ChatTab() {
                   className={cn(
                     'grid size-8 shrink-0 place-items-center rounded-full shadow-2xs font-semibold text-xs',
                     message.role === 'user'
-                      ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white'
+                      ? 'bg-primary text-primary-foreground'
                       : 'bg-emerald-600 text-white',
                   )}
                 >
@@ -214,7 +214,7 @@ export default function ChatTab() {
                   className={cn(
                     'max-w-[85%] rounded-xl px-4 py-2.5 text-sm shadow-2xs leading-relaxed',
                     message.role === 'user'
-                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium'
+                      ? 'bg-primary text-primary-foreground font-medium'
                       : 'border border-border/80 bg-card text-foreground',
                   )}
                 >
@@ -287,7 +287,7 @@ export default function ChatTab() {
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               placeholder={t('chat_placeholder')}
-              aria-label="Pergunta para o assistente"
+              aria-label="Pergunta para a Simi"
               disabled={streaming}
               className="rounded-lg shadow-2xs"
             />

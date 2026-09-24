@@ -3,68 +3,90 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * Identidade visual Scientata (https://scientata.com), família à qual o Simetrics pertence.
+ *
+ * Duas superfícies: "tinta" (#07110f, escuro, padrão) e "papel" (#f0eee6, claro).
+ * Acentos: sinal (#b8ff4a) no escuro e pinho (#236e5e) no claro — o verde-limão não tem
+ * contraste sobre o papel. Cantos retos, linhas finas no lugar de sombras, tipografia
+ * Manrope + Instrument Serif (itálico de destaque) + DM Mono (rótulos em caixa-alta).
+ */
 :root {
-  --radius: 0.625rem;
+  --radius: 0px;
 
-  /* Fundo suave em tom neutro-frio para dar contraste e profundidade aos cards */
-  --background: hsl(215 28% 97%);
-  --foreground: hsl(222 47% 11%);
+  --ink: #07110f;
+  --paper: #f0eee6;
+  --signal: #b8ff4a;
+  --pine: #236e5e;
+  --cyan: #53d7d0;
 
-  --card: hsl(0 0% 100%);
-  --card-foreground: hsl(222 47% 11%);
+  /* Linhas da grade de fundo */
+  --grid-line: rgb(7 17 15 / 0.05);
 
-  --popover: hsl(0 0% 100%);
-  --popover-foreground: hsl(222 47% 11%);
+  --background: #f0eee6;
+  --foreground: #07110f;
 
-  /* Azul vibrante moderno (#1273B9 / hsl 205 85% 44%) para identidade visual marcante */
-  --primary: hsl(205 85% 44%);
-  --primary-foreground: hsl(210 40% 98%);
+  --card: #f7f6f1;
+  --card-foreground: #07110f;
 
-  --secondary: hsl(215 30% 94%);
-  --secondary-foreground: hsl(222 47% 15%);
+  --popover: #f7f6f1;
+  --popover-foreground: #07110f;
 
-  --muted: hsl(215 30% 94%);
-  --muted-foreground: hsl(215 18% 46%);
+  --primary: #236e5e;
+  --primary-foreground: #f0eee6;
 
-  --accent: hsl(215 35% 92%);
-  --accent-foreground: hsl(222 47% 11%);
+  /* Destaque da marca: pinho no papel, sinal na tinta */
+  --highlight: #236e5e;
 
-  --destructive: hsl(0 84% 60%);
-  --destructive-foreground: hsl(210 40% 98%);
+  --secondary: #e6e3d8;
+  --secondary-foreground: #07110f;
 
-  --border: hsl(216 28% 90%);
-  --input: hsl(216 28% 88%);
-  --ring: hsl(205 85% 44%);
+  --muted: #e6e3d8;
+  --muted-foreground: #56625d;
+
+  --accent: #e2dfd3;
+  --accent-foreground: #07110f;
+
+  --destructive: #c2412d;
+  --destructive-foreground: #f0eee6;
+
+  --border: #d5d2c6;
+  --input: #cbc8bb;
+  --ring: #236e5e;
 }
 
 .dark {
-  --background: hsl(224 45% 9%);
-  --foreground: hsl(210 40% 98%);
+  --grid-line: rgb(236 243 238 / 0.045);
 
-  --card: hsl(224 45% 12%);
-  --card-foreground: hsl(210 40% 98%);
+  --background: #07110f;
+  --foreground: #f0eee6;
 
-  --popover: hsl(224 45% 12%);
-  --popover-foreground: hsl(210 40% 98%);
+  --card: #0c1a16;
+  --card-foreground: #f0eee6;
 
-  --primary: hsl(205 85% 58%);
-  --primary-foreground: hsl(222 47% 11%);
+  --popover: #0e1d19;
+  --popover-foreground: #f0eee6;
 
-  --secondary: hsl(217 33% 18%);
-  --secondary-foreground: hsl(210 40% 98%);
+  --primary: #b8ff4a;
+  --primary-foreground: #07110f;
 
-  --muted: hsl(217 33% 18%);
-  --muted-foreground: hsl(215 20% 65%);
+  --highlight: #b8ff4a;
 
-  --accent: hsl(217 33% 20%);
-  --accent-foreground: hsl(210 40% 98%);
+  --secondary: #13241f;
+  --secondary-foreground: #f0eee6;
 
-  --destructive: hsl(0 63% 45%);
-  --destructive-foreground: hsl(210 40% 98%);
+  --muted: #13241f;
+  --muted-foreground: #9ca7a2;
 
-  --border: hsl(217 33% 20%);
-  --input: hsl(217 33% 20%);
-  --ring: hsl(205 85% 58%);
+  --accent: #172b25;
+  --accent-foreground: #f0eee6;
+
+  --destructive: #ff7a66;
+  --destructive-foreground: #07110f;
+
+  --border: #1f302b;
+  --input: #2a3c36;
+  --ring: #b8ff4a;
 }
 
 @theme inline {
@@ -87,18 +109,221 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-highlight: var(--highlight);
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
+  --color-ink: var(--ink);
+  --color-paper: var(--paper);
+  --color-signal: var(--signal);
+  --color-pine: var(--pine);
+
+  --radius-xs: 0px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --radius-3xl: 0px;
+  --radius-4xl: 0px;
+}
+
+@theme {
+  --font-sans: 'Manrope', Arial, sans-serif;
+  --font-serif: 'Instrument Serif', Georgia, serif;
+  --font-mono: 'DM Mono', ui-monospace, monospace;
+
+  /* Plano, como o Scientata: sombras só para o que flutua (menus, diálogos). */
+  --shadow-2xs: 0 0 #0000;
+  --shadow-xs: 0 0 #0000;
+  --shadow-sm: 0 0 #0000;
+  --shadow-md: 0 0 #0000;
+  --shadow-lg: 0 18px 50px -20px rgb(7 17 15 / 0.35);
+  --shadow-xl: 0 24px 70px -24px rgb(7 17 15 / 0.45);
+  --shadow-2xl: 0 30px 90px -30px rgb(7 17 15 / 0.55);
+
+  /*
+   * Paletas do Tailwind remapeadas para a família Scientata. Os componentes usam
+   * blue/indigo/purple/cyan/emerald/slate diretamente; trocar as escalas aqui recolore
+   * todos de uma vez, sem editar centenas de classes.
+   *   blue, indigo, sky  → pinho (marca)
+   *   purple, violet     → sinal (IA / inteligência)
+   *   cyan               → ciano Scientata
+   *   emerald, green, teal → musgo (sucesso)
+   *   slate, gray, zinc  → cinza-tinta
+   * amber, orange, red e rose ficam como estão: são semânticos (aviso/erro).
+   */
+  --color-blue-50: #eef5f2;
+  --color-blue-100: #d7e8e1;
+  --color-blue-200: #b0d1c4;
+  --color-blue-300: #7fb3a2;
+  --color-blue-400: #4f9380;
+  --color-blue-500: #2f7d6b;
+  --color-blue-600: #236e5e;
+  --color-blue-700: #1d5a4d;
+  --color-blue-800: #18483e;
+  --color-blue-900: #133a32;
+  --color-blue-950: #0b231e;
+
+  --color-indigo-50: #eef5f2;
+  --color-indigo-100: #d7e8e1;
+  --color-indigo-200: #b0d1c4;
+  --color-indigo-300: #7fb3a2;
+  --color-indigo-400: #4f9380;
+  --color-indigo-500: #2f7d6b;
+  --color-indigo-600: #236e5e;
+  --color-indigo-700: #1d5a4d;
+  --color-indigo-800: #18483e;
+  --color-indigo-900: #133a32;
+  --color-indigo-950: #0b231e;
+
+  --color-sky-50: #eef5f2;
+  --color-sky-100: #d7e8e1;
+  --color-sky-200: #b0d1c4;
+  --color-sky-300: #7fb3a2;
+  --color-sky-400: #4f9380;
+  --color-sky-500: #2f7d6b;
+  --color-sky-600: #236e5e;
+  --color-sky-700: #1d5a4d;
+  --color-sky-800: #18483e;
+  --color-sky-900: #133a32;
+  --color-sky-950: #0b231e;
+
+  --color-purple-50: #f4fbe6;
+  --color-purple-100: #e8f8c8;
+  --color-purple-200: #d4f39a;
+  --color-purple-300: #c6fb72;
+  --color-purple-400: #b8ff4a;
+  --color-purple-500: #8fce2a;
+  --color-purple-600: #557f10;
+  --color-purple-700: #42630d;
+  --color-purple-800: #344f0f;
+  --color-purple-900: #283d0e;
+  --color-purple-950: #15230a;
+
+  --color-violet-50: #f4fbe6;
+  --color-violet-100: #e8f8c8;
+  --color-violet-200: #d4f39a;
+  --color-violet-300: #c6fb72;
+  --color-violet-400: #b8ff4a;
+  --color-violet-500: #8fce2a;
+  --color-violet-600: #557f10;
+  --color-violet-700: #42630d;
+  --color-violet-800: #344f0f;
+  --color-violet-900: #283d0e;
+  --color-violet-950: #15230a;
+
+  --color-cyan-50: #eafbfa;
+  --color-cyan-100: #cdf5f2;
+  --color-cyan-200: #9eebe6;
+  --color-cyan-300: #72e0da;
+  --color-cyan-400: #53d7d0;
+  --color-cyan-500: #2fbab3;
+  --color-cyan-600: #177f7a;
+  --color-cyan-700: #146663;
+  --color-cyan-800: #14524f;
+  --color-cyan-900: #134441;
+  --color-cyan-950: #082725;
+
+  --color-emerald-50: #f0f7ec;
+  --color-emerald-100: #dcedd3;
+  --color-emerald-200: #bcdcab;
+  --color-emerald-300: #95c67c;
+  --color-emerald-400: #7cc25a;
+  --color-emerald-500: #52943b;
+  --color-emerald-600: #417a2f;
+  --color-emerald-700: #356227;
+  --color-emerald-800: #2c4f22;
+  --color-emerald-900: #25421e;
+  --color-emerald-950: #10240c;
+
+  --color-green-50: #f0f7ec;
+  --color-green-100: #dcedd3;
+  --color-green-200: #bcdcab;
+  --color-green-300: #95c67c;
+  --color-green-400: #7cc25a;
+  --color-green-500: #52943b;
+  --color-green-600: #417a2f;
+  --color-green-700: #356227;
+  --color-green-800: #2c4f22;
+  --color-green-900: #25421e;
+  --color-green-950: #10240c;
+
+  --color-teal-50: #eafbfa;
+  --color-teal-100: #cdf5f2;
+  --color-teal-200: #9eebe6;
+  --color-teal-300: #72e0da;
+  --color-teal-400: #53d7d0;
+  --color-teal-500: #2fbab3;
+  --color-teal-600: #177f7a;
+  --color-teal-700: #146663;
+  --color-teal-800: #14524f;
+  --color-teal-900: #134441;
+  --color-teal-950: #082725;
+
+  --color-slate-50: #f7f6f1;
+  --color-slate-100: #eceae2;
+  --color-slate-200: #dcdad0;
+  --color-slate-300: #c3cbc7;
+  --color-slate-400: #9ca7a2;
+  --color-slate-500: #74807b;
+  --color-slate-600: #56625d;
+  --color-slate-700: #3d4843;
+  --color-slate-800: #1f2c28;
+  --color-slate-900: #13201c;
+  --color-slate-950: #07110f;
+
+  --color-gray-50: #f7f6f1;
+  --color-gray-100: #eceae2;
+  --color-gray-200: #dcdad0;
+  --color-gray-300: #c3cbc7;
+  --color-gray-400: #9ca7a2;
+  --color-gray-500: #74807b;
+  --color-gray-600: #56625d;
+  --color-gray-700: #3d4843;
+  --color-gray-800: #1f2c28;
+  --color-gray-900: #13201c;
+  --color-gray-950: #07110f;
+
+  --color-zinc-50: #f7f6f1;
+  --color-zinc-100: #eceae2;
+  --color-zinc-200: #dcdad0;
+  --color-zinc-300: #c3cbc7;
+  --color-zinc-400: #9ca7a2;
+  --color-zinc-500: #74807b;
+  --color-zinc-600: #56625d;
+  --color-zinc-700: #3d4843;
+  --color-zinc-800: #1f2c28;
+  --color-zinc-900: #13201c;
+  --color-zinc-950: #07110f;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
   body {
     @apply bg-background text-foreground antialiased;
+    font-family: var(--font-sans);
+    /* Grade milimetrada do Scientata, fixa atrás do conteúdo. */
+    background-image:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 64px 64px;
+    background-attachment: fixed;
+  }
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.03em;
+  }
+  ::selection {
+    background: var(--signal);
+    color: var(--ink);
   }
 }
 
@@ -107,4 +332,343 @@
   margin-inline: auto;
   padding-inline: 1.5rem;
   max-width: 1600px;
+}
+
+/* Rótulo técnico em DM Mono caixa-alta — "ECOSSISTEMA PARA PESQUISA · CIÊNCIA". */
+@utility eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+/* Itálico serifado de destaque — "Pesquisa com *visão*". */
+@utility accent-serif {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  color: var(--highlight);
+}
+
+/* Logotipo monocromático: a máscara herda a cor do texto e acompanha o tema. */
+@utility brand-mark {
+  display: inline-block;
+  aspect-ratio: 2130 / 928;
+  background-color: currentColor;
+  mask: url('/simetrics-mark.png') center / contain no-repeat;
+}
+
+/* Controles do cabeçalho — "EXPLORAR ECOSSISTEMA": DM Mono caixa-alta, contorno fino. */
+@utility header-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 2.25rem;
+  padding-inline: 0.75rem;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transition: color 0.2s, border-color 0.2s;
+  &:hover {
+    border-color: var(--highlight);
+    color: var(--highlight);
+  }
+}
+
+/* Dicas "i" (popover nativo): entram e saem com fade e um leve deslocamento, em vez de
+   aparecerem de um quadro para o outro. `allow-discrete` anima também a saída do
+   top layer. */
+[popover] {
+  opacity: 0;
+  translate: 0 4px;
+  transition:
+    opacity 0.16s ease-out,
+    translate 0.16s ease-out,
+    overlay 0.16s allow-discrete,
+    display 0.16s allow-discrete;
+}
+[popover]:popover-open {
+  opacity: 1;
+  translate: 0 0;
+}
+@starting-style {
+  [popover]:popover-open {
+    opacity: 0;
+    translate: 0 4px;
+  }
+}
+
+/* Troca de tema: cruzamento suave entre as duas paletas (View Transitions). */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.3s;
+  animation-timing-function: ease-out;
+}
+
+/* Quem pede menos movimento no sistema não recebe animações. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Tamanho da letra (Configurações): tudo em rem acompanha a raiz. */
+html[data-font='min'] {
+  font-size: 14px;
+}
+html[data-font='max'] {
+  font-size: 18px;
+}
+
+/* Alto contraste (Configurações): textos secundários e linhas bem mais marcados. Os
+   seletores repetem `html` para vencer `.dark` e `:root` em especificidade. */
+html[data-contrast='high']:not(.dark) {
+  --foreground: #000000;
+  --muted-foreground: #28322e;
+  --border: #7d796c;
+  --input: #5f5b50;
+  --highlight: #134f42;
+  --primary: #134f42;
+  --ring: #134f42;
+  --grid-line: rgb(7 17 15 / 0.08);
+}
+html.dark[data-contrast='high'] {
+  --background: #020806;
+  --foreground: #ffffff;
+  --card: #07130f;
+  --muted-foreground: #dbe2de;
+  --border: #5d726b;
+  --input: #7a8f88;
+  --grid-line: rgb(236 243 238 / 0.08);
+}
+html[data-contrast='high'] :focus-visible {
+  outline: 2px solid var(--highlight);
+  outline-offset: 2px;
+}
+
+/* Faixa de indicadores (ticker) sob o cabeçalho. */
+@keyframes ticker-scroll {
+  to {
+    transform: translateX(-50%);
+  }
+}
+.ticker-track {
+  animation: ticker-scroll var(--ticker-duration, 60s) linear infinite;
+}
+/* Sob o mouse pausa só enquanto o cursor está em cima. A pausa persistente é o clique,
+   que liga a preferência `tickerScroll` (o foco não pausa: sair dele retomava a faixa). */
+.ticker:hover .ticker-track {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ticker-track {
+    animation: none;
+  }
+  .ticker {
+    overflow-x: auto;
+  }
+}
+
+/* Fundo animado da tela inicial (LandingScreen). Quase tudo é transform e opacity, que
+   rodam no compositor sem repintar a página; só o feixe e o fluxo das arestas animam
+   stroke-dashoffset, em poucos elementos SVG. Com movimento reduzido, a regra global
+   acima zera as durações e o fundo fica parado. */
+.landing-ambient {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background-color: var(--background);
+}
+.landing-ambient::before {
+  content: '';
+  position: absolute;
+  inset: -64px;
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 64px 64px;
+  animation: grid-drift 14s linear infinite;
+  will-change: transform;
+}
+/* Desloca exatamente uma célula: o quadro final é idêntico ao inicial, laço sem emenda. */
+@keyframes grid-drift {
+  to {
+    transform: translate(64px, 64px);
+  }
+}
+
+.ambient-glow {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(64px);
+  opacity: 0.2;
+  will-change: transform;
+}
+.dark .ambient-glow {
+  opacity: 0.16;
+}
+.ambient-glow--a {
+  width: 46vw;
+  height: 46vw;
+  left: 50%;
+  top: -14%;
+  background: radial-gradient(circle, var(--highlight), transparent 65%);
+  animation: glow-drift-a 18s ease-in-out infinite alternate;
+}
+.ambient-glow--b {
+  width: 40vw;
+  height: 40vw;
+  left: -12%;
+  top: 40%;
+  background: radial-gradient(circle, var(--cyan), transparent 65%);
+  animation: glow-drift-b 22s ease-in-out infinite alternate;
+}
+.ambient-glow--c {
+  width: 30vw;
+  height: 30vw;
+  left: 30%;
+  top: 70%;
+  background: radial-gradient(circle, var(--highlight), transparent 65%);
+  opacity: 0.12;
+  animation: glow-drift-c 26s ease-in-out infinite alternate;
+}
+@keyframes glow-drift-a {
+  50% {
+    transform: translate(-14vw, 18vh) scale(1.2);
+  }
+  to {
+    transform: translate(-30vw, 6vh) scale(0.95);
+  }
+}
+@keyframes glow-drift-b {
+  50% {
+    transform: translate(26vw, -14vh) scale(0.85);
+  }
+  to {
+    transform: translate(12vw, -30vh) scale(1.15);
+  }
+}
+@keyframes glow-drift-c {
+  to {
+    transform: translate(34vw, -40vh) scale(1.3);
+  }
+}
+
+/* Órbitas do hero: giram em torno do centro da mira (930, 250 no viewBox). */
+.orbit-spin {
+  transform-box: view-box;
+  transform-origin: 930px 250px;
+  animation: orbit-spin linear infinite;
+}
+.orbit-spin--outer {
+  animation-duration: 48s;
+}
+.orbit-spin--middle {
+  animation-duration: 64s;
+  animation-direction: reverse;
+}
+.orbit-spin--inner {
+  animation-duration: 28s;
+  animation-direction: reverse;
+}
+@keyframes orbit-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Pulso de radar saindo da mira. */
+.radar-ping {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: radar-ping 4.5s ease-out infinite;
+}
+.radar-ping--late {
+  animation-delay: -2.25s;
+}
+@keyframes radar-ping {
+  from {
+    transform: scale(0.4);
+    opacity: 0.8;
+  }
+  to {
+    transform: scale(7);
+    opacity: 0;
+  }
+}
+
+/* Feixe percorrendo a diagonal (comprimento da linha ≈ 1292). */
+.beam {
+  stroke-dasharray: 90 1400;
+  animation: beam-travel 5.5s cubic-bezier(0.45, 0, 0.25, 1) infinite;
+}
+@keyframes beam-travel {
+  from {
+    stroke-dashoffset: 90;
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  to {
+    stroke-dashoffset: -1300;
+    opacity: 0;
+  }
+}
+
+/* Constelação: arestas com fluxo e nós que pulsam. */
+.edge-flow {
+  stroke-dasharray: 3 7;
+  animation: edge-flow 6s linear infinite;
+}
+@keyframes edge-flow {
+  to {
+    stroke-dashoffset: -60;
+  }
+}
+.node-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: node-pulse 3.2s ease-in-out infinite;
+}
+@keyframes node-pulse {
+  50% {
+    transform: scale(1.8);
+    opacity: 0.55;
+  }
+}
+
+/* Partículas: cada uma com trajetória própria (--dx, --dy definidos no componente). */
+.particle-float {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: particle-float 8s ease-in-out infinite alternate;
+}
+@keyframes particle-float {
+  from {
+    transform: translate(0, 0) scale(0.8);
+    opacity: 0.25;
+  }
+  to {
+    transform: translate(var(--dx, 6px), var(--dy, -14px)) scale(1.15);
+    opacity: 1;
+  }
 }

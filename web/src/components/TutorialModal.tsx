@@ -165,7 +165,7 @@ const TUTORIAL_STEPS_PT: TutorialStep[] = [
       },
       {
         icon: Bot,
-        label: 'Simi - Assistente Científico Flutuante',
+        label: 'Simi - Assistente Científica Flutuante',
         text: 'Acesse a Simi via widget flutuante no canto inferior direito a partir de qualquer aba.',
       },
     ],
@@ -444,15 +444,19 @@ export function TutorialModal({ open: isOpen, onOpenChange: handleOpenChange }: 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-2xl sm:max-w-3xl overflow-hidden p-0 gap-0 border-border/80 bg-card shadow-2xl rounded-2xl">
-        {/* Barra superior de progresso com gradiente */}
+        {/* Barra superior de progresso */}
         <div className="h-1.5 w-full bg-muted overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-blue-600 via-indigo-500 to-purple-600 transition-all duration-300 ease-out"
+            className="h-full bg-highlight transition-all duration-300 ease-out"
             style={{ width: `${((stepIndex + 1) / steps.length) * 100}%` }}
           />
         </div>
 
-        <div className="p-6 sm:p-7 space-y-5 max-h-[82vh] overflow-y-auto">
+        {/* Chave por etapa: cada passo entra com fade, em vez de trocar o texto de uma vez. */}
+        <div
+          key={stepIndex}
+          className="p-6 sm:p-7 space-y-5 max-h-[82vh] overflow-y-auto duration-300 animate-in fade-in-0 slide-in-from-right-2"
+        >
           {/* Header do Passo */}
           <DialogHeader className="space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -484,7 +488,7 @@ export function TutorialModal({ open: isOpen, onOpenChange: handleOpenChange }: 
               {currentStep.highlights.map(({ icon: Icon, label, text }) => (
                 <div
                   key={label}
-                  className="rounded-xl border border-border/80 bg-gradient-to-br from-muted/50 to-card p-3 shadow-2xs space-y-1.5 transition-all hover:border-primary/40"
+                  className="border border-border bg-card p-3 space-y-1.5 transition-colors hover:border-highlight/60"
                 >
                   <div className="flex items-center gap-2 text-foreground font-semibold text-xs">
                     <div className="grid size-6 place-items-center rounded-md bg-primary/10 text-primary">
@@ -566,7 +570,7 @@ function TutorialStepPreview({
 
   if (type === 'overview') {
     return (
-      <div className="rounded-xl border border-blue-200/80 bg-gradient-to-br from-blue-500/10 via-card to-indigo-500/10 p-4 shadow-2xs dark:border-blue-900/50">
+      <div className="border border-border border-l-2 border-l-blue-500 bg-card p-4">
         <div className="flex flex-wrap items-center justify-around gap-2 text-center">
           <div className="flex flex-col items-center p-2 rounded-lg bg-card/80 border border-border/60 shadow-2xs">
             <span className="text-xl">📂</span>
@@ -600,7 +604,7 @@ function TutorialStepPreview({
 
   if (type === 'upload') {
     return (
-      <div className="rounded-xl border border-emerald-200/80 bg-gradient-to-br from-emerald-500/10 via-card to-teal-500/10 p-4 shadow-2xs dark:border-emerald-900/50">
+      <div className="border border-border border-l-2 border-l-emerald-500 bg-card p-4">
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
           <div className="flex items-center gap-2">
             <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -630,7 +634,7 @@ function TutorialStepPreview({
 
   if (type === 'kpis') {
     return (
-      <div className="rounded-xl border border-amber-200/80 bg-gradient-to-br from-amber-500/10 via-card to-orange-500/10 p-3 shadow-2xs dark:border-amber-900/50">
+      <div className="border border-border border-l-2 border-l-amber-500 bg-card p-3">
         <div className="grid grid-cols-4 gap-2">
           <div className="rounded-lg border border-blue-200 bg-card p-2 text-center shadow-2xs">
             <p className="text-[10px] text-muted-foreground font-semibold">{isEn ? 'Docs' : 'Docs'}</p>
@@ -655,7 +659,7 @@ function TutorialStepPreview({
 
   if (type === 'networks') {
     return (
-      <div className="rounded-xl border border-purple-200/80 bg-gradient-to-br from-purple-500/10 via-card to-indigo-500/10 p-3.5 shadow-2xs dark:border-purple-900/50">
+      <div className="border border-border border-l-2 border-l-purple-500 bg-card p-3.5">
         <div className="flex items-center justify-between text-xs">
           <span className="font-bold text-foreground">
             {isEn ? 'Heterogeneous Graph & Communities' : 'Grafo Heterogêneo & Clusters'}
@@ -679,7 +683,7 @@ function TutorialStepPreview({
 
   if (type === 'byok') {
     return (
-      <div className="rounded-xl border border-indigo-200/80 bg-gradient-to-br from-indigo-500/10 via-card to-purple-500/10 p-3.5 shadow-2xs dark:border-indigo-900/50">
+      <div className="border border-border border-l-2 border-l-indigo-500 bg-card p-3.5">
         <div className="flex items-center justify-between text-xs">
           <span className="font-bold text-foreground">
             {isEn ? 'Bring Your Own Key (BYOK)' : 'Traga sua Chave de IA (BYOK)'}
@@ -699,7 +703,7 @@ function TutorialStepPreview({
   }
 
   return (
-    <div className="rounded-xl border border-cyan-200/80 bg-gradient-to-br from-cyan-500/10 via-card to-blue-500/10 p-3.5 shadow-2xs dark:border-cyan-900/50">
+    <div className="border border-border border-l-2 border-l-cyan-500 bg-card p-3.5">
       <div className="flex items-center justify-between text-xs">
         <span className="font-bold text-foreground">
           {isEn ? 'Search Dossiers & AI Assistant' : 'Busca de Dossiês & Assistente IA'}
@@ -722,14 +726,9 @@ export function TutorialTriggerButton({ onClick }: { onClick: () => void }) {
   const t = useLocale((state) => state.t);
 
   return (
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={onClick}
-      className="h-9 gap-1.5 rounded-xl border-border/80 bg-card/80 text-xs font-semibold text-foreground shadow-2xs hover:border-primary/40 hover:bg-muted"
-    >
-      <HelpCircle className="size-3.5 text-primary" aria-hidden />
-      <span>{t('tutorial_btn')}</span>
-    </Button>
+    <button type="button" onClick={onClick} className="header-chip cursor-pointer">
+      <HelpCircle className="size-3.5" aria-hidden />
+      <span className="hidden sm:inline">{t('tutorial_btn')}</span>
+    </button>
   );
 }

@@ -191,8 +191,17 @@ export const useDataset = create<DatasetState>()(subscribeWithSelector((set, get
   },
 
   async applyDedup(strategy, threshold = 0.9) {
-    const { original } = get();
+    const { original, active } = get();
     if (!original) return;
+
+    // Voltar à base completa quando ela já é a ativa não muda nada. Sem este atalho, o
+    // reset abaixo apagaria as análises derivadas, mas `active` manteria a mesma
+    // referência — e as abas, que recalculam quando `active` muda, nunca recalculariam:
+    // os blocos que dependem delas sumiam da tela.
+    if (strategy === 'none' && active === original) {
+      set({ duplicates: [], dedupStrategy: 'none', dedupThreshold: null });
+      return;
+    }
 
     set({ isDeduplicating: true, progress: { phase: 'Deduplicando', ratio: 0 }, error: null });
 
@@ -254,7 +263,8 @@ export const useDataset = create<DatasetState>()(subscribeWithSelector((set, get
 
     try {
       const result = await getAnalyticsWorker().overview(active);
-      set({ overview: result });
+      // A base pode ter mudado (nova deduplicação) enquanto o worker calculava.
+      if (get().active === active) set({ overview: result });
     } catch (cause) {
       set({ error: describeError(cause) });
     }
@@ -266,7 +276,7 @@ export const useDataset = create<DatasetState>()(subscribeWithSelector((set, get
 
     try {
       const result = await getAnalyticsWorker().tables(active);
-      set({ tables: result });
+      if (get().active === active) set({ tables: result });
     } catch (cause) {
       set({ error: describeError(cause) });
     }
@@ -282,7 +292,7 @@ export const useDataset = create<DatasetState>()(subscribeWithSelector((set, get
         active,
         proxyProgress((update: WorkerProgress) => set({ snaProgress: update })),
       );
-      set({ sna: result });
+      if (get().active === active) set({ sna: result });
     } catch (cause) {
       set({ error: describeError(cause) });
     } finally {
@@ -367,7 +377,7 @@ export const useDataset = create<DatasetState>()(subscribeWithSelector((set, get
 
     try {
       const result = await getGraphWorker().cooccurrence(active, kind, topN, sizeMetric);
-      set({ network: result });
+      if (get().active === active) set({ network: result });
     } catch (cause) {
       set({ error: describeError(cause) });
     }

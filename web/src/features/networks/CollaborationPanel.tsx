@@ -1,12 +1,5 @@
 import { lazy, Suspense, useState } from 'react';
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -16,17 +9,17 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { circularPositions, type CollaborationNetwork } from '@/core/viz/collaboration';
+import { CONTINENTS, continentOf, type Continent } from '@/core/continents';
+import type { CollaborationNetwork } from '@/core/viz/collaboration';
 import type { Dataset } from '@/lib/types';
 import { useAsyncResult } from '@/lib/use-async-result';
 import { useLocale } from '@/state/locale.store';
 import { getAnalyticsWorker } from '@/workers/client';
 import { PALETTE, chartMessage } from '@/features/overview/viz-shared';
+import { openInSearch } from '@/state/navigation.store';
 
-const PlotlyChart = lazy(() => import('@/components/charts/PlotlyChart'));
-
-const MIN_EDGE_WIDTH = 1;
-const MAX_EDGE_WIDTH = 6;
+const WorldMap = lazy(() => import('@/components/charts/WorldMap'));
+const RadialGraph = lazy(() => import('@/components/charts/RadialGraph'));
 
 export interface CollaborationPanelProps {
   dataset: Dataset;
@@ -34,7 +27,7 @@ export interface CollaborationPanelProps {
 
 export function CollaborationPanel({ dataset }: CollaborationPanelProps) {
   const [topN, setTopN] = useState(30);
-  const [view, setView] = useState<'mapa' | 'circular'>('mapa');
+  const [view, setView] = useState<'mapa' | 'radial'>('mapa');
   const t = useLocale((state) => state.t);
 
   const { data: network } = useAsyncResult<CollaborationNetwork>(`collab ${topN}`, () =>
@@ -42,15 +35,7 @@ export function CollaborationPanel({ dataset }: CollaborationPanelProps) {
   );
 
   return (
-    <Card className="border-t-4 border-t-indigo-500 shadow-xs">
-      <CardHeader>
-        <CardTitle className="text-base font-bold text-foreground">{t('network_collab_title')}</CardTitle>
-        <CardDescription>
-          {t('network_collab_desc')}
-        </CardDescription>
-      </CardHeader>
-
-      <CardContent className="space-y-4">
+    <div className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="collab-top">{t('network_top_label')}</Label>
@@ -77,170 +62,103 @@ export function CollaborationPanel({ dataset }: CollaborationPanelProps) {
               'nem toda exportação inclui.',
           )
         ) : (
-          <Tabs value={view} onValueChange={(value) => setView(value as 'mapa' | 'circular')}>
-            <TabsList className="bg-slate-100 dark:bg-slate-800/80 p-1">
+          <Tabs value={view} onValueChange={(value) => setView(value as 'mapa' | 'radial')}>
+            <TabsList className="w-full justify-start">
               <TabsTrigger value="mapa">{t('network_map_tab')}</TabsTrigger>
-              <TabsTrigger value="circular">{t('network_circular_tab')}</TabsTrigger>
+              <TabsTrigger value="radial">{t('network_radial_tab')}</TabsTrigger>
             </TabsList>
 
             <TabsContent value="mapa">
               <GeoView network={network} />
             </TabsContent>
-            <TabsContent value="circular">
-              <CircularView network={network} />
+            <TabsContent value="radial">
+              <RadialView network={network} />
             </TabsContent>
           </Tabs>
         )}
-      </CardContent>
-    </Card>
+    </div>
   );
 }
 
-/** Escala a espessura da aresta entre os limites visuais. */
-function edgeWidth(documents: number, min: number, max: number): number {
-  if (max === min) return (MIN_EDGE_WIDTH + MAX_EDGE_WIDTH) / 2;
-  return (
-    MIN_EDGE_WIDTH + ((documents - min) / (max - min)) * (MAX_EDGE_WIDTH - MIN_EDGE_WIDTH)
-  );
-}
-
+/**
+ * Mapa-múndi em SVG (componente WorldMap): primeiro clique num país destaca ele e suas
+ * colaborações; o segundo abre o perfil do país no Motor de Busca.
+ */
 function GeoView({ network }: { network: CollaborationNetwork }) {
-  const byCountry = new Map(network.nodes.map((node) => [node.country, node]));
-  const weights = network.edges.map((edge) => edge.documents);
-  const minWeight = weights.length > 0 ? Math.min(...weights) : 0;
-  const maxWeight = weights.length > 0 ? Math.max(...weights) : 0;
-
-  const traces: Record<string, unknown>[] = [
-    {
-      type: 'choropleth',
-      locationmode: 'country names',
-      locations: network.nodes.map((node) => node.plotlyName),
-      z: network.nodes.map((node) => node.documents),
-      text: network.nodes.map((node) => {
-        const partners = node.partners
-          .slice(0, 8)
-          .map((partner) => `  • ${partner.country}: ${partner.documents}`)
-          .join('<br>');
-        return (
-          `<b>${node.label}</b><br>Documentos: ${node.documents}<br>` +
-          `<b>Principais parceiros:</b><br>${partners || '  (sem colaborações diretas)'}`
-        );
-      }),
-      hoverinfo: 'text',
-      colorscale: 'Teal',
-      showscale: false,
-      marker: { line: { color: 'rgba(255,255,255,0.6)', width: 0.5 } },
-    },
-  ];
-
-  for (const edge of network.edges) {
-    const source = byCountry.get(edge.source);
-    const target = byCountry.get(edge.target);
-    // Sem coordenada não há como traçar o arco; o país continua pintado no choropleth.
-    if (!source?.latitude || !target?.latitude) continue;
-
-    traces.push({
-      type: 'scattergeo',
-      mode: 'lines',
-      lat: [source.latitude, target.latitude],
-      lon: [source.longitude, target.longitude],
-      line: { width: edgeWidth(edge.documents, minWeight, maxWeight), color: 'rgba(232,115,74,0.5)' },
-      hoverinfo: 'text',
-      text: `${edge.sourceLabel} ↔ ${edge.targetLabel}: ${edge.documents} documentos`,
-      showlegend: false,
-    });
-  }
-
+  const labelOf = new Map(network.nodes.map((node) => [node.country, node.label]));
   return (
     <Suspense fallback={chartMessage('Carregando mapa…')}>
-      <PlotlyChart
+      <WorldMap
+        nodes={network.nodes.map((node) => ({
+          key: node.country,
+          label: node.label,
+          documents: node.documents,
+          latitude: node.latitude,
+          longitude: node.longitude,
+        }))}
+        edges={network.edges.map((edge) => ({
+          source: edge.source,
+          target: edge.target,
+          documents: edge.documents,
+        }))}
+        onOpenProfile={(key) => openInSearch(labelOf.get(key) ?? key, ['País'])}
         exportName="colaboracao-internacional"
-        height={520}
-        data={traces as never}
-        layout={{
-          showlegend: false,
-          geo: {
-            projection: { type: 'natural earth' },
-            showland: true,
-            landcolor: 'rgba(200,206,212,0.35)',
-            coastlinecolor: 'rgba(150,160,170,0.6)',
-            showframe: false,
-            bgcolor: 'rgba(0,0,0,0)',
-          },
-          margin: { l: 0, r: 0, t: 10, b: 0 },
-        }}
       />
     </Suspense>
   );
 }
 
-function CircularView({ network }: { network: CollaborationNetwork }) {
-  const positions = circularPositions(network.nodes);
-  const weights = network.edges.map((edge) => edge.documents);
-  const minWeight = weights.length > 0 ? Math.min(...weights) : 0;
-  const maxWeight = weights.length > 0 ? Math.max(...weights) : 0;
+const CONTINENT_KEYS = {
+  Africa: 'continent_Africa',
+  'North America': 'continent_North_America',
+  'South America': 'continent_South_America',
+  Asia: 'continent_Asia',
+  Europe: 'continent_Europe',
+  Oceania: 'continent_Oceania',
+} as const satisfies Record<Continent, string>;
 
-  const traces: Record<string, unknown>[] = network.edges.map((edge) => {
-    const source = positions.get(edge.source);
-    const target = positions.get(edge.target);
-
-    return {
-      type: 'scatter',
-      mode: 'lines',
-      x: [source?.x ?? 0, target?.x ?? 0],
-      y: [source?.y ?? 0, target?.y ?? 0],
-      line: {
-        width: edgeWidth(edge.documents, minWeight, maxWeight),
-        color: 'rgba(18,115,185,0.28)',
-      },
-      hoverinfo: 'text',
-      text: `${edge.sourceLabel} ↔ ${edge.targetLabel}: ${edge.documents} documentos`,
-      showlegend: false,
-    };
-  });
-
-  const maxDocuments = Math.max(...network.nodes.map((node) => node.documents), 1);
-
-  traces.push({
-    type: 'scatter',
-    mode: 'text+markers',
-    x: network.nodes.map((node) => positions.get(node.country)?.x ?? 0),
-    y: network.nodes.map((node) => positions.get(node.country)?.y ?? 0),
-    text: network.nodes.map((node) => node.label),
-    // Rótulos para fora do círculo, para não colidirem com as arestas do centro.
-    textposition: network.nodes.map((node) => {
-      const position = positions.get(node.country);
-      return `${(position?.y ?? 0) >= 0 ? 'top' : 'bottom'} ${
-        (position?.x ?? 0) >= 0 ? 'right' : 'left'
-      }`;
-    }),
-    textfont: { size: 10 },
-    marker: {
-      size: network.nodes.map(
-        (node) => 10 + (node.documents / maxDocuments) * 30,
-      ),
-      color: PALETTE[0],
-      opacity: 0.85,
-      line: { width: 1, color: 'white' },
-    },
-    customdata: network.nodes.map((node) => node.documents) as never,
-    hovertemplate: '<b>%{text}</b><br>%{customdata} documentos<extra></extra>',
-    showlegend: false,
-  });
+/**
+ * Grafo radial (diagrama de cordas): cada país num ponto do círculo, agrupado e colorido
+ * por continente, do que mais publica para o que menos dentro de cada grupo; as
+ * colaborações são cordas — mais grossas quanto mais documentos em comum.
+ */
+function RadialView({ network }: { network: CollaborationNetwork }) {
+  const t = useLocale((state) => state.t);
+  const labelOf = new Map(network.nodes.map((node) => [node.country, node.label]));
+  // Índice do continente = grupo no círculo e cor; país sem continente conhecido fica no fim.
+  const groupOf = (country: string): number => {
+    const continent = continentOf(country);
+    return continent ? CONTINENTS.indexOf(continent) : CONTINENTS.length;
+  };
+  // Sem continente: o cinza, último tom da paleta.
+  const colorOf = (group: number): string => (group < CONTINENTS.length && PALETTE[group]) || PALETTE[7];
+  const groups = [...new Set(network.nodes.map((node) => groupOf(node.country)))].sort((a, b) => a - b);
 
   return (
     <Suspense fallback={chartMessage('Carregando grafo…')}>
-      <PlotlyChart
-        exportName="colaboracao-circular"
-        height={560}
-        data={traces as never}
-        layout={{
-          showlegend: false,
-          xaxis: { visible: false, range: [-1.35, 1.35] },
-          // Escala travada ao eixo X para o círculo não virar elipse ao redimensionar.
-          yaxis: { visible: false, range: [-1.35, 1.35], scaleanchor: 'x', scaleratio: 1 },
-          margin: { l: 10, r: 10, t: 10, b: 10 },
-        }}
+      <RadialGraph
+        nodes={network.nodes.map((node) => ({
+          key: node.country,
+          label: node.label,
+          weight: node.documents,
+          group: groupOf(node.country),
+          color: colorOf(groupOf(node.country)),
+        }))}
+        edges={network.edges.map((edge) => ({
+          source: edge.source,
+          target: edge.target,
+          weight: edge.documents,
+        }))}
+        weightLabel={t('radial_documents')}
+        legend={groups.map((group) => {
+          const continent = CONTINENTS[group];
+          return {
+            label: t(continent ? CONTINENT_KEYS[continent] : 'continent_unknown'),
+            color: colorOf(group),
+          };
+        })}
+        onNodeClick={(key) => openInSearch(labelOf.get(key) ?? key, ['País'])}
+        exportName="colaboracao-radial"
       />
     </Suspense>
   );

@@ -132,7 +132,7 @@ const api = {
     const columns = collectColumns(dataset);
     const column =
       source === 'abstract' ? 'ABSTRACT' : pickColumn(columns, FIELD_CANDIDATES.keywords);
-    return column ? thematicMap(dataset, column, topWords) : null;
+    return column ? thematicMap(dataset, column, topWords, source === 'abstract' ? 'words' : 'keywords') : null;
   },
 
   /** Entidades disponíveis para comparação no boxplot. */

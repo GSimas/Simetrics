@@ -10,20 +10,24 @@ import { useEffect, useState } from 'react';
  *    carregamento é DERIVADO: se o resultado guardado não pertence às entradas atuais,
  *    ainda estamos carregando.
  *
- * 2. **Resultados obsoletos.** Trocar de filtro antes de a resposta anterior chegar
- *    mostraria dados que não correspondem mais aos controles na tela. Comparar a chave
- *    descarta o que ficou para trás.
+ * 2. **Resultados obsoletos.** Uma resposta que chega depois de a chave mudar é
+ *    descartada; até a nova chegar, o último resultado segue exibido (`loading` avisa
+ *    que ele está sendo substituído) — melhor que piscar o painel para vazio.
  *
  * @param key Identidade das entradas. Mude-a sempre que o cálculo deva refazer-se.
  * @param compute Função assíncrona, normalmente uma chamada ao worker.
+ * @param options.enabled Com `false`, não calcula e mantém o último resultado — para
+ *   esperar uma entrada que ainda está chegando de outro cálculo.
  */
 export function useAsyncResult<T>(
   key: string,
   compute: () => Promise<T>,
+  { enabled = true }: { enabled?: boolean } = {},
 ): { data: T | null; loading: boolean } {
   const [result, setResult] = useState<{ key: string; data: T } | null>(null);
 
   useEffect(() => {
+    if (!enabled) return;
     let cancelled = false;
 
     void (async () => {
@@ -37,8 +41,10 @@ export function useAsyncResult<T>(
     // `compute` é recriada a cada render por ser um closure sobre as entradas; a chave é
     // que define quando recalcular, e incluí-la nas dependências causaria laço infinito.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
+  }, [key, enabled]);
 
+  // Enquanto a nova chave calcula, o resultado anterior continua na tela: trocar um
+  // filtro não pisca o gráfico para uma mensagem de carregamento e de volta.
   const fresh = result?.key === key;
-  return { data: fresh ? result.data : null, loading: !fresh };
+  return { data: result?.data ?? null, loading: !fresh };
 }

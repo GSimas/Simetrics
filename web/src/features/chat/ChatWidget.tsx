@@ -11,6 +11,7 @@ import { getAiWorker } from '@/workers/client';
 import { cn } from '@/lib/utils';
 import { AiSettingsModal } from '@/components/AiSettingsModal';
 import { MarkdownContent } from '@/components/MarkdownContent';
+import { usePresence } from '@/lib/use-presence';
 
 /** Quantos documentos o BM25 seleciona por pergunta. */
 const CONTEXT_SIZE = 40;
@@ -23,6 +24,7 @@ export function ChatWidget() {
   const isAiConfigured = isConfigured();
 
   const [isOpen, setIsOpen] = useState(false);
+  const panel = usePresence(isOpen);
   const [aiModalOpen, setAiModalOpen] = useState(false);
   const [messages, setMessages] = useState<ChatTurn[]>([]);
   const [draft, setDraft] = useState('');
@@ -140,7 +142,7 @@ export function ChatWidget() {
             'group relative flex items-center rounded-full py-2.5 sm:py-3 text-white shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 focus:outline-hidden',
             isOpen
               ? 'gap-2.5 px-4 bg-slate-800 dark:bg-slate-700'
-              : 'gap-0 px-3.5 hover:gap-2.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 shadow-emerald-500/25 ring-2 ring-emerald-400/40',
+              : 'gap-0 px-3.5 hover:gap-2.5 bg-primary text-primary-foreground shadow-[0_0_28px_-8px_var(--highlight)]',
           )}
           title={isOpen ? (isEn ? 'Close Assistant' : 'Fechar Assistente') : t('chat_title')}
           aria-label={t('chat_title')}
@@ -152,8 +154,8 @@ export function ChatWidget() {
               <div className="relative shrink-0">
                 <Bot className="size-5" />
                 <span className="absolute -right-1 -top-1 flex size-2.5">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-75" />
-                  <span className="relative inline-flex size-2.5 rounded-full bg-emerald-400" />
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary-foreground opacity-50" />
+                  <span className="relative inline-flex size-2.5 rounded-full bg-primary-foreground" />
                 </span>
               </div>
               <span className="grid grid-cols-[0fr] group-hover:grid-cols-[1fr] transition-[grid-template-columns] duration-300 ease-out">
@@ -170,12 +172,19 @@ export function ChatWidget() {
       </div>
 
       {/* Janela Flutuante do Widget de Chat */}
-      {isOpen && (
-        <div className="fixed bottom-[116px] right-4 sm:right-6 z-50 flex h-[540px] max-h-[72vh] w-[94vw] sm:w-[440px] flex-col overflow-hidden rounded-2xl border border-border/90 bg-card/95 shadow-2xl backdrop-blur-md animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-4">
+      {panel.mounted && (
+        <div
+          className={cn(
+            'fixed bottom-[116px] right-4 sm:right-6 z-50 flex h-[540px] max-h-[72vh] w-[94vw] sm:w-[440px] origin-bottom-right flex-col overflow-hidden rounded-2xl border border-border/90 bg-card/95 shadow-2xl backdrop-blur-md duration-200',
+            panel.closing
+              ? 'animate-out fade-out-0 zoom-out-95 slide-out-to-bottom-2 fill-mode-forwards'
+              : 'animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-4',
+          )}
+        >
           {/* Cabeçalho do Widget */}
-          <div className="flex items-center justify-between border-b border-border/80 bg-gradient-to-r from-emerald-600/10 via-teal-600/5 to-transparent px-4 py-3">
+          <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <div className="flex items-center gap-2.5">
-              <div className="flex size-8 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-xs">
+              <div className="flex size-8 items-center justify-center bg-primary text-primary-foreground">
                 <Bot className="size-4.5" aria-hidden />
               </div>
               <div>
@@ -278,7 +287,7 @@ export function ChatWidget() {
                       className={cn(
                         'grid size-6.5 shrink-0 place-items-center rounded-full text-[10px] font-semibold shadow-2xs',
                         message.role === 'user'
-                          ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white'
+                          ? 'bg-primary text-primary-foreground'
                           : 'bg-emerald-600 text-white',
                       )}
                     >
@@ -293,7 +302,7 @@ export function ChatWidget() {
                       className={cn(
                         'max-w-[88%] rounded-xl px-3.5 py-2.5 text-xs leading-relaxed shadow-2xs',
                         message.role === 'user'
-                          ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium'
+                          ? 'bg-primary text-primary-foreground font-medium'
                           : 'border border-border/80 bg-card text-foreground',
                       )}
                     >
@@ -366,7 +375,7 @@ export function ChatWidget() {
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
                 placeholder={t('chat_placeholder')}
-                aria-label="Pergunta para o assistente"
+                aria-label="Pergunta para a Simi"
                 disabled={streaming || !active}
                 className="h-9 rounded-lg text-xs"
               />

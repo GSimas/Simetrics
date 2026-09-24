@@ -10,18 +10,33 @@ import { createElement } from 'react';
  *
  * As cores codificam categorias — agrupamentos, períodos, entidades comparadas — e não
  * intensidade, então precisam ser distinguíveis entre si e não formar um gradiente.
- * Escolhidas para permanecerem separáveis também nas formas mais comuns de daltonismo.
+ * Escolhidas para permanecerem separáveis também nas formas mais comuns de daltonismo,
+ * em tons médios da família Scientata legíveis tanto sobre a tinta quanto sobre o papel.
  */
 export const PALETTE = [
-  '#1273B9',
-  '#E8734A',
-  '#3FA96C',
-  '#A05FC4',
-  '#D8A13A',
-  '#4BAFC9',
-  '#D45D79',
-  '#7A8B99',
+  '#3FAE8F',
+  '#E56D45',
+  '#9AD63A',
+  '#6A7DFF',
+  '#E0B040',
+  '#4CC3D9',
+  '#D25F86',
+  '#8F9B95',
 ] as const;
+
+/**
+ * Paleta das comunidades detectadas pelo Louvain — compartilhada pelo grafo de forças
+ * (Sigma) e pelo diagrama de cordas, para a mesma comunidade ter a mesma cor nos dois.
+ * Qualitativa: a cor codifica pertencimento a um agrupamento, não intensidade.
+ */
+export const COMMUNITY_COLORS = [
+  '#3FAE8F', '#E56D45', '#9AD63A', '#6A7DFF', '#E0B040',
+  '#4CC3D9', '#D25F86', '#8F9B95', '#A37B4F', '#B07CE8',
+] as const;
+
+export function communityColor(community: number): string {
+  return COMMUNITY_COLORS[community % COMMUNITY_COLORS.length] as string;
+}
 
 /** Leitura dos quadrantes do mapa temático. */
 export const QUADRANT_NOTE =

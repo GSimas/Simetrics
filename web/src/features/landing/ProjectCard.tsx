@@ -54,7 +54,7 @@ export function ProjectCard({
   };
 
   return (
-    <Card className="flex flex-col shadow-xs transition-shadow hover:shadow-md">
+    <Card className="flex flex-col transition-colors hover:border-highlight/60">
       <CardHeader className="pb-3">
         {isEditing ? (
           <div className="flex items-center gap-1.5">
@@ -102,7 +102,6 @@ export function ProjectCard({
 
         <div className="flex flex-wrap items-center gap-1.5">
           <Button
-            variant="gradient"
             size="sm"
             onClick={() => onOpen(project.id)}
             className="flex-1 cursor-pointer font-medium"

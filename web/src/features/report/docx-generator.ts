@@ -12,6 +12,10 @@ import {
   AlignmentType,
   ShadingType,
   ImageRun,
+  Footer,
+  PageNumber,
+  TabStopType,
+  TabStopPosition,
 } from 'docx';
 
 import type { AnalyticsBundle, EntityTables } from '@/workers/analytics.worker';
@@ -23,6 +27,7 @@ import { FIELD, FIELD_CANDIDATES } from '@/lib/schema';
 import { collectColumns, pickColumn, toNumeric } from '@/core/text';
 import type { ReportSectionsSelection } from './pdf-generator';
 import {
+  BRAND,
   renderHorizontalBarChart,
   renderNetworkGraphCanvas,
   renderProductionTimelineCanvas,
@@ -42,6 +47,78 @@ export interface DocxReportData {
   selection: ReportSectionsSelection;
   topN: number;
   locale: 'pt' | 'en';
+}
+
+// Paleta Scientata (tema claro) em hexadecimal sem '#', como o docx espera
+const hex = (c: string) => c.slice(1).toUpperCase();
+const H = {
+  paper: hex(BRAND.paper),
+  card: hex(BRAND.card),
+  muted: hex(BRAND.muted),
+  border: hex(BRAND.border),
+  ink: hex(BRAND.ink),
+  inkMuted: hex(BRAND.inkMuted),
+  pine: hex(BRAND.pine),
+  lime: hex(BRAND.lime),
+};
+const SANS = 'Manrope';
+const SERIF = 'Instrument Serif';
+const MONO = 'DM Mono';
+
+// Contorno fino (0,5 pt) nas cores de borda da marca
+const hairline = { style: BorderStyle.SINGLE, size: 4, color: H.border };
+const hairlines = { top: hairline, bottom: hairline, left: hairline, right: hairline };
+
+/** Rótulo "eyebrow": mono, maiúsculo, espaçado. */
+function eyebrowRun(text: string, color: string = H.pine, size = 15): TextRun {
+  return new TextRun({ text: text.toUpperCase(), font: MONO, color, size, characterSpacing: 20 });
+}
+
+/** Cabeçalho de seção: eyebrow numerado em pinho + título em tinta. */
+function sectionHeading(num: number, title: string): Paragraph[] {
+  return [
+    new Paragraph({
+      children: [eyebrowRun(`— ${String(num).padStart(2, '0')}`)],
+      spacing: { before: 280, after: 40 },
+      keepNext: true,
+    }),
+    new Paragraph({
+      heading: HeadingLevel.HEADING_1,
+      children: [new TextRun({ text: title, bold: true, font: SANS, size: 28, color: H.ink })],
+      spacing: { before: 0, after: 120 },
+      keepNext: true,
+    }),
+  ];
+}
+
+/** Grade de cartões de KPI chapados: rótulo mono + valor grande. */
+function createKpiGrid(items: [string, string][], cols = 4): Table {
+  const colWidth = Math.floor(9020 / cols);
+  const rows: [string, string][][] = [];
+  for (let i = 0; i < items.length; i += cols) rows.push(items.slice(i, i + cols));
+  return new Table({
+    columnWidths: Array<number>(cols).fill(colWidth),
+    width: { size: colWidth * cols, type: WidthType.DXA },
+    rows: rows.map(
+      (row) =>
+        new TableRow({
+          cantSplit: true,
+          children: row.map(
+            ([label, value]) =>
+              new TableCell({
+                width: { size: colWidth, type: WidthType.DXA },
+                borders: hairlines,
+                shading: { type: ShadingType.CLEAR, fill: H.card },
+                margins: { top: 120, bottom: 120, left: 140, right: 140 },
+                children: [
+                  new Paragraph({ children: [eyebrowRun(label, H.inkMuted, 13)], spacing: { after: 60 } }),
+                  new Paragraph({ children: [new TextRun({ text: value, bold: true, font: SANS, size: 32, color: H.ink })] }),
+                ],
+              }),
+          ),
+        }),
+    ),
+  });
 }
 
 function formatVal(val: number | string, decimals = 4): string {
@@ -75,9 +152,7 @@ export async function generateDocxReport({
   const isEn = locale === 'en';
   const sectionsChildren: (Paragraph | Table)[] = [];
 
-  const primaryHex = '2563EB'; // Blue
-  const darkHex = '0F172A';
-  const tableHeaderBg = 'E2E8F0';
+  const tableHeaderBg = H.ink;
 
   const totalCitations = dataset.reduce((acc, d) => acc + (toNumeric(d[FIELD.TOTAL_CITATIONS]) ?? 0), 0);
   const meanCitations = dataset.length > 0 ? totalCitations / dataset.length : 0;
@@ -85,17 +160,29 @@ export async function generateDocxReport({
   // --- TÍTULO DO RELATÓRIO ---
   sectionsChildren.push(
     new Paragraph({
+      children: [eyebrowRun(isEn ? 'Simetrics · Scientometric Report' : 'Simetrics · Relatório Cientométrico')],
+      spacing: { after: 120 },
+    }),
+    // Título com palavra de destaque em serifa itálica
+    new Paragraph({
       heading: HeadingLevel.TITLE,
       children: [
         new TextRun({
-          text: isEn
-            ? 'SIMETRICS — Scientometric Intelligence Report'
-            : 'SIMETRICS — Relatório Cientométrico & Bibliométrico',
+          text: isEn ? 'Scientometric Intelligence ' : 'Relatório Cientométrico & ',
           bold: true,
-          size: 36,
-          color: primaryHex,
+          font: SANS,
+          size: 44,
+          color: H.ink,
+        }),
+        new TextRun({
+          text: isEn ? 'Report' : 'Bibliométrico',
+          italics: true,
+          font: SERIF,
+          size: 50,
+          color: H.pine,
         }),
       ],
+      spacing: { after: 80 },
     }),
     new Paragraph({
       children: [
@@ -106,12 +193,18 @@ export async function generateDocxReport({
             year: 'numeric',
             hour: '2-digit',
             minute: '2-digit',
-          })} · Desenvolvido por Gustavo Simas (gustavosimas.com)`,
-          italics: true,
+          })} · ${isEn ? 'Simetrics · A Scientata application' : 'Simetrics · Uma aplicação Scientata'}`,
+          font: SANS,
           size: 18,
-          color: '64748B',
+          color: H.inkMuted,
         }),
       ],
+      spacing: { after: 60 },
+    }),
+    // Régua fina em pinho com bloco curto em lima
+    new Paragraph({
+      border: { bottom: { style: BorderStyle.SINGLE, size: 8, color: H.pine, space: 1 } },
+      children: [new TextRun({ text: '\u2003\u2003\u2003', size: 8, shading: { type: ShadingType.CLEAR, fill: H.lime } })],
       spacing: { after: 300 },
     }),
   );
@@ -120,23 +213,26 @@ export async function generateDocxReport({
   if (selection.summary && overview) {
     sectionsChildren.push(
       new Paragraph({
-        heading: HeadingLevel.HEADING_1,
-        children: [
-          new TextRun({
-            text: isEn ? 'Executive Summary & Dataset Scope' : 'Resumo Executivo & Escopo da Base',
-            bold: true,
-            color: darkHex,
-          }),
-        ],
+        children: [eyebrowRun(isEn ? 'Executive Summary & Dataset Scope' : 'Resumo Executivo & Escopo da Base')],
         spacing: { before: 200, after: 100 },
+        keepNext: true,
       }),
       new Paragraph({
+        shading: { type: ShadingType.CLEAR, fill: H.card },
+        border: {
+          left: { style: BorderStyle.SINGLE, size: 18, color: H.pine, space: 8 },
+          top: { ...hairline, space: 6 },
+          bottom: { ...hairline, space: 6 },
+          right: { ...hairline, space: 8 },
+        },
         children: [
           new TextRun({
             text: isEn
               ? `This document presents a comprehensive bibliometric and scientometric evaluation based on ${dataset.length.toLocaleString('en-US')} publications indexed between ${overview.summary.timespan || 'N/A'}. In total, ${overview.summary.authorsCount.toLocaleString('en-US')} distinct authors and ${overview.summary.countriesCount.toLocaleString('en-US')} countries contributed to the corpus.`
               : `Este documento apresenta uma avaliação bibliométrica e cientométrica detalhada a partir de ${dataset.length.toLocaleString('pt-BR')} publicações indexadas entre ${overview.summary.timespan || 'N/A'}. Ao todo, ${overview.summary.authorsCount.toLocaleString('pt-BR')} autores distintos e ${overview.summary.countriesCount.toLocaleString('pt-BR')} países contribuíram com a produção acadêmica.`,
             size: 20,
+            font: SANS,
+            color: H.ink,
           }),
         ],
         spacing: { after: 200 },
@@ -148,48 +244,17 @@ export async function generateDocxReport({
   if (selection.kpis && overview) {
     const s = overview.summary;
     sectionsChildren.push(
-      new Paragraph({
-        heading: HeadingLevel.HEADING_1,
-        children: [
-          new TextRun({
-            text: isEn ? '1. Core Scientometric Indicators' : '1. Indicadores Cientométricos Globais',
-            bold: true,
-            color: darkHex,
-          }),
-        ],
-        spacing: { before: 200, after: 100 },
-      }),
-      createWordTable(
-        [
-          [isEn ? 'Metric' : 'Métrica', isEn ? 'Value' : 'Valor', isEn ? 'Metric' : 'Métrica', isEn ? 'Value' : 'Valor'],
-          [
-            isEn ? 'Total Documents' : 'Total de Documentos',
-            s.totalDocs.toLocaleString(isEn ? 'en-US' : 'pt-BR'),
-            isEn ? 'Total Authors' : 'Total de Autores',
-            s.authorsCount.toLocaleString(isEn ? 'en-US' : 'pt-BR'),
-          ],
-          [
-            isEn ? 'Total Citations' : 'Total de Citações',
-            totalCitations.toLocaleString(isEn ? 'en-US' : 'pt-BR'),
-            isEn ? 'Mean Citations/Doc' : 'Média de Citações/Doc',
-            meanCitations.toFixed(2),
-          ],
-          [
-            isEn ? 'Annual Growth Rate' : 'Crescimento Anual',
-            `${s.bibliometrix.growthRate.toFixed(2)}%`,
-            isEn ? 'Co-authors / Doc' : 'Coautores / Artigo',
-            s.bibliometrix.coauthIndex.toFixed(2),
-          ],
-          [
-            isEn ? 'Unique Countries' : 'Países Únicos',
-            s.countriesCount.toLocaleString(isEn ? 'en-US' : 'pt-BR'),
-            isEn ? 'Unique Venues' : 'Periódicos (Venues)',
-            s.venuesCount.toLocaleString(isEn ? 'en-US' : 'pt-BR'),
-          ],
-        ],
-        [2800, 1710, 2800, 1710],
-        tableHeaderBg,
-      ),
+      ...sectionHeading(1, isEn ? 'Core Scientometric Indicators' : 'Indicadores Cientométricos Globais'),
+      createKpiGrid([
+        [isEn ? 'Total Documents' : 'Total de Documentos', s.totalDocs.toLocaleString(isEn ? 'en-US' : 'pt-BR')],
+        [isEn ? 'Total Authors' : 'Total de Autores', s.authorsCount.toLocaleString(isEn ? 'en-US' : 'pt-BR')],
+        [isEn ? 'Total Citations' : 'Total de Citações', totalCitations.toLocaleString(isEn ? 'en-US' : 'pt-BR')],
+        [isEn ? 'Mean Citations/Doc' : 'Média de Citações/Doc', meanCitations.toFixed(2)],
+        [isEn ? 'Annual Growth Rate' : 'Crescimento Anual', `${s.bibliometrix.growthRate.toFixed(2)}%`],
+        [isEn ? 'Co-authors / Doc' : 'Coautores / Artigo', s.bibliometrix.coauthIndex.toFixed(2)],
+        [isEn ? 'Unique Countries' : 'Países Únicos', s.countriesCount.toLocaleString(isEn ? 'en-US' : 'pt-BR')],
+        [isEn ? 'Unique Venues' : 'Periódicos (Venues)', s.venuesCount.toLocaleString(isEn ? 'en-US' : 'pt-BR')],
+      ]),
     );
   }
 
@@ -230,17 +295,7 @@ export async function generateDocxReport({
     ];
 
     sectionsChildren.push(
-      new Paragraph({
-        heading: HeadingLevel.HEADING_1,
-        children: [
-          new TextRun({
-            text: isEn ? `2. Top ${topN} Authors by Production & Impact` : `2. Principais Autores (Top ${topN})`,
-            bold: true,
-            color: darkHex,
-          }),
-        ],
-        spacing: { before: 240, after: 100 },
-      }),
+      ...sectionHeading(2, isEn ? `Top ${topN} Authors by Production & Impact` : `Principais Autores (Top ${topN})`),
       createWordTable(
         authorRows,
         [500, 2920, 800, 1000, 600, 600, 600, 700, 1300],
@@ -293,17 +348,7 @@ export async function generateDocxReport({
     ];
 
     sectionsChildren.push(
-      new Paragraph({
-        heading: HeadingLevel.HEADING_1,
-        children: [
-          new TextRun({
-            text: isEn ? `3. Geographic Distribution (Top ${topN} Countries)` : `3. Distribuição Geográfica (Top ${topN} Países)`,
-            bold: true,
-            color: darkHex,
-          }),
-        ],
-        spacing: { before: 240, after: 100 },
-      }),
+      ...sectionHeading(3, isEn ? `Geographic Distribution (Top ${topN} Countries)` : `Distribuição Geográfica (Top ${topN} Países)`),
       createWordTable(
         countryRows,
         [600, 3420, 1200, 1400, 900, 1500],
@@ -379,17 +424,7 @@ export async function generateDocxReport({
     ];
 
     sectionsChildren.push(
-      new Paragraph({
-        heading: HeadingLevel.HEADING_1,
-        children: [
-          new TextRun({
-            text: isEn ? `4. Top Publishing Venues (Top ${topN})` : `4. Principais Veículos de Publicação (Top ${topN})`,
-            bold: true,
-            color: darkHex,
-          }),
-        ],
-        spacing: { before: 240, after: 100 },
-      }),
+      ...sectionHeading(4, isEn ? `Top Publishing Venues (Top ${topN})` : `Principais Veículos de Publicação (Top ${topN})`),
       createWordTable(
         venueRows,
         [600, 4120, 1100, 1200, 800, 1200],
@@ -413,17 +448,7 @@ export async function generateDocxReport({
     ];
 
     sectionsChildren.push(
-      new Paragraph({
-        heading: HeadingLevel.HEADING_1,
-        children: [
-          new TextRun({
-            text: isEn ? `5. Top Keywords & Lexicometrics (Top ${topN})` : `5. Palavras-Chave & Lexicometria (Top ${topN})`,
-            bold: true,
-            color: darkHex,
-          }),
-        ],
-        spacing: { before: 240, after: 100 },
-      }),
+      ...sectionHeading(5, isEn ? `Top Keywords & Lexicometrics (Top ${topN})` : `Palavras-Chave & Lexicometria (Top ${topN})`),
       createWordTable(
         kwRows,
         [600, 3920, 1100, 1200, 800, 1400],
@@ -468,19 +493,9 @@ export async function generateDocxReport({
     ];
 
     sectionsChildren.push(
-      new Paragraph({
-        heading: HeadingLevel.HEADING_1,
-        children: [
-          new TextRun({
-            text: isEn
-              ? `6. AI Semantic Thematic Clusters (Silhouette Score: ${clustering.silhouette.toFixed(3)})`
-              : `6. Agrupamento Temático por IA (Score Silhouette: ${clustering.silhouette.toFixed(3)})`,
-            bold: true,
-            color: darkHex,
-          }),
-        ],
-        spacing: { before: 240, after: 100 },
-      }),
+      ...sectionHeading(6, isEn
+              ? `AI Semantic Thematic Clusters (Silhouette Score: ${clustering.silhouette.toFixed(3)})`
+              : `Agrupamento Temático por IA (Score Silhouette: ${clustering.silhouette.toFixed(3)})`),
       createWordTable(
         themeRows,
         [600, 2420, 1000, 1000, 4000],
@@ -518,17 +533,7 @@ export async function generateDocxReport({
   if (selection.networkTopology && sna) {
     const g = sna.global;
     sectionsChildren.push(
-      new Paragraph({
-        heading: HeadingLevel.HEADING_1,
-        children: [
-          new TextRun({
-            text: isEn ? '7. Deep Knowledge Ecology & Network Topology' : '7. Topologia da Rede & Ecologia Profunda',
-            bold: true,
-            color: darkHex,
-          }),
-        ],
-        spacing: { before: 240, after: 100 },
-      }),
+      ...sectionHeading(7, isEn ? 'Deep Knowledge Ecology & Network Topology' : 'Topologia da Rede & Ecologia Profunda'),
       createWordTable(
         [
           [isEn ? 'Topology Metric' : 'Métrica Topológica', isEn ? 'Value' : 'Valor', isEn ? 'Topology Metric' : 'Métrica Topológica', isEn ? 'Value' : 'Valor'],
@@ -591,17 +596,7 @@ export async function generateDocxReport({
     ];
 
     sectionsChildren.push(
-      new Paragraph({
-        heading: HeadingLevel.HEADING_1,
-        children: [
-          new TextRun({
-            text: isEn ? `8. Highly Cited Seminal Documents (Top ${topN})` : `8. Documentos Mais Citados da Base (Top ${topN})`,
-            bold: true,
-            color: darkHex,
-          }),
-        ],
-        spacing: { before: 240, after: 100 },
-      }),
+      ...sectionHeading(8, isEn ? `Highly Cited Seminal Documents (Top ${topN})` : `Documentos Mais Citados da Base (Top ${topN})`),
       createWordTable(
         docRows,
         [500, 3620, 1900, 700, 800, 1500],
@@ -612,8 +607,40 @@ export async function generateDocxReport({
 
   // Monta o arquivo Docx com margens e dimensões A4 exatas
   const doc = new Document({
+    background: { color: H.paper },
+    styles: {
+      default: {
+        document: { run: { font: SANS, color: H.ink } },
+      },
+    },
     sections: [
       {
+        footers: {
+          default: new Footer({
+            children: [
+              new Paragraph({
+                border: { top: { ...hairline, space: 4 } },
+                tabStops: [{ type: TabStopType.RIGHT, position: TabStopPosition.MAX }],
+                children: [
+                  new TextRun({
+                    text: isEn
+                      ? 'Simetrics · A Scientata application · scientata.com'
+                      : 'Simetrics · Uma aplicação Scientata · scientata.com',
+                    font: SANS,
+                    size: 15,
+                    color: H.inkMuted,
+                  }),
+                  new TextRun({
+                    children: ['\t', isEn ? 'Page ' : 'Página ', PageNumber.CURRENT, isEn ? ' of ' : ' de ', PageNumber.TOTAL_PAGES],
+                    font: MONO,
+                    size: 15,
+                    color: H.inkMuted,
+                  }),
+                ],
+              }),
+            ],
+          }),
+        },
         properties: {
           page: {
             margin: {
@@ -654,12 +681,7 @@ function createWordTable(data: string[][], colWidthsDxa: number[], headerBgHex: 
         cantSplit: true,
         children: row.map((cellText, colIndex) => {
           const colWidth = colWidthsDxa[colIndex] ?? 1000;
-          const borders = {
-            top: { style: BorderStyle.SINGLE, size: 1, color: 'CBD5E1' },
-            bottom: { style: BorderStyle.SINGLE, size: 1, color: 'CBD5E1' },
-            left: { style: BorderStyle.SINGLE, size: 1, color: 'CBD5E1' },
-            right: { style: BorderStyle.SINGLE, size: 1, color: 'CBD5E1' },
-          };
+          const borders = hairlines;
 
           const paragraph = new Paragraph({
             alignment: isHeader ? AlignmentType.LEFT : AlignmentType.LEFT,
@@ -667,8 +689,9 @@ function createWordTable(data: string[][], colWidthsDxa: number[], headerBgHex: 
               new TextRun({
                 text: cellText,
                 bold: isHeader,
+                font: SANS,
                 size: 17,
-                color: isHeader ? '0F172A' : '334155',
+                color: isHeader ? H.paper : H.ink,
               }),
             ],
           });
@@ -682,9 +705,11 @@ function createWordTable(data: string[][], colWidthsDxa: number[], headerBgHex: 
             });
           }
 
+          // Corpo alternando cartão / papel
           return new TableCell({
             width: { size: colWidth, type: WidthType.DXA },
             borders,
+            shading: { type: ShadingType.CLEAR, fill: rowIndex % 2 === 1 ? H.card : H.paper },
             children: [paragraph],
           });
         }),

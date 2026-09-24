@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 
+import { SectionTitle } from '@/components/InfoTip';
+
 import { Button } from '@/components/ui/button';
 import {
   Card,
-  CardContent,
   CardDescription,
+  CardContent,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
@@ -196,12 +198,9 @@ export default function FeedbackTab() {
   }
 
   return (
-    <Card className="border-t-4 border-t-amber-500 shadow-xs">
+    <Card>
       <CardHeader>
-        <CardTitle className="text-base font-bold text-foreground">{t('feedback_title')}</CardTitle>
-        <CardDescription>
-          {t('feedback_desc')}
-        </CardDescription>
+        <SectionTitle title={t('feedback_title')} info={t('feedback_desc')} />
       </CardHeader>
 
       <CardContent>
@@ -271,12 +270,7 @@ export default function FeedbackTab() {
           <Separator />
 
           <section className="space-y-4">
-            <div>
-              <h3 className="text-sm font-semibold">{t('feedback_part2')}</h3>
-              <p className="text-sm text-muted-foreground">
-                {t('feedback_part2_desc')}
-              </p>
-            </div>
+            <SectionTitle title={t('feedback_part2')} info={t('feedback_part2_desc')} />
 
             {susStatements.map((statement, index) => {
               const name = `sus_${String(index + 1).padStart(2, '0')}`;
@@ -326,9 +320,8 @@ export default function FeedbackTab() {
 
           <Button
             type="submit"
-            variant="gradient"
             disabled={sending}
-            className="w-full font-semibold shadow-xs"
+            className="w-full"
           >
             {sending ? (isEn ? 'Submitting...' : 'Enviando…') : t('feedback_submit_btn')}
           </Button>

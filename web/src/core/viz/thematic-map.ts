@@ -4,6 +4,7 @@ import louvain from 'graphology-communities-louvain';
 import type { Dataset } from '@/lib/types';
 import { WORDCLOUD_STOP_WORDS } from '../ml/wordcloud-stop-words';
 import { mean } from '../stats';
+import { splitTokens } from '../text';
 
 /**
  * Mapa temático — ⇄ `gerar_mapa_tematico` (utils.py:2450).
@@ -61,10 +62,15 @@ export interface ThematicMap {
   meanDensity: number;
 }
 
+/**
+ * `words` quebra o texto em palavras (resumos); `keywords` mantém cada palavra-chave
+ * inteira, separada por `;` — "water distribution" é um termo, não dois.
+ */
 export function thematicMap(
   rows: Dataset,
   column: string,
   topWords = 150,
+  tokens: 'words' | 'keywords' = 'words',
 ): ThematicMap | null {
   // Tokeniza cada documento, descartando stop words.
   const documents: string[][] = [];
@@ -75,15 +81,16 @@ export function thematicMap(
     if (!text.trim()) continue;
 
     const words: string[] = [];
-    WORD_PATTERN.lastIndex = 0;
-
-    let match: RegExpExecArray | null;
-    while ((match = WORD_PATTERN.exec(text)) !== null) {
-      const word = match[0];
-      if (STOP_WORDS.has(word)) continue;
-      words.push(word);
-      totalFrequency.set(word, (totalFrequency.get(word) ?? 0) + 1);
+    if (tokens === 'keywords') {
+      words.push(...new Set(splitTokens(text)));
+    } else {
+      WORD_PATTERN.lastIndex = 0;
+      let match: RegExpExecArray | null;
+      while ((match = WORD_PATTERN.exec(text)) !== null) {
+        if (!STOP_WORDS.has(match[0])) words.push(match[0]);
+      }
     }
+    for (const word of words) totalFrequency.set(word, (totalFrequency.get(word) ?? 0) + 1);
 
     if (words.length > 0) documents.push(words);
   }

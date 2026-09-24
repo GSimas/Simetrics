@@ -17,7 +17,41 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#1273B9" />
+    <meta name="theme-color" content="#07110f" />
+
+    <!-- Tipografia Scientata: Manrope (texto), Instrument Serif (destaques), DM Mono (rótulos) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;500;600;700;800&display=swap"
+    />
+
+    <!-- Aplica as preferências antes do primeiro paint (tema escuro por padrão, como o
+         Scientata; tamanho da letra; alto contraste). Mesmas chaves de
+         src/state/preferences.store.ts. -->
+    <script>
+      (function () {
+        var root = document.documentElement;
+        try {
+          if (localStorage.getItem('simetrics-theme') !== 'light') root.classList.add('dark');
+          var font = localStorage.getItem('simetrics-font');
+          root.dataset.font = font === 'min' || font === 'max' ? font : 'med';
+          if (localStorage.getItem('simetrics-contrast') === 'high') root.dataset.contrast = 'high';
+        } catch (e) {
+          root.classList.add('dark');
+        }
+      })();
+    </script>
+    <style>
+      html { background: #f0eee6; color: #07110f; }
+      html.dark { background: #07110f; color: #f0eee6; }
+      /* O espelho de marketing existe para rastreadores (o texto está no HTML). Para quem
+         tem JavaScript, o React o substitui antes de 2,5 s; sem este atraso ele piscaria
+         na tela a cada carregamento. Só aparece se o app não subir. */
+      #seo-fallback { opacity: 0; animation: seo-reveal 0.4s ease-out 2.5s forwards; }
+      @keyframes seo-reveal { to { opacity: 1; } }
+    </style>
 
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
@@ -87,7 +121,7 @@
             "name": "O Simetrics é gratuito?",
             "acceptedAnswer": {
               "@type": "Answer",
-              "text": "Sim, totalmente gratuito e sem necessidade de cadastro. Os recursos de IA (categorização temática, assistente científico) são opcionais e usam a chave de API do próprio usuário (BYOK)."
+              "text": "Sim, totalmente gratuito e sem necessidade de cadastro. Os recursos de IA (categorização temática, assistente científica) são opcionais e usam a chave de API do próprio usuário (BYOK)."
             }
           },
           {
@@ -167,12 +201,12 @@
         Manter em sincronia com as chaves `landing_*`/`app_*` de src/lib/i18n/translations.ts
         (só a versão pt — HTML bruto não escolhe idioma) sempre que o texto da landing mudar.
       -->
-      <div id="seo-fallback" style="max-width: 48rem; margin: 0 auto; padding: 3rem 1.5rem; text-align: center; font-family: system-ui, -apple-system, sans-serif;">
+      <div id="seo-fallback" style="max-width: 48rem; margin: 0 auto; padding: 3rem 1.5rem; text-align: center; font-family: Manrope, system-ui, sans-serif;">
         <h1 style="font-size: 2rem; font-weight: 800; margin: 0 0 0.5rem;">Simetrics</h1>
-        <p style="font-size: 1.125rem; font-weight: 500; color: #475569; margin: 0 0 1.5rem;">
+        <p style="font-size: 1.125rem; font-weight: 500; opacity: 0.72; margin: 0 0 1.5rem;">
           Plataforma de Inteligência Bibliométrica &amp; Mapeamento Científico
         </p>
-        <p style="font-size: 1rem; color: #475569; margin: 0 0 2rem;">
+        <p style="font-size: 1rem; opacity: 0.72; margin: 0 0 2rem;">
           O Simetrics transforma exports de bases bibliográficas (Scopus, Web of Science,
           SciELO e mais) em indicadores cientométricos, redes de colaboração e mapeamento
           temático por Inteligência Artificial — tudo processado no seu navegador, sem
@@ -180,19 +214,19 @@
         </p>
 
         <h2 style="font-size: 1rem; font-weight: 700; margin: 0 0 0.25rem;">100% no seu navegador</h2>
-        <p style="font-size: 0.875rem; color: #475569; margin: 0 0 1rem;">
+        <p style="font-size: 0.875rem; opacity: 0.72; margin: 0 0 1rem;">
           Seus dados nunca saem do seu computador. Todo o processamento roda via Web
           Workers, direto no navegador.
         </p>
 
         <h2 style="font-size: 1rem; font-weight: 700; margin: 0 0 0.25rem;">Ecologia do Conhecimento</h2>
-        <p style="font-size: 0.875rem; color: #475569; margin: 0 0 1rem;">
+        <p style="font-size: 0.875rem; opacity: 0.72; margin: 0 0 1rem;">
           Mapeie a estrutura intelectual da sua base através de grafos, métricas de rede,
           PCA e similaridade.
         </p>
 
         <h2 style="font-size: 1rem; font-weight: 700; margin: 0 0 0.25rem;">Inteligência Artificial</h2>
-        <p style="font-size: 0.875rem; color: #475569; margin: 0 0 2rem;">
+        <p style="font-size: 0.875rem; opacity: 0.72; margin: 0 0 2rem;">
           Categorização temática automática e assistente conversacional sobre a sua base
           de artigos.
         </p>
@@ -200,23 +234,23 @@
         <h2 style="font-size: 1.125rem; font-weight: 700; margin: 0 0 1rem;">Perguntas frequentes</h2>
 
         <h3 style="font-size: 0.95rem; font-weight: 600; margin: 0 0 0.25rem;">O que é o Simetrics?</h3>
-        <p style="font-size: 0.875rem; color: #475569; margin: 0 0 1rem;">
+        <p style="font-size: 0.875rem; opacity: 0.72; margin: 0 0 1rem;">
           Uma plataforma gratuita de bibliometria e cientometria. Ela transforma exports de
           bases acadêmicas (Scopus, Web of Science, SciELO e outras) em indicadores
           cientométricos, redes de colaboração e mapeamento temático por IA.
         </p>
 
         <h3 style="font-size: 0.95rem; font-weight: 600; margin: 0 0 0.25rem;">O Simetrics é gratuito?</h3>
-        <p style="font-size: 0.875rem; color: #475569; margin: 0 0 1rem;">
+        <p style="font-size: 0.875rem; opacity: 0.72; margin: 0 0 1rem;">
           Sim, totalmente gratuito e sem necessidade de cadastro. Os recursos de IA
-          (categorização temática, assistente científico) são opcionais e usam a chave de
+          (categorização temática, assistente científica) são opcionais e usam a chave de
           API do próprio usuário (BYOK).
         </p>
 
         <h3 style="font-size: 0.95rem; font-weight: 600; margin: 0 0 0.25rem;">
           Meus dados ficam salvos onde? É seguro enviar minha base?
         </h3>
-        <p style="font-size: 0.875rem; color: #475569; margin: 0 0 1rem;">
+        <p style="font-size: 0.875rem; opacity: 0.72; margin: 0 0 1rem;">
           Todo o processamento acontece no seu navegador — os documentos nunca são
           enviados a nenhum servidor. Os projetos que você salva ficam armazenados
           localmente, neste navegador e neste dispositivo, via IndexedDB.
@@ -225,7 +259,7 @@
         <h3 style="font-size: 0.95rem; font-weight: 600; margin: 0 0 0.25rem;">
           Quais formatos de arquivo o Simetrics aceita?
         </h3>
-        <p style="font-size: 0.875rem; color: #475569; margin: 0 0 1rem;">
+        <p style="font-size: 0.875rem; opacity: 0.72; margin: 0 0 1rem;">
           RIS (SciELO, Web of Science, Scopus, Mendeley, Cochrane), CSV (Scopus, Cochrane),
           Excel (Web of Science) e TXT/NBIB (PubMed).
         </p>
@@ -233,7 +267,7 @@
         <h3 style="font-size: 0.95rem; font-weight: 600; margin: 0 0 0.25rem;">
           Preciso de conta ou chave de API para usar?
         </h3>
-        <p style="font-size: 0.875rem; color: #475569; margin: 0;">
+        <p style="font-size: 0.875rem; opacity: 0.72; margin: 0;">
           Não. A análise bibliométrica completa funciona sem conta e sem chave de API. Uma
           chave própria (Gemini, OpenAI, Claude ou OpenRouter) só é necessária para os
           recursos opcionais de IA.

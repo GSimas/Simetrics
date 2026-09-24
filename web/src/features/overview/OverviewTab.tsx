@@ -1,27 +1,28 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import {
+  BarChart3,
   BookOpen,
   Building2,
   CalendarRange,
-  Copy,
   Globe2,
+  Layers,
   Quote,
+  ShieldCheck,
+  Sparkles,
+  Table2,
   TrendingUp,
   Users,
 } from 'lucide-react';
 
 import type { Trace } from '@/components/charts/plotly';
+import { SectionTitle } from '@/components/InfoTip';
+import { Collapse } from '@/components/Collapse';
 import { KpiCard } from '@/components/KpiCard';
+import { Launcher, LauncherGrid } from '@/components/Launcher';
 import { UploadPanel } from '@/components/UploadPanel';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -39,11 +40,14 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import type { ProductionCategory, ProductionSeries } from '@/core/viz/production-timeline';
-import type { Dataset, MetadataCompleteness } from '@/lib/types';
+import type { Dataset, MetadataCompleteness, SearchEntityType } from '@/lib/types';
 import { useAsyncResult } from '@/lib/use-async-result';
+import { useStickyValue } from '@/lib/use-sticky-value';
+import { cn } from '@/lib/utils';
 import { useDataset, type DedupStrategy } from '@/state/dataset.store';
 import { useLocale } from '@/state/locale.store';
 import { getAnalyticsWorker } from '@/workers/client';
+import { openInSearch } from '@/state/navigation.store';
 import { EntityTables } from './EntityTables';
 import { ThemePanel } from './ThemePanel';
 import { VisualAnalyses } from './VisualAnalyses';
@@ -61,6 +65,12 @@ const PRODUCTION_CATEGORIES: readonly ProductionCategory[] = [
 
 type ProductionChartMode = 'bars-grouped' | 'bars-stacked' | 'line';
 
+/** Categorias cujas séries são entidades do Motor de Busca — clicar abre o perfil. */
+const PRODUCTION_SEARCH_TYPES: Partial<Record<ProductionCategory, SearchEntityType[]>> = {
+  Países: ['País'],
+  'Temas (IA)': ['Tema'],
+};
+
 const STATUS_VARIANT: Record<MetadataCompleteness['status'], 'success' | 'default' | 'warning' | 'destructive'> = {
   Excelente: 'success',
   Bom: 'default',
@@ -70,9 +80,15 @@ const STATUS_VARIANT: Record<MetadataCompleteness['status'], 'success' | 'defaul
 
 export default function OverviewTab() {
   const active = useDataset((state) => state.active);
-  const overview = useDataset((state) => state.overview);
-  const tables = useDataset((state) => state.tables);
+  // Após deduplicar ou mapear temas, as análises voltam a `null` até o worker
+  // recalcular. Mostrar as anteriores nesse intervalo (esmaecidas) evita que KPIs e
+  // blocos sumam e reapareçam.
+  const { value: overview, stale: overviewStale } = useStickyValue(
+    useDataset((state) => state.overview),
+  );
+  const { value: tables } = useStickyValue(useDataset((state) => state.tables));
   const duplicates = useDataset((state) => state.duplicates);
+  const shownDuplicates = useStickyValue(duplicates.length > 0 ? duplicates : null).value ?? [];
   const dedupStrategy = useDataset((state) => state.dedupStrategy);
   const computeOverview = useDataset((state) => state.computeOverview);
   const computeTables = useDataset((state) => state.computeTables);
@@ -105,15 +121,18 @@ export default function OverviewTab() {
     return (
       <div className="space-y-4">
         <UploadPanel />
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('empty_start_title')}</CardTitle>
-            <CardDescription>{t('empty_start_desc')}</CardDescription>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            {t('empty_client_note')}
-          </CardContent>
-        </Card>
+        <div className="border border-dashed border-border p-10 text-center">
+          <SectionTitle
+            className="justify-center"
+            title={t('empty_start_title')}
+            info={
+              <>
+                <p>{t('empty_start_desc')}</p>
+                <p>{t('empty_client_note')}</p>
+              </>
+            }
+          />
+        </div>
       </div>
     );
   }
@@ -121,12 +140,105 @@ export default function OverviewTab() {
   const summary = overview?.summary;
   const metrics = summary?.bibliometrix;
 
+  const dedupCard = (
+    <Card>
+      <CardHeader className="pb-3">
+        <SectionTitle title={t('dedup_title')} info={t('dedup_description')} />
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="w-72 sm:w-80">
+            <Select
+              value={selectedStrategy}
+              onValueChange={(val) => setSelectedStrategy(val as DedupStrategy)}
+              disabled={busy}
+            >
+              <SelectTrigger className="h-9">
+                <SelectValue placeholder={t('dedup_strategy_label')} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">{t('dedup_none')}</SelectItem>
+                <SelectItem value="doi">{t('dedup_doi')}</SelectItem>
+                <SelectItem value="similarity">{t('dedup_similarity')}</SelectItem>
+                <SelectItem value="both">{t('dedup_both')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Button
+            size="sm"
+            disabled={busy}
+            onClick={() => void applyDedup(selectedStrategy)}
+            className="cursor-pointer"
+          >
+            {t('dedup_execute_btn')}
+          </Button>
+
+          {dedupStrategy !== 'none' && <Badge variant="blue">{dedupLabels[dedupStrategy]}</Badge>}
+
+          {duplicates.length > 0 && (
+            <Badge variant="warning">
+              {duplicates.length.toLocaleString('pt-BR')} {t('dedup_removed')}
+            </Badge>
+          )}
+        </div>
+
+        {/* O relatório abre e fecha animado; durante o fechamento mostra a última lista. */}
+        <Collapse open={duplicates.length > 0} delayOpen={false}>
+            <div className="space-y-3 pt-2">
+              <SectionTitle
+                title="Relatório de documentos excluídos"
+                info="Cada linha indica o documento removido e qual foi mantido em seu lugar."
+              />
+              <div className="max-h-96 overflow-auto border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Documento removido</TableHead>
+                      <TableHead>Mantido no lugar</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {shownDuplicates.slice(0, 200).map((doc, index) => (
+                      <TableRow key={`${String(doc['TITLE'])}-${index}`}>
+                        <TableCell className="max-w-96 truncate" title={String(doc['TITLE'])}>
+                          {String(doc['TITLE'])}
+                        </TableCell>
+                        <TableCell
+                          className="max-w-96 truncate"
+                          title={doc['DOCUMENTO DE REFERÊNCIA (MANTIDO)']}
+                        >
+                          {doc['DOCUMENTO DE REFERÊNCIA (MANTIDO)']}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              {shownDuplicates.length > 200 && (
+                <p className="eyebrow">
+                  Exibindo as 200 primeiras de {shownDuplicates.length.toLocaleString('pt-BR')}.
+                </p>
+              )}
+            </div>
+        </Collapse>
+      </CardContent>
+    </Card>
+  );
+
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <UploadPanel />
 
       {summary && metrics && (
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        <div
+          aria-busy={overviewStale}
+          className={cn(
+            'grid grid-cols-2 gap-3 transition-opacity duration-300 animate-in fade-in-0 sm:gap-4 lg:grid-cols-4',
+            overviewStale && 'opacity-60',
+          )}
+        >
           <KpiCard
             title={t('kpi_docs')}
             value={summary.totalDocs}
@@ -186,66 +298,15 @@ export default function OverviewTab() {
         </div>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{t('dedup_title')}</CardTitle>
-          <CardDescription>{t('dedup_description')}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="w-72 sm:w-80">
-              <Select
-                value={selectedStrategy}
-                onValueChange={(val) => setSelectedStrategy(val as DedupStrategy)}
-                disabled={busy}
-              >
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder={t('dedup_strategy_label')} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">{t('dedup_none')}</SelectItem>
-                  <SelectItem value="doi">{t('dedup_doi')}</SelectItem>
-                  <SelectItem value="similarity">{t('dedup_similarity')}</SelectItem>
-                  <SelectItem value="both">{t('dedup_both')}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <Button
-              size="sm"
-              variant="default"
-              disabled={busy}
-              onClick={() => void applyDedup(selectedStrategy)}
-              className="gap-2 cursor-pointer font-medium"
-            >
-              {t('dedup_execute_btn')}
-            </Button>
-
-            {dedupStrategy !== 'none' && (
-              <Badge variant="blue" className="text-xs">
-                {dedupLabels[dedupStrategy]}
-              </Badge>
-            )}
-
-            {duplicates.length > 0 && (
-              <Badge variant="warning" className="text-xs">
-                {duplicates.length.toLocaleString('pt-BR')} {t('dedup_removed')}
-              </Badge>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      <ThemePanel />
-
-      {overview && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">{t('meta_quality_title')}</CardTitle>
-            <CardDescription>{t('meta_quality_description')}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto rounded-md border">
+      <LauncherGrid label={t('launcher_section')} intro={dedupCard}>
+        {overview && (
+          <Launcher
+            Icon={ShieldCheck}
+            title={t('meta_quality_title')}
+            summary={t('sum_meta')}
+            info={t('meta_quality_description')}
+          >
+            <div className="overflow-x-auto border">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -277,115 +338,31 @@ export default function OverviewTab() {
                 </TableBody>
               </Table>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </Launcher>
+        )}
 
-      {overview && (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <ProductionTimelineCard dataset={active} />
+        {overview && (
+          <Launcher Icon={BarChart3} title={t('prod_title')} summary={t('sum_prod')} info={t('prod_description')}>
+            <ProductionTimeline dataset={active} />
+          </Launcher>
+        )}
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">{t('lotka_title')}</CardTitle>
-              <CardDescription>{t('lotka_description')}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Suspense fallback={<ChartSkeleton />}>
-                {overview.lotka && (
-                  <PlotlyChart
-                    exportName="lei-de-lotka"
-                    height={320}
-                    data={[
-                      {
-                        type: 'scatter',
-                        mode: 'lines',
-                        name: 'Observado',
-                        x: overview.lotka.observed.map((point) => point.articles),
-                        y: overview.lotka.observed.map((point) => point.frequency),
-                        line: { color: '#1273B9', width: 2 },
-                      },
-                      {
-                        type: 'scatter',
-                        mode: 'lines',
-                        name: 'Teórico (Lotka)',
-                        x: overview.lotka.theoretical.map((point) => point.articles),
-                        y: overview.lotka.theoretical.map((point) => point.frequency),
-                        line: { color: '#E8734A', width: 2, dash: 'dash' },
-                      },
-                    ]}
-                    layout={{
-                      xaxis: { title: { text: 'Artigos publicados' } },
-                      yaxis: { title: { text: 'Proporção de autores' } },
-                      legend: { x: 0.6, y: 0.95 },
-                    }}
-                  />
-                )}
-              </Suspense>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+        <Launcher Icon={Layers} title={t('visual_title')} summary={t('sum_visual')} info={t('visual_description')}>
+          <VisualAnalyses dataset={active} />
+        </Launcher>
 
-      {duplicates.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Copy className="size-4" aria-hidden />
-              Relatório de documentos excluídos
-            </CardTitle>
-            <CardDescription>
-              Cada linha indica o documento removido e qual foi mantido em seu lugar.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="max-h-80 overflow-auto rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Documento removido</TableHead>
-                    <TableHead>Mantido no lugar</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {duplicates.slice(0, 200).map((doc, index) => (
-                    <TableRow key={`${String(doc['TITLE'])}-${index}`}>
-                      <TableCell className="max-w-96 truncate" title={String(doc['TITLE'])}>
-                        {String(doc['TITLE'])}
-                      </TableCell>
-                      <TableCell
-                        className="max-w-96 truncate"
-                        title={doc['DOCUMENTO DE REFERÊNCIA (MANTIDO)']}
-                      >
-                        {doc['DOCUMENTO DE REFERÊNCIA (MANTIDO)']}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-            {duplicates.length > 200 && (
-              <p className="mt-2 text-xs text-muted-foreground">
-                Exibindo as 200 primeiras de {duplicates.length.toLocaleString('pt-BR')}.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      )}
+        <Launcher Icon={Sparkles} title={t('theme_title')} summary={t('sum_theme')} info={t('theme_description')}>
+          <ThemePanel />
+        </Launcher>
 
-      <VisualAnalyses dataset={active} />
-
-      {tables && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">{t('tables_title')}</CardTitle>
-            <CardDescription>{t('tables_description')}</CardDescription>
-          </CardHeader>
-          <CardContent>
+        {tables && (
+          <Launcher Icon={Table2} title={t('tables_title')} summary={t('sum_tables')} info={t('tables_description')}>
             <EntityTables tables={tables} />
-          </CardContent>
-        </Card>
-      )}
+          </Launcher>
+        )}
+
+
+      </LauncherGrid>
     </div>
   );
 }
@@ -403,7 +380,7 @@ function ChartSkeleton() {
  * modo de visualização (barras separadas/agrupadas ou linha) são estado de UI puro;
  * só a categoria dispara um novo cálculo no worker (`core/viz/production-timeline.ts`).
  */
-function ProductionTimelineCard({ dataset }: { dataset: Dataset }) {
+function ProductionTimeline({ dataset }: { dataset: Dataset }) {
   const t = useLocale((state) => state.t);
   const hasThemes = useDataset((state) => state.clustering !== null);
   const [category, setCategory] = useState<ProductionCategory>('Total');
@@ -425,12 +402,7 @@ function ProductionTimelineCard({ dataset }: { dataset: Dataset }) {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">{t('prod_title')}</CardTitle>
-        <CardDescription>{t('prod_description')}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
+    <div className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="prod-category">{t('prod_category_label')}</Label>
@@ -479,7 +451,12 @@ function ProductionTimelineCard({ dataset }: { dataset: Dataset }) {
           <Suspense fallback={<ChartSkeleton />}>
             <PlotlyChart
               exportName="producao-por-ano"
-              height={340}
+              onPointClick={
+                PRODUCTION_SEARCH_TYPES[category]
+                  ? (point) => openInSearch(point.data?.name, PRODUCTION_SEARCH_TYPES[category] ?? [])
+                  : undefined
+              }
+              height={440}
               data={resolvedSeries.map((entry, index): Trace => {
                 const color = PALETTE[index % PALETTE.length] as string;
                 const x = entry.points.map((point) => point.year);
@@ -515,7 +492,6 @@ function ProductionTimelineCard({ dataset }: { dataset: Dataset }) {
             />
           </Suspense>
         )}
-      </CardContent>
-    </Card>
+    </div>
   );
 }

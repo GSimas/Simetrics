@@ -118,7 +118,7 @@ export function AiSettingsModal({ open, onOpenChange }: AiSettingsModalProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl overflow-hidden p-0 border-border/80 bg-card shadow-2xl rounded-2xl">
-        <div className="h-1.5 w-full bg-gradient-to-r from-purple-600 via-indigo-500 to-blue-600" />
+        <div className="h-0.5 w-full bg-highlight" />
 
         <div className="p-6 space-y-5">
           <DialogHeader className="space-y-1.5">
@@ -338,31 +338,5 @@ export function AiSettingsModal({ open, onOpenChange }: AiSettingsModalProps) {
         </div>
       </DialogContent>
     </Dialog>
-  );
-}
-
-export function AiSettingsButton({ onClick }: { onClick: () => void }) {
-  const t = useLocale((state) => state.t);
-  const isConfigured = useAiConfig((state) => state.isConfigured());
-
-  return (
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={onClick}
-      className={`h-9 gap-1.5 rounded-xl border text-xs font-semibold shadow-2xs transition-all ${
-        isConfigured
-          ? 'border-purple-300/80 bg-purple-50/70 text-purple-800 hover:bg-purple-100 dark:border-purple-900/60 dark:bg-purple-950/60 dark:text-purple-300'
-          : 'border-border/80 bg-card/80 text-foreground hover:bg-muted'
-      }`}
-      title={isConfigured ? t('ai_configured') : t('ai_not_configured')}
-    >
-      <KeyRound
-        className={`size-3.5 ${isConfigured ? 'text-purple-600 dark:text-purple-400' : 'text-muted-foreground'}`}
-        aria-hidden
-      />
-      <span>{t('ai_settings_btn')}</span>
-      {isConfigured && <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />}
-    </Button>
   );
 }

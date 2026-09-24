@@ -1,18 +1,16 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
-import { Info } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 
+import { Collapse } from '@/components/Collapse';
 import { DataTable } from '@/components/DataTable';
+import { EntityChip } from '@/components/EntityChip';
+import { InfoTip, SectionTitle } from '@/components/InfoTip';
 import { Badge } from '@/components/ui/badge';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -22,16 +20,37 @@ import {
 } from '@/components/ui/select';
 import type { CooccurrenceKind, SizeMetric } from '@/core/graph';
 import type { GlobalMetrics } from '@/core/graph/metrics';
-import type { SnaNodeMetrics } from '@/lib/types';
+import type { SearchEntityType, SnaNodeMetrics } from '@/lib/types';
+import { communityColor } from '@/features/overview/viz-shared';
+import { useStickyValue } from '@/lib/use-sticky-value';
+import { cn } from '@/lib/utils';
 import { useDataset } from '@/state/dataset.store';
 import { useLocale } from '@/state/locale.store';
+import { openInSearch } from '@/state/navigation.store';
 import { EmptyState } from '@/features/EmptyState';
 import { CollaborationPanel } from './CollaborationPanel';
 
 const SigmaGraph = lazy(() => import('@/components/charts/SigmaGraph'));
+const RadialGraph = lazy(() => import('@/components/charts/RadialGraph'));
 
 const NETWORK_KINDS: CooccurrenceKind[] = ['Coautoria', 'Palavras-chave', 'Países'];
 const TOP_N_OPTIONS = [20, 30, 50, 75, 100] as const;
+
+/** Tipo de entidade do Motor de Busca para cada tipo de nó do grafo heterogêneo. */
+const SNA_SEARCH_TYPES: Record<string, SearchEntityType[]> = {
+  Documento: ['Documento'],
+  Autor: ['Autor'],
+  País: ['País'],
+  Venue: ['Local de Publicação (Venue)'],
+  'Local de Publicação (Venue)': ['Local de Publicação (Venue)'],
+};
+
+/** Tipo de entidade do Motor de Busca para os nós de cada rede. */
+const NETWORK_SEARCH_TYPES: Record<CooccurrenceKind, SearchEntityType[]> = {
+  Coautoria: ['Autor'],
+  'Palavras-chave': ['Palavra-chave'],
+  Países: ['País'],
+};
 const SIZE_METRICS: SizeMetric[] = [
   'Tamanho Fixo',
   'Grau Absoluto',
@@ -142,59 +161,104 @@ function NetworkMetricCard({
   value: number | string;
   hint: string;
 }) {
-  const [showTooltip, setShowTooltip] = useState(false);
-
   return (
-    <div className="relative rounded-xl border border-border/80 bg-gradient-to-br from-purple-500/[0.04] via-card to-card p-3 shadow-2xs transition-all hover:border-purple-300">
+    <div className="border border-border bg-card p-4 transition-colors hover:border-highlight/60">
       <div className="flex items-center justify-between gap-1.5">
-        <dt className="text-xs font-semibold text-muted-foreground truncate" title={hint}>
-          {label}
-        </dt>
-        <div
-          className="relative inline-flex items-center shrink-0"
-          onMouseEnter={() => setShowTooltip(true)}
-          onMouseLeave={() => setShowTooltip(false)}
-        >
-          <button
-            type="button"
-            className="text-muted-foreground/60 transition-colors hover:text-purple-600 focus:outline-hidden"
-            title={hint}
-            aria-label={hint}
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowTooltip((prev) => !prev);
-            }}
-          >
-            <Info className="size-3.5" />
-          </button>
-
-          {showTooltip && (
-            <div className="pointer-events-none absolute right-0 bottom-full mb-2 z-50 w-52 rounded-lg border border-border/90 bg-popover p-2.5 text-[11px] font-normal normal-case leading-snug text-popover-foreground shadow-xl backdrop-blur-xs animate-in fade-in-0 zoom-in-95">
-              <p>{hint}</p>
-            </div>
-          )}
-        </div>
+        <dt className="eyebrow truncate">{label}</dt>
+        <InfoTip label={label}>{hint}</InfoTip>
       </div>
-      <dd className="mt-1 text-base font-bold tabular-nums text-foreground">
+      <dd className="mt-2 text-xl font-medium tabular-nums tracking-tight text-foreground">
         {formatMetric(value)}
       </dd>
     </div>
   );
 }
 
-export default function NetworksTab() {
-  const active = useDataset((state) => state.active);
-  const sna = useDataset((state) => state.sna);
-  const network = useDataset((state) => state.network);
-  const snaProgress = useDataset((state) => state.snaProgress);
-  const computeSna = useDataset((state) => state.computeSna);
-  const computeNetwork = useDataset((state) => state.computeNetwork);
+/** Quantas métricas ficam à vista antes do "ver todas". */
+const VISIBLE_METRICS = 4;
+
+/**
+ * Ecologia profunda da rede: o resumo (nós, arestas, componentes) e as primeiras
+ * métricas ficam à vista; as demais abrem num collapse, para a aba não começar com uma
+ * parede de números.
+ */
+function NetworkEcology({ global }: { global: GlobalMetrics }) {
   const { t, locale } = useLocale();
   const isEn = locale === 'en';
+  const [expanded, setExpanded] = useState(false);
+
+  const cards = METRIC_LABELS.map(({ key, label, labelEn, hint, hintEn }) => (
+    <NetworkMetricCard
+      key={key}
+      label={isEn ? labelEn : label}
+      value={global[key] as number | string}
+      hint={isEn ? hintEn : hint}
+    />
+  ));
+  const hidden = cards.length - VISIBLE_METRICS;
+
+  return (
+    <Card>
+      <CardHeader className="space-y-1.5">
+        <SectionTitle
+          title={t('network_deep_title')}
+          info={t('network_deep_desc').replace(/:\s*$/, '.')}
+        />
+        <p className="eyebrow">
+          {global.nodeCount.toLocaleString('pt-BR')} {t('network_nodes')} ·{' '}
+          {global.edgeCount.toLocaleString('pt-BR')} {t('network_edges')} ·{' '}
+          {global.componentCount.toLocaleString('pt-BR')} {t('network_components')}
+        </p>
+      </CardHeader>
+      <CardContent>
+        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {cards.slice(0, VISIBLE_METRICS)}
+        </dl>
+
+        {hidden > 0 && (
+          <>
+            <Collapse open={expanded} delayOpen={false}>
+              <dl className="grid grid-cols-2 gap-3 pt-3 sm:grid-cols-3 lg:grid-cols-4">
+                {cards.slice(VISIBLE_METRICS)}
+              </dl>
+            </Collapse>
+            <button
+              type="button"
+              onClick={() => setExpanded((open) => !open)}
+              aria-expanded={expanded}
+              className="mt-3 inline-flex cursor-pointer items-center gap-1.5 border-b border-border pb-0.5 text-sm transition-colors hover:border-highlight hover:text-highlight"
+            >
+              {expanded ? t('network_show_less') : `${t('network_show_all_metrics')} (+${hidden})`}
+              <ChevronDown
+                className={cn('size-4 transition-transform duration-300', expanded && 'rotate-180')}
+                aria-hidden
+              />
+            </button>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function NetworksTab() {
+  const active = useDataset((state) => state.active);
+  const { value: sna } = useStickyValue(useDataset((state) => state.sna));
+  const network = useDataset((state) => state.network);
+  const snaProgress = useDataset((state) => state.snaProgress);
+  const shownProgress = useStickyValue(snaProgress).value;
+  const computeSna = useDataset((state) => state.computeSna);
+  const computeNetwork = useDataset((state) => state.computeNetwork);
+  const { t } = useLocale();
 
   const [kind, setKind] = useState<CooccurrenceKind>('Coautoria');
   const [topN, setTopN] = useState<number>(50);
   const [sizeMetric, setSizeMetric] = useState<SizeMetric>('Grau Absoluto');
+  const [graphLayout, setGraphLayout] = useState<'force' | 'radial'>('force');
+
+  const openNode = (key: string): void => {
+    openInSearch(network?.nodes.find((node) => node.key === key)?.label ?? key, NETWORK_SEARCH_TYPES[kind]);
+  };
 
   useEffect(() => {
     if (active) void computeSna();
@@ -211,9 +275,10 @@ export default function NetworksTab() {
           accessorKey: 'item',
           header: 'Item',
           cell: ({ row }) => (
-            <span className="block max-w-96 truncate font-medium" title={String(row.original['item'])}>
-              {String(row.original['item'])}
-            </span>
+            <EntityChip
+              label={String(row.original['item'])}
+              types={SNA_SEARCH_TYPES[String(row.original['kind'])] ?? []}
+            />
           ),
         },
         {
@@ -246,147 +311,168 @@ export default function NetworksTab() {
   }
 
   return (
-    <div className="space-y-4">
-      {snaProgress && (
-        <Card>
-          <CardContent className="space-y-1.5 pt-6">
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>{snaProgress.phase}</span>
-              <span className="tabular-nums">{Math.round(snaProgress.ratio * 100)}%</span>
+    <div className="space-y-6">
+      {/* Fechada, a barra zera a própria margem do space-y (mb-0 vence o :where do
+          Tailwind) para não deixar um vão acima dos blocos. */}
+      <Collapse open={snaProgress !== null} className={snaProgress ? '' : 'mb-0'}>
+        {shownProgress && (
+          <Card>
+            <CardContent className="space-y-1.5 pt-6">
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>{shownProgress.phase}</span>
+                <span className="tabular-nums">{Math.round(shownProgress.ratio * 100)}%</span>
+              </div>
+              <Progress value={shownProgress.ratio * 100} />
+            </CardContent>
+          </Card>
+        )}
+      </Collapse>
+
+        {sna && <NetworkEcology global={sna.global} />}
+
+        {/* Coocorrência e colaboração lado a lado em telas largas. */}
+        <div className="grid items-start gap-6 lg:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <SectionTitle title={t('network_cooccurrence_title')} info={t('network_cooccurrence_desc')} />
+            </CardHeader>
+            <CardContent className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="network-kind">{t('network_kind_label')}</Label>
+                <Select value={kind} onValueChange={(value) => setKind(value as CooccurrenceKind)}>
+                  <SelectTrigger id="network-kind">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {NETWORK_KINDS.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="network-top">{t('network_top_label')}</Label>
+                <Select value={String(topN)} onValueChange={(value) => setTopN(Number(value))}>
+                  <SelectTrigger id="network-top">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TOP_N_OPTIONS.map((option) => (
+                      <SelectItem key={option} value={String(option)}>
+                        Top {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="network-size">{t('network_size_label')}</Label>
+                <Select
+                  value={sizeMetric}
+                  onValueChange={(value) => setSizeMetric(value as SizeMetric)}
+                >
+                  <SelectTrigger id="network-size">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SIZE_METRICS.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
             </div>
-            <Progress value={snaProgress.ratio * 100} />
-          </CardContent>
-        </Card>
-      )}
 
-      {sna && (
-        <Card className="border-t-4 border-t-purple-500 shadow-xs">
-          <CardHeader>
-            <CardTitle className="text-base font-bold text-foreground">{t('network_deep_title')}</CardTitle>
-            <CardDescription>
-              {t('network_deep_desc')}{' '}
-              <strong className="text-foreground">{sna.global.nodeCount.toLocaleString('pt-BR')}</strong> {t('network_nodes')},{' '}
-              <strong className="text-foreground">{sna.global.edgeCount.toLocaleString('pt-BR')}</strong> {t('network_edges')} e{' '}
-              <strong className="text-foreground">{sna.global.componentCount.toLocaleString('pt-BR')}</strong> {t('network_components')}.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {METRIC_LABELS.map(({ key, label, labelEn, hint, hintEn }) => (
-                <NetworkMetricCard
-                  key={key}
-                  label={isEn ? labelEn : label}
-                  value={sna.global[key] as number | string}
-                  hint={isEn ? hintEn : hint}
-                />
-              ))}
-            </dl>
-          </CardContent>
-        </Card>
-      )}
+            {network && (
+              <>
+                <p className="eyebrow">
+                  {network.nodes.length} {t('network_nodes')} · {network.edges.length}{' '}
+                  {t('network_edges')} · {network.communityCount} comunidades
+                </p>
+                <Tabs value={graphLayout} onValueChange={(value) => setGraphLayout(value as 'force' | 'radial')}>
+                  <TabsList className="w-full justify-start">
+                    <TabsTrigger value="force">{t('network_layout_force')}</TabsTrigger>
+                    <TabsTrigger value="radial">{t('network_radial_tab')}</TabsTrigger>
+                  </TabsList>
+                  <Suspense
+                    fallback={
+                      <div className="grid h-[560px] place-items-center border text-sm text-muted-foreground">
+                        Carregando renderizador…
+                      </div>
+                    }
+                  >
+                    <TabsContent value="force">
+                      <SigmaGraph
+                        nodes={network.nodes}
+                        edges={network.edges}
+                        onNodeClick={openNode}
+                        exportName={`rede-${kind}`}
+                      />
+                    </TabsContent>
+                    <TabsContent value="radial">
+                      <RadialGraph
+                        nodes={network.nodes.map((node) => ({
+                          key: node.key,
+                          label: node.label,
+                          weight: node.count,
+                          group: node.community,
+                          color: communityColor(node.community),
+                        }))}
+                        edges={network.edges}
+                        weightLabel={t('radial_documents')}
+                        legend={
+                          // Com muitas comunidades a legenda viraria uma parede de rótulos.
+                          network.communityCount <= 8
+                            ? Array.from({ length: network.communityCount }, (_, index) => ({
+                                label: `${t('radial_communities')} ${index + 1}`,
+                                color: communityColor(index),
+                              }))
+                            : undefined
+                        }
+                        onNodeClick={openNode}
+                        exportName={`rede-radial-${kind}`}
+                      />
+                    </TabsContent>
+                  </Suspense>
+                </Tabs>
+              </>
+            )}
+            </CardContent>
+          </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{t('network_cooccurrence_title')}</CardTitle>
-          <CardDescription>
-            {t('network_cooccurrence_desc')}
-          </CardDescription>
-        </CardHeader>
+          <Card>
+            <CardHeader>
+              <SectionTitle title={t('network_collab_title')} info={t('network_collab_desc')} />
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <CollaborationPanel dataset={active} />
+            </CardContent>
+          </Card>
+        </div>
 
-        <CardContent className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="network-kind">{t('network_kind_label')}</Label>
-              <Select value={kind} onValueChange={(value) => setKind(value as CooccurrenceKind)}>
-                <SelectTrigger id="network-kind">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {NETWORK_KINDS.map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {option}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="network-top">{t('network_top_label')}</Label>
-              <Select value={String(topN)} onValueChange={(value) => setTopN(Number(value))}>
-                <SelectTrigger id="network-top">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {TOP_N_OPTIONS.map((option) => (
-                    <SelectItem key={option} value={String(option)}>
-                      Top {option}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="network-size">{t('network_size_label')}</Label>
-              <Select
-                value={sizeMetric}
-                onValueChange={(value) => setSizeMetric(value as SizeMetric)}
-              >
-                <SelectTrigger id="network-size">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {SIZE_METRICS.map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {option}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {network && (
-            <>
-              <p className="text-xs text-muted-foreground">
-                {network.nodes.length} nós, {network.edges.length} arestas,{' '}
-                {network.communityCount} comunidades.
-              </p>
-              <Suspense
-                fallback={
-                  <div className="grid h-[560px] place-items-center rounded-lg border text-sm text-muted-foreground">
-                    Carregando renderizador…
-                  </div>
-                }
-              >
-                <SigmaGraph nodes={network.nodes} edges={network.edges} />
-              </Suspense>
-            </>
-          )}
-        </CardContent>
-      </Card>
-
-      <CollaborationPanel dataset={active} />
-
-      {sna && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">{t('network_nodes_metrics_title')}</CardTitle>
-            <CardDescription>
-              {t('network_nodes_metrics_desc')}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+        {sna && (
+          <Card>
+            <CardHeader>
+              <SectionTitle title={t('network_nodes_metrics_title')} info={t('network_nodes_metrics_desc')} />
+            </CardHeader>
+            <CardContent className="space-y-4">
             <DataTable
               data={sna.nodes as unknown as Record<string, unknown>[]}
               columns={snaColumns}
               exportName="metricas-sna"
               filterPlaceholder={t('table_filter_placeholder')}
             />
-          </CardContent>
-        </Card>
-      )}
+            </CardContent>
+          </Card>
+        )}
     </div>
   );
 }

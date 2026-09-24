@@ -9,7 +9,8 @@ import {
   MAX_BOXPLOT_ITEMS,
   type BoxplotMetric,
 } from '@/core/viz/boxplot';
-import { circularPositions, collaborationNetwork } from '@/core/viz/collaboration';
+import { chordLayout } from '@/core/graph/chord';
+import { collaborationNetwork } from '@/core/viz/collaboration';
 import { conceptMap } from '@/core/viz/concept-map';
 import { keywordGenetics } from '@/core/viz/genetics';
 import { historiograph } from '@/core/viz/historiograph';
@@ -167,18 +168,22 @@ describe('colaboração internacional', () => {
     expect(usa?.plotlyName).toBe('United States');
   });
 
-  it('posiciona os nós sobre um círculo de raio unitário', () => {
-    const positions = circularPositions(network.nodes);
-    expect(positions.size).toBe(network.nodes.length);
+  // O grafo circular do Python (`plot_circular_collaboration`) segue como diagrama de
+  // cordas (core/graph/chord.ts): todos os países no círculo unitário.
+  const chord = () =>
+    chordLayout(network.nodes.map((node) => ({ key: node.country, weight: node.documents })));
 
-    for (const [country, position] of positions) {
-      expect(Math.hypot(position.x, position.y), country).toBeCloseTo(1, 10);
+  it('posiciona os nós sobre um círculo de raio unitário', () => {
+    const positions = chord();
+    expect(positions).toHaveLength(network.nodes.length);
+
+    for (const position of positions) {
+      expect(Math.hypot(position.x, position.y), position.key).toBeCloseTo(1, 10);
     }
   });
 
   it('dá a cada país uma posição distinta no círculo', () => {
-    const positions = circularPositions(network.nodes);
-    const unique = new Set([...positions.values()].map((p) => `${p.x.toFixed(6)},${p.y.toFixed(6)}`));
+    const unique = new Set(chord().map((p) => `${p.x.toFixed(6)},${p.y.toFixed(6)}`));
     expect(unique.size).toBe(network.nodes.length);
   });
 });

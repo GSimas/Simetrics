@@ -8,7 +8,7 @@
  */
 
 /** Dicionário geográfico do pipeline Python, incluindo as variantes do WoS. */
-const COUNTRIES: readonly string[] = [
+export const COUNTRIES: readonly string[] = [
   'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Antigua and Barbuda', 'Argentina',
   'Armenia', 'Australia', 'Austria', 'Azerbaijan', 'Bahamas', 'Bahrain', 'Bangladesh', 'Barbados',
   'Belarus', 'Belgium', 'Belize', 'Benin', 'Bhutan', 'Bolivia', 'Bosnia and Herzegovina',

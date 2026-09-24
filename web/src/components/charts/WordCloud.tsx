@@ -1,31 +1,39 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import cloud from 'd3-cloud';
-import { Download, FileImage } from 'lucide-react';
 
 import type { WordFrequency } from '@/core/wordcloud';
-import { downloadBlob, timestampedFilename } from '@/core/export';
-import { Button } from '@/components/ui/button';
+import { ExpandChartButton, expandedHeight } from '@/components/charts/ExpandChartButton';
+import { ExportImageButton } from '@/components/charts/ExportImageButton';
+import { imageFromSvgElement } from '@/lib/export-image';
 import { cn } from '@/lib/utils';
 import { useLocale } from '@/state/locale.store';
 
 /**
- * Paleta refinada da nuvem em tons contrastantes e elegantes.
+ * Paleta da nuvem: tons médios da família Scientata, legíveis sobre tinta e papel.
  */
 const PALETTE = [
-  '#0284c7', // Sky 600
-  '#2563eb', // Blue 600
-  '#4f46e5', // Indigo 600
-  '#7c3aed', // Violet 600
-  '#0d9488', // Teal 600
-  '#0891b2', // Cyan 600
-  '#1d4ed8', // Blue 700
-  '#3b82f6', // Blue 500
+  '#3FAE8F', // pinho claro
+  '#8FCE2A', // sinal
+  '#2FBAB3', // ciano
+  '#E56D45', // laranja Scientata
+  '#6A7DFF', // índigo Simetrics
+  '#5E9E88', // musgo
+  '#C9A13A', // âmbar
+  '#8F9B95', // sálvia
 ] as const;
 
 const MIN_FONT = 13;
 const MAX_FONT = 48;
 
-type CloudWord = cloud.Word & { value: number; color: string };
+// O d3-cloud preenche x0/x1/y0/y1 (limites do sprite) no layout, mas os tipos não os declaram.
+type CloudWord = cloud.Word & {
+  value: number;
+  color: string;
+  x0?: number;
+  x1?: number;
+  y0?: number;
+  y1?: number;
+};
 
 interface PlacedWord {
   text: string;
@@ -35,6 +43,37 @@ interface PlacedWord {
   y: number;
   rotate: number;
   color: string;
+  /** Limites do sprite relativos ao centro da palavra, devolvidos pelo d3-cloud. */
+  x0: number;
+  x1: number;
+  y0: number;
+  y1: number;
+}
+
+/** Ampliação máxima ao enquadrar — evita que uma palavra solitária vire um cartaz. */
+const MAX_ZOOM = 4;
+const FIT_PADDING = 12;
+
+/**
+ * Recorta o viewBox à área que as palavras ocupam, para a nuvem preencher o quadro
+ * inteiro seja qual for o número de termos. Mantém a proporção do quadro para o
+ * `preserveAspectRatio` não distorcer nada.
+ */
+function fitViewBox(placed: readonly PlacedWord[], width: number, height: number): string {
+  if (placed.length === 0) return `${-width / 2} ${-height / 2} ${width} ${height}`;
+
+  const minX = Math.min(...placed.map((word) => word.x + word.x0)) - FIT_PADDING;
+  const maxX = Math.max(...placed.map((word) => word.x + word.x1)) + FIT_PADDING;
+  const minY = Math.min(...placed.map((word) => word.y + word.y0)) - FIT_PADDING;
+  const maxY = Math.max(...placed.map((word) => word.y + word.y1)) + FIT_PADDING;
+
+  const zoom = Math.min(MAX_ZOOM, width / (maxX - minX), height / (maxY - minY));
+  const boxWidth = width / zoom;
+  const boxHeight = height / zoom;
+  const centerX = (minX + maxX) / 2;
+  const centerY = (minY + maxY) / 2;
+
+  return `${centerX - boxWidth / 2} ${centerY - boxHeight / 2} ${boxWidth} ${boxHeight}`;
 }
 
 interface HoverState {
@@ -50,21 +89,45 @@ export interface WordCloudProps {
   height?: number;
   className?: string;
   exportName?: string;
+  /** Clique numa palavra. Só recebe as palavras para as quais `isClickable` é verdadeiro. */
+  onWordClick?: (text: string) => void;
+  isClickable?: (text: string) => boolean;
+  /** Dentro da janela ampliada: sem o botão de ampliar e com altura da tela. */
+  expanded?: boolean;
 }
 
-export default function WordCloud({
-  words,
-  width = 900,
-  height = 420,
-  className,
-  exportName = 'nuvem-de-palavras',
-}: WordCloudProps) {
+export default function WordCloud(props: WordCloudProps) {
+  const {
+    words,
+    width: fallbackWidth = 900,
+    height = 420,
+    className,
+    exportName = 'nuvem-de-palavras',
+    onWordClick,
+    isClickable,
+    expanded,
+  } = props;
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const { locale } = useLocale();
   const isEn = locale === 'en';
 
   const [hovered, setHovered] = useState<HoverState | null>(null);
+  // O layout usa a largura real do quadro: com uma largura fixa, numa coluna estreita o
+  // SVG encolheria tudo para caber e as palavras ficariam minúsculas.
+  const [measuredWidth, setMeasuredWidth] = useState<number | null>(null);
+  const width = measuredWidth ?? fallbackWidth;
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const observer = new ResizeObserver(([entry]) => {
+      const next = Math.round(entry?.contentRect.width ?? 0);
+      if (next > 0) setMeasuredWidth((previous) => (previous === next ? previous : next));
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
   const [layout, setLayout] = useState<{ source: readonly CloudWord[]; placed: PlacedWord[] } | null>(
     null,
   );
@@ -78,19 +141,30 @@ export default function WordCloud({
       .sort((a, b) => b.value - a.value)
       .slice(0, 80);
 
+    // Escala relativa ao mínimo e máximo desta nuvem, não da base inteira. Com todas as
+    // frequências iguais não há o que ordenar: todas ficam no meio da escala, e o
+    // enquadramento (fitViewBox) as amplia até ocupar o quadro.
+    // A faixa de fontes acompanha a área do quadro: num quadro estreito, fontes de
+    // tamanho fixo não cabem e o d3-cloud descarta as palavras que sobram. O
+    // enquadramento (fitViewBox) amplia o resultado depois.
+    const areaScale = Math.min(1, Math.sqrt((width * height) / (900 * 420)));
+    const minFont = Math.max(9, MIN_FONT * areaScale);
+    const maxFont = Math.max(minFont + 8, MAX_FONT * areaScale);
+
     const maxValue = Math.max(...topWords.map((word) => word.value));
     const minValue = Math.min(...topWords.map((word) => word.value));
-    const range = Math.sqrt(maxValue) - Math.sqrt(minValue) || 1;
+    const range = Math.sqrt(maxValue) - Math.sqrt(minValue);
 
     return topWords.map((word, index) => ({
       text: word.text,
       value: word.value,
       size:
-        MIN_FONT +
-        ((Math.sqrt(word.value) - Math.sqrt(minValue)) / range) * (MAX_FONT - MIN_FONT),
+        range === 0
+          ? (minFont + maxFont) / 2
+          : minFont + ((Math.sqrt(word.value) - Math.sqrt(minValue)) / range) * (maxFont - minFont),
       color: PALETTE[index % PALETTE.length] as string,
     }));
-  }, [words]);
+  }, [words, width, height]);
 
   useEffect(() => {
     if (scaled.length === 0) return;
@@ -107,6 +181,9 @@ export default function WordCloud({
       .font('system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif')
       .fontSize((word) => word.size ?? MIN_FONT)
       .spiral('archimedean')
+      // Posiciona em fatias de 12 ms: sem isso o layout inteiro roda de uma vez e
+      // congela a troca de aba que monta a nuvem.
+      .timeInterval(12)
       .on('end', (output) => {
         if (cancelled) return;
         setLayout({
@@ -121,6 +198,10 @@ export default function WordCloud({
               y: word.y ?? 0,
               rotate: word.rotate ?? 0,
               color: raw.color ?? PALETTE[0],
+              x0: raw.x0 ?? 0,
+              x1: raw.x1 ?? 0,
+              y0: raw.y0 ?? 0,
+              y1: raw.y1 ?? 0,
             };
           }),
         });
@@ -134,53 +215,11 @@ export default function WordCloud({
     };
   }, [scaled, width, height]);
 
-  const placed = layout?.source === scaled ? layout.placed : [];
-
-  const exportSvg = (): void => {
-    const svg = svgRef.current;
-    if (!svg) return;
-
-    const source = new XMLSerializer().serializeToString(svg);
-    downloadBlob(
-      timestampedFilename(exportName, 'svg'),
-      new Blob([source], { type: 'image/svg+xml;charset=utf-8' }),
-    );
-  };
-
-  const exportPng = (): void => {
-    const svg = svgRef.current;
-    if (!svg) return;
-
-    const svgData = new XMLSerializer().serializeToString(svg);
-    const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-    const url = URL.createObjectURL(svgBlob);
-
-    const img = new Image();
-    img.onload = () => {
-      const scale = 2; // Alta resolução (DPI 2x)
-      const canvas = document.createElement('canvas');
-      canvas.width = width * scale;
-      canvas.height = height * scale;
-
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      // Fundo branco limpo para PNG
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      ctx.scale(scale, scale);
-      ctx.drawImage(img, 0, 0, width, height);
-      URL.revokeObjectURL(url);
-
-      canvas.toBlob((blob) => {
-        if (blob) {
-          downloadBlob(timestampedFilename(exportName, 'png'), blob);
-        }
-      }, 'image/png');
-    };
-    img.src = url;
-  };
+  const placed = useMemo(
+    () => (layout?.source === scaled ? layout.placed : []),
+    [layout, scaled],
+  );
+  const viewBox = useMemo(() => fitViewBox(placed, width, height), [placed, width, height]);
 
   const handleWordMouseMove = (e: React.MouseEvent, word: PlacedWord) => {
     const container = containerRef.current;
@@ -189,35 +228,24 @@ export default function WordCloud({
     setHovered({
       text: word.text,
       value: word.value,
-      x: e.clientX - rect.left,
+      // O tooltip é centrado no cursor; perto das bordas seria cortado pelo quadro.
+      x: Math.min(Math.max(e.clientX - rect.left, 90), rect.width - 90),
       y: e.clientY - rect.top,
     });
   };
 
   return (
     <div className={cn('space-y-2', className)}>
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={exportPng}
-          disabled={placed.length === 0}
-          className="gap-1.5 text-xs font-semibold"
-        >
-          <FileImage className="size-3.5 text-blue-600" />
-          <span>{isEn ? 'Download PNG' : 'Baixar PNG'}</span>
-        </Button>
-
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={exportSvg}
-          disabled={placed.length === 0}
-          className="gap-1.5 text-xs font-medium"
-        >
-          <Download className="size-3.5" />
-          <span>{isEn ? 'Download SVG' : 'Baixar SVG'}</span>
-        </Button>
+      <div className="flex justify-end gap-1.5">
+        {!expanded && (
+          <ExpandChartButton>
+            <WordCloud {...props} height={Math.max(height, expandedHeight())} expanded />
+          </ExpandChartButton>
+        )}
+        <ExportImageButton
+          filename={exportName}
+          getImage={() => (svgRef.current ? imageFromSvgElement(svgRef.current) : null)}
+        />
       </div>
 
       <div
@@ -226,7 +254,7 @@ export default function WordCloud({
       >
         <svg
           ref={svgRef}
-          viewBox={`0 0 ${width} ${height}`}
+          viewBox={viewBox}
           width="100%"
           height={height}
           role="img"
@@ -234,8 +262,10 @@ export default function WordCloud({
           xmlns="http://www.w3.org/2000/svg"
           className="mx-auto select-none"
         >
-          <g transform={`translate(${width / 2},${height / 2})`}>
-            {placed.map((word) => (
+          <g>
+            {placed.map((word) => {
+              const clickable = Boolean(onWordClick) && (isClickable?.(word.text) ?? true);
+              return (
               <text
                 key={`${word.text}-${word.x}-${word.y}`}
                 textAnchor="middle"
@@ -246,24 +276,19 @@ export default function WordCloud({
                   fill: word.color,
                   fontFamily: 'system-ui, -apple-system, sans-serif',
                 }}
-                className="cursor-pointer transition-opacity duration-150 hover:opacity-75"
+                className={cn(
+                  'transition-opacity duration-150 hover:opacity-75',
+                  clickable ? 'cursor-pointer' : 'cursor-default',
+                )}
+                onClick={clickable ? () => onWordClick?.(word.text) : undefined}
                 onMouseEnter={(e) => handleWordMouseMove(e, word)}
                 onMouseMove={(e) => handleWordMouseMove(e, word)}
                 onMouseLeave={() => setHovered(null)}
               >
                 {word.text}
-                <title>
-                  {word.text}: {word.value}{' '}
-                  {word.value === 1
-                    ? isEn
-                      ? 'occurrence'
-                      : 'ocorrência'
-                    : isEn
-                      ? 'occurrences'
-                      : 'ocorrências'}
-                </title>
               </text>
-            ))}
+              );
+            })}
           </g>
         </svg>
 

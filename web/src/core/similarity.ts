@@ -34,6 +34,20 @@ function addAll(target: Map<string, Set<string>>, key: string, values: Iterable<
 }
 
 /** Monta os perfis de todas as entidades numa única passagem pela base. */
+// Os perfis dependem só da base; montá-los a cada abertura do Motor de Busca travava a
+// troca de aba por centenas de milissegundos. A WeakMap solta a entrada junto com a base.
+const profileCache = new WeakMap<Dataset, Profiles>();
+
+/** `buildProfiles` memorizado por base. */
+export function cachedProfiles(rows: Dataset): Profiles {
+  let profiles = profileCache.get(rows);
+  if (!profiles) {
+    profiles = buildProfiles(rows);
+    profileCache.set(rows, profiles);
+  }
+  return profiles;
+}
+
 export function buildProfiles(rows: Dataset): Profiles {
   const columns = collectColumns(rows);
   const titleColumn = pickColumn(columns, FIELD_CANDIDATES.title);

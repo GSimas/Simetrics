@@ -1,5 +1,5 @@
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import autoTable, { type UserOptions } from 'jspdf-autotable';
 
 import type { AnalyticsBundle, EntityTables } from '@/workers/analytics.worker';
 import type { CooccurrenceReport, SnaReport } from '@/core/graph';
@@ -9,6 +9,7 @@ import type { Dataset } from '@/lib/types';
 import { FIELD, FIELD_CANDIDATES } from '@/lib/schema';
 import { collectColumns, pickColumn, toNumeric } from '@/core/text';
 import {
+  BRAND,
   renderHorizontalBarChart,
   renderNetworkGraphCanvas,
   renderProductionTimelineCanvas,
@@ -49,6 +50,25 @@ export interface PdfReportData {
   locale: 'pt' | 'en';
 }
 
+type Rgb = [number, number, number];
+
+/** Converte '#rrggbb' em tupla RGB para o jsPDF. */
+function rgb(hex: string): Rgb {
+  return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
+}
+
+// Paleta Scientata (tema claro) em RGB
+const C = {
+  paper: rgb(BRAND.paper),
+  card: rgb(BRAND.card),
+  muted: rgb(BRAND.muted),
+  border: rgb(BRAND.border),
+  ink: rgb(BRAND.ink),
+  inkMuted: rgb(BRAND.inkMuted),
+  pine: rgb(BRAND.pine),
+  lime: rgb(BRAND.lime),
+};
+
 function formatMetricVal(val: number | string, decimals = 4): string {
   if (typeof val === 'string') return val;
   if (!Number.isFinite(val)) return '—';
@@ -80,39 +100,107 @@ export function generatePdfReport({
   const contentWidth = pageWidth - margin * 2;
   let cursorY = margin;
 
-  const primaryColor: [number, number, number] = [37, 99, 235]; // Blue 600
-  const secondaryColor: [number, number, number] = [15, 23, 42]; // Slate 900
-  const mutedColor: [number, number, number] = [100, 116, 139]; // Slate 500
-  const accentColor: [number, number, number] = [124, 58, 237]; // Purple 600
+  // Pinta o fundo papel de cada página uma única vez (antes do conteúdo)
+  const paintedPages = new Set<number>();
+  const paintPage = () => {
+    const page = doc.getCurrentPageInfo().pageNumber;
+    if (paintedPages.has(page)) return;
+    paintedPages.add(page);
+    doc.setFillColor(...C.paper);
+    doc.rect(0, 0, pageWidth, pageHeight, 'F');
+  };
+  paintPage();
 
   const checkPageBreak = (neededHeight: number) => {
     if (cursorY + neededHeight > pageHeight - margin - 30) {
       doc.addPage();
+      paintPage();
       cursorY = margin + 20;
     }
+  };
+
+  // Rótulo "eyebrow": mono, maiúsculo, espaçado
+  const eyebrow = (text: string, x: number, y: number, color: Rgb = C.pine, size = 7.5) => {
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(size);
+    doc.setTextColor(...color);
+    doc.text(text.toUpperCase(), x, y, { charSpace: 0.8 });
+  };
+
+  // Cabeçalho de seção: eyebrow numerado em pinho + título em tinta
+  const sectionHeading = (num: number, title: string) => {
+    eyebrow(`— ${String(num).padStart(2, '0')}`, margin, cursorY);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(...C.ink);
+    doc.text(title, margin, cursorY + 16);
+    cursorY += 26;
+  };
+
+  // Estilo comum das tabelas: cabeçalho em tinta, corpo alternando cartão/papel, bordas finas
+  const tableBase: Partial<UserOptions> = {
+    margin: { left: margin, right: margin },
+    theme: 'grid',
+    willDrawPage: paintPage,
+    headStyles: { fillColor: C.ink, textColor: C.paper, fontSize: 8, fontStyle: 'bold' },
+    bodyStyles: { fillColor: C.card },
+    alternateRowStyles: { fillColor: C.paper },
+  };
+  const cellStyles = (fontSize: number, cellPadding: number) => ({
+    font: 'helvetica',
+    fontSize,
+    cellPadding,
+    textColor: C.ink,
+    lineColor: C.border,
+    lineWidth: 0.5,
+  });
+
+  // Cartões de KPI chapados: rótulo mono + valor grande
+  const kpiCards = (items: [string, string][]) => {
+    const cols = 4;
+    const gap = 8;
+    const cardW = (contentWidth - gap * (cols - 1)) / cols;
+    const cardH = 50;
+    items.forEach(([label, value], idx) => {
+      const x = margin + (idx % cols) * (cardW + gap);
+      const y = cursorY + Math.floor(idx / cols) * (cardH + gap);
+      doc.setFillColor(...C.card);
+      doc.setDrawColor(...C.border);
+      doc.setLineWidth(0.5);
+      doc.rect(x, y, cardW, cardH, 'FD');
+      eyebrow(label, x + 10, y + 16, C.inkMuted, 6.5);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(17);
+      doc.setTextColor(...C.ink);
+      doc.text(value, x + 10, y + 39);
+    });
+    cursorY += Math.ceil(items.length / cols) * (cardH + gap) + 8;
   };
 
   const totalCitations = dataset.reduce((acc, d) => acc + (toNumeric(d[FIELD.TOTAL_CITATIONS]) ?? 0), 0);
   const meanCitations = dataset.length > 0 ? totalCitations / dataset.length : 0;
 
   // --- CABEÇALHO DO RELATÓRIO ---
-  doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.rect(margin, cursorY, contentWidth, 4, 'F');
-  cursorY += 16;
+  eyebrow(isEn ? 'Simetrics · Scientometric Report' : 'Simetrics · Relatório Cientométrico', margin, cursorY + 6);
+  cursorY += 32;
 
+  // Título com palavra de destaque em serifa itálica
+  const titleMain = isEn ? 'Scientometric Intelligence ' : 'Relatório Cientométrico & ';
+  const titleAccent = isEn ? 'Report' : 'Bibliométrico';
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(20);
-  doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-  doc.text(
-    isEn ? 'SIMETRICS — Scientometric Intelligence Report' : 'SIMETRICS — Relatório Cientométrico & Bibliométrico',
-    margin,
-    cursorY,
-  );
-  cursorY += 16;
+  doc.setFontSize(22);
+  doc.setTextColor(...C.ink);
+  doc.text(titleMain, margin, cursorY);
+  const titleMainW = doc.getTextWidth(titleMain);
+  doc.setFont('times', 'italic');
+  doc.setFontSize(25);
+  doc.setTextColor(...C.pine);
+  doc.text(titleAccent, margin + titleMainW, cursorY);
+  cursorY += 18;
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
-  doc.setTextColor(mutedColor[0], mutedColor[1], mutedColor[2]);
+  doc.setTextColor(...C.inkMuted);
   const dateStr = new Date().toLocaleDateString(isEn ? 'en-US' : 'pt-BR', {
     day: '2-digit',
     month: 'long',
@@ -121,34 +209,42 @@ export function generatePdfReport({
     minute: '2-digit',
   });
   doc.text(
-    `${isEn ? 'Generated on' : 'Emitido em'}: ${dateStr} · Plataforma Simetrics (gustavosimas.com)`,
+    `${isEn ? 'Generated on' : 'Emitido em'}: ${dateStr} · ${isEn ? 'Simetrics · A Scientata application' : 'Simetrics · Uma aplicação Scientata'}`,
     margin,
     cursorY,
   );
-  cursorY += 16;
+  cursorY += 12;
+
+  // Régua fina em pinho com bloco curto em lima
+  doc.setDrawColor(...C.pine);
+  doc.setLineWidth(1);
+  doc.line(margin, cursorY, pageWidth - margin, cursorY);
+  doc.setFillColor(...C.lime);
+  doc.rect(margin, cursorY - 2, 36, 4, 'F');
+  cursorY += 22;
 
   // --- 1. RESUMO EXECUTIVO ---
   if (selection.summary && overview) {
     checkPageBreak(120);
 
-    doc.setFillColor(248, 250, 252);
-    doc.setDrawColor(226, 232, 240);
-    doc.roundedRect(margin, cursorY, contentWidth, 68, 6, 6, 'FD');
+    doc.setFillColor(...C.card);
+    doc.setDrawColor(...C.border);
+    doc.setLineWidth(0.5);
+    doc.rect(margin, cursorY, contentWidth, 68, 'FD');
+    doc.setFillColor(...C.pine);
+    doc.rect(margin, cursorY, 3, 68, 'F');
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.text(isEn ? 'Executive Summary & Dataset Scope' : 'Resumo Executivo & Escopo da Base', margin + 12, cursorY + 18);
+    eyebrow(isEn ? 'Executive Summary & Dataset Scope' : 'Resumo Executivo & Escopo da Base', margin + 14, cursorY + 18);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
-    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+    doc.setTextColor(...C.ink);
 
     const summaryText = isEn
       ? `This report compiles bibliometric metrics, collaboration graphs, and research themes from a corpus of ${dataset.length.toLocaleString('en-US')} papers published between ${overview.summary.timespan || 'N/A'}. A total of ${overview.summary.authorsCount.toLocaleString('en-US')} authors and ${overview.summary.countriesCount.toLocaleString('en-US')} countries participated in the production.`
       : `Este relatório consolida indicadores cientométricos, redes de colaboração e tópicos de pesquisa a partir de uma base com ${dataset.length.toLocaleString('pt-BR')} documentos indexados no período ${overview.summary.timespan || 'N/A'}. A produção envolveu ${overview.summary.authorsCount.toLocaleString('pt-BR')} autores e ${overview.summary.countriesCount.toLocaleString('pt-BR')} países.`;
 
-    doc.text(doc.splitTextToSize(summaryText, contentWidth - 24), margin + 12, cursorY + 34);
+    doc.text(doc.splitTextToSize(summaryText, contentWidth - 28), margin + 14, cursorY + 34);
     cursorY += 80;
   }
 
@@ -156,55 +252,20 @@ export function generatePdfReport({
   if (selection.kpis && overview) {
     checkPageBreak(120);
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
-    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-    doc.text(isEn ? '1. Core Scientometric Indicators' : '1. Indicadores Cientométricos Globais', margin, cursorY);
-    cursorY += 14;
+    sectionHeading(1, isEn ? 'Core Scientometric Indicators' : 'Indicadores Cientométricos Globais');
 
     const s = overview.summary;
-    const kpiData = [
-      [
-        { content: isEn ? 'Total Documents' : 'Total de Documentos', styles: { fontStyle: 'bold' as const } },
-        s.totalDocs.toLocaleString(isEn ? 'en-US' : 'pt-BR'),
-        { content: isEn ? 'Total Authors' : 'Total de Autores', styles: { fontStyle: 'bold' as const } },
-        s.authorsCount.toLocaleString(isEn ? 'en-US' : 'pt-BR'),
-      ],
-      [
-        { content: isEn ? 'Total Citations' : 'Total de Citações', styles: { fontStyle: 'bold' as const } },
-        totalCitations.toLocaleString(isEn ? 'en-US' : 'pt-BR'),
-        { content: isEn ? 'Citations / Doc (Mean)' : 'Citações / Doc (Média)', styles: { fontStyle: 'bold' as const } },
-        meanCitations.toFixed(2),
-      ],
-      [
-        { content: isEn ? 'Annual Growth Rate' : 'Crescimento Anual', styles: { fontStyle: 'bold' as const } },
-        `${s.bibliometrix.growthRate.toFixed(2)}%`,
-        { content: isEn ? 'Co-authors / Doc' : 'Coautores / Artigo', styles: { fontStyle: 'bold' as const } },
-        s.bibliometrix.coauthIndex.toFixed(2),
-      ],
-      [
-        { content: isEn ? 'Unique Countries' : 'Países Únicos', styles: { fontStyle: 'bold' as const } },
-        s.countriesCount.toLocaleString(isEn ? 'en-US' : 'pt-BR'),
-        { content: isEn ? 'Unique Venues' : 'Periódicos (Venues)', styles: { fontStyle: 'bold' as const } },
-        s.venuesCount.toLocaleString(isEn ? 'en-US' : 'pt-BR'),
-      ],
-    ];
-
-    autoTable(doc, {
-      startY: cursorY,
-      margin: { left: margin, right: margin },
-      body: kpiData,
-      theme: 'grid',
-      styles: { fontSize: 8.5, cellPadding: 4.5, textColor: secondaryColor },
-      columnStyles: {
-        0: { fillColor: [241, 245, 249], cellWidth: 140 },
-        1: { cellWidth: 100 },
-        2: { fillColor: [241, 245, 249], cellWidth: 140 },
-        3: { cellWidth: 'auto' },
-      },
-    });
-
-    cursorY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 16;
+    const loc = isEn ? 'en-US' : 'pt-BR';
+    kpiCards([
+      [isEn ? 'Total Documents' : 'Total de Documentos', s.totalDocs.toLocaleString(loc)],
+      [isEn ? 'Total Authors' : 'Total de Autores', s.authorsCount.toLocaleString(loc)],
+      [isEn ? 'Total Citations' : 'Total de Citações', totalCitations.toLocaleString(loc)],
+      [isEn ? 'Citations / Doc (Mean)' : 'Citações / Doc (Média)', meanCitations.toFixed(2)],
+      [isEn ? 'Annual Growth Rate' : 'Crescimento Anual', `${s.bibliometrix.growthRate.toFixed(2)}%`],
+      [isEn ? 'Co-authors / Doc' : 'Coautores / Artigo', s.bibliometrix.coauthIndex.toFixed(2)],
+      [isEn ? 'Unique Countries' : 'Países Únicos', s.countriesCount.toLocaleString(loc)],
+      [isEn ? 'Unique Venues' : 'Periódicos (Venues)', s.venuesCount.toLocaleString(loc)],
+    ]);
   }
 
   // --- GRÁFICO 1: EVOLUÇÃO TEMPORAL DA PRODUÇÃO ---
@@ -221,11 +282,7 @@ export function generatePdfReport({
   if (selection.authors && tables && tables.authors.length > 0) {
     checkPageBreak(140);
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
-    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-    doc.text(isEn ? `2. Top ${topN} Authors by Production & Impact` : `2. Principais Autores (Top ${topN})`, margin, cursorY);
-    cursorY += 10;
+    sectionHeading(2, isEn ? `Top ${topN} Authors by Production & Impact` : `Principais Autores (Top ${topN})`);
 
     const authorRows = tables.authors.slice(0, topN).map((a, idx) => [
       String(idx + 1),
@@ -241,7 +298,7 @@ export function generatePdfReport({
 
     autoTable(doc, {
       startY: cursorY,
-      margin: { left: margin, right: margin },
+      ...tableBase,
       head: [[
         '#',
         isEn ? 'Author' : 'Autor',
@@ -254,9 +311,7 @@ export function generatePdfReport({
         isEn ? 'Mean Cit.' : 'Média Cit.',
       ]],
       body: authorRows,
-      theme: 'striped',
-      headStyles: { fillColor: primaryColor, fontSize: 8, fontStyle: 'bold' },
-      styles: { fontSize: 7.5, cellPadding: 3.5 },
+      styles: cellStyles(7.5, 3.5),
       columnStyles: {
         0: { cellWidth: 20 },
         1: { cellWidth: 160 },
@@ -290,11 +345,7 @@ export function generatePdfReport({
   if (selection.countries && tables && tables.countries.length > 0) {
     checkPageBreak(130);
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
-    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-    doc.text(isEn ? `3. Geographic Distribution (Top ${topN} Countries)` : `3. Distribuição Geográfica (Top ${topN} Países)`, margin, cursorY);
-    cursorY += 10;
+    sectionHeading(3, isEn ? `Geographic Distribution (Top ${topN} Countries)` : `Distribuição Geográfica (Top ${topN} Países)`);
 
     const countryRows = tables.countries.slice(0, topN).map((c, idx) => [
       String(idx + 1),
@@ -308,7 +359,7 @@ export function generatePdfReport({
 
     autoTable(doc, {
       startY: cursorY,
-      margin: { left: margin, right: margin },
+      ...tableBase,
       head: [[
         '#',
         isEn ? 'Country' : 'País',
@@ -319,9 +370,7 @@ export function generatePdfReport({
         isEn ? 'Top Document' : 'Documento Mais Citado',
       ]],
       body: countryRows,
-      theme: 'striped',
-      headStyles: { fillColor: [30, 41, 59], fontSize: 8, fontStyle: 'bold' },
-      styles: { fontSize: 7.5, cellPadding: 3.5 },
+      styles: cellStyles(7.5, 3.5),
       columnStyles: {
         0: { cellWidth: 20 },
         1: { cellWidth: 110 },
@@ -370,11 +419,7 @@ export function generatePdfReport({
   if (selection.venues && tables && tables.venues.length > 0) {
     checkPageBreak(130);
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
-    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-    doc.text(isEn ? `4. Top Publishing Venues (Top ${topN})` : `4. Principais Veículos de Publicação (Top ${topN})`, margin, cursorY);
-    cursorY += 10;
+    sectionHeading(4, isEn ? `Top Publishing Venues (Top ${topN})` : `Principais Veículos de Publicação (Top ${topN})`);
 
     const venueRows = tables.venues.slice(0, topN).map((v, idx) => [
       String(idx + 1),
@@ -387,7 +432,7 @@ export function generatePdfReport({
 
     autoTable(doc, {
       startY: cursorY,
-      margin: { left: margin, right: margin },
+      ...tableBase,
       head: [[
         '#',
         'Venue / Journal',
@@ -397,9 +442,7 @@ export function generatePdfReport({
         isEn ? 'Mean Citations' : 'Média Citações',
       ]],
       body: venueRows,
-      theme: 'striped',
-      headStyles: { fillColor: [13, 148, 136], fontSize: 8, fontStyle: 'bold' },
-      styles: { fontSize: 7.5, cellPadding: 3.5 },
+      styles: cellStyles(7.5, 3.5),
       columnStyles: {
         0: { cellWidth: 20 },
         1: { cellWidth: 260 },
@@ -413,11 +456,7 @@ export function generatePdfReport({
   if (selection.keywords && tables && tables.keywords.length > 0) {
     checkPageBreak(130);
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
-    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-    doc.text(isEn ? `5. Top Keywords & Lexicometrics (Top ${topN})` : `5. Palavras-Chave & Lexicometria (Top ${topN})`, margin, cursorY);
-    cursorY += 10;
+    sectionHeading(5, isEn ? `Top Keywords & Lexicometrics (Top ${topN})` : `Palavras-Chave & Lexicometria (Top ${topN})`);
 
     const kwRows = tables.keywords.slice(0, topN).map((k, idx) => [
       String(idx + 1),
@@ -430,7 +469,7 @@ export function generatePdfReport({
 
     autoTable(doc, {
       startY: cursorY,
-      margin: { left: margin, right: margin },
+      ...tableBase,
       head: [[
         '#',
         isEn ? 'Keyword' : 'Palavra-chave',
@@ -440,9 +479,7 @@ export function generatePdfReport({
         isEn ? 'Mean Citations' : 'Média de Citações',
       ]],
       body: kwRows,
-      theme: 'striped',
-      headStyles: { fillColor: [8, 145, 178], fontSize: 8, fontStyle: 'bold' },
-      styles: { fontSize: 7.5, cellPadding: 3.5 },
+      styles: cellStyles(7.5, 3.5),
       columnStyles: {
         0: { cellWidth: 20 },
         1: { cellWidth: 220 },
@@ -466,17 +503,12 @@ export function generatePdfReport({
   if (selection.themes && clustering && clustering.clusters.length > 0) {
     checkPageBreak(130);
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
-    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-    doc.text(
+    sectionHeading(
+      6,
       isEn
-        ? `6. AI Semantic Thematic Clusters (Silhouette: ${clustering.silhouette.toFixed(3)})`
-        : `6. Agrupamento Temático por IA (Silhouette: ${clustering.silhouette.toFixed(3)})`,
-      margin,
-      cursorY,
+        ? `AI Semantic Thematic Clusters (Silhouette: ${clustering.silhouette.toFixed(3)})`
+        : `Agrupamento Temático por IA (Silhouette: ${clustering.silhouette.toFixed(3)})`,
     );
-    cursorY += 10;
 
     const themeRows = clustering.clusters.map((c) => {
       const share = dataset.length > 0 ? (c.size / dataset.length) * 100 : 0;
@@ -491,7 +523,7 @@ export function generatePdfReport({
 
     autoTable(doc, {
       startY: cursorY,
-      margin: { left: margin, right: margin },
+      ...tableBase,
       head: [[
         '#',
         isEn ? 'Theme Name' : 'Nome do Tema',
@@ -500,9 +532,7 @@ export function generatePdfReport({
         isEn ? 'Key Terms' : 'Termos Característicos',
       ]],
       body: themeRows,
-      theme: 'striped',
-      headStyles: { fillColor: accentColor, fontSize: 8, fontStyle: 'bold' },
-      styles: { fontSize: 7.5, cellPadding: 4 },
+      styles: cellStyles(7.5, 4),
       columnStyles: {
         0: { cellWidth: 20 },
         1: { cellWidth: 160 },
@@ -535,15 +565,7 @@ export function generatePdfReport({
   if (selection.networkTopology && sna) {
     checkPageBreak(140);
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
-    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-    doc.text(
-      isEn ? '7. Deep Knowledge Ecology & Network Topology' : '7. Topologia da Rede & Ecologia Profunda',
-      margin,
-      cursorY,
-    );
-    cursorY += 10;
+    sectionHeading(7, isEn ? 'Deep Knowledge Ecology & Network Topology' : 'Topologia da Rede & Ecologia Profunda');
 
     const g = sna.global;
     const snaRows = [
@@ -581,14 +603,14 @@ export function generatePdfReport({
 
     autoTable(doc, {
       startY: cursorY,
-      margin: { left: margin, right: margin },
+      ...tableBase,
       body: snaRows,
-      theme: 'grid',
-      styles: { fontSize: 8, cellPadding: 4, textColor: secondaryColor },
+      styles: cellStyles(8, 4),
+      alternateRowStyles: {},
       columnStyles: {
-        0: { fillColor: [245, 243, 255], cellWidth: 150 },
+        0: { fillColor: C.muted, cellWidth: 150 },
         1: { cellWidth: 90 },
-        2: { fillColor: [245, 243, 255], cellWidth: 150 },
+        2: { fillColor: C.muted, cellWidth: 150 },
         3: { cellWidth: 'auto' },
       },
     });
@@ -614,15 +636,7 @@ export function generatePdfReport({
   if (selection.topDocuments && dataset.length > 0) {
     checkPageBreak(150);
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
-    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-    doc.text(
-      isEn ? `8. Highly Cited Seminal Documents (Top ${topN})` : `8. Documentos Mais Citados da Base (Top ${topN})`,
-      margin,
-      cursorY,
-    );
-    cursorY += 10;
+    sectionHeading(8, isEn ? `Highly Cited Seminal Documents (Top ${topN})` : `Documentos Mais Citados da Base (Top ${topN})`);
 
     const columns = collectColumns(dataset);
     const titleCol = pickColumn(columns, FIELD_CANDIDATES.title);
@@ -644,7 +658,7 @@ export function generatePdfReport({
 
     autoTable(doc, {
       startY: cursorY,
-      margin: { left: margin, right: margin },
+      ...tableBase,
       head: [[
         '#',
         isEn ? 'Title' : 'Título',
@@ -654,9 +668,7 @@ export function generatePdfReport({
         'Venue',
       ]],
       body: docRows,
-      theme: 'striped',
-      headStyles: { fillColor: [30, 41, 59], fontSize: 8, fontStyle: 'bold' },
-      styles: { fontSize: 7.5, cellPadding: 3.5 },
+      styles: cellStyles(7.5, 3.5),
       columnStyles: {
         0: { cellWidth: 20 },
         1: { cellWidth: 180 },
@@ -670,16 +682,23 @@ export function generatePdfReport({
 
   // --- NUMERAÇÃO DE PÁGINAS E RODAPÉ ---
   const totalPages = doc.getNumberOfPages();
+  const footerText = isEn
+    ? 'Simetrics · A Scientata application · scientata.com'
+    : 'Simetrics · Uma aplicação Scientata · scientata.com';
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(mutedColor[0], mutedColor[1], mutedColor[2]);
 
-    doc.setDrawColor(226, 232, 240);
+    doc.setDrawColor(...C.border);
+    doc.setLineWidth(0.5);
     doc.line(margin, pageHeight - 25, pageWidth - margin, pageHeight - 25);
 
-    doc.text('Simetrics · Plataforma de Inteligência Bibliométrica (gustavosimas.com)', margin, pageHeight - 14);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...C.inkMuted);
+    doc.text(footerText, margin, pageHeight - 14);
+
+    doc.setFont('courier', 'normal');
+    doc.setFontSize(7.5);
     const pageStr = isEn ? `Page ${i} of ${totalPages}` : `Página ${i} de ${totalPages}`;
     doc.text(pageStr, pageWidth - margin - doc.getTextWidth(pageStr), pageHeight - 14);
   }

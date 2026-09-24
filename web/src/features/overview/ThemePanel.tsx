@@ -4,13 +4,6 @@ import { KeyRound, Sparkles } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import {
   Table,
   TableBody,
   TableCell,
@@ -24,6 +17,7 @@ import { useAiConfig } from '@/state/ai-config.store';
 import { useDataset } from '@/state/dataset.store';
 import { useLocale } from '@/state/locale.store';
 import { AiSettingsModal } from '@/components/AiSettingsModal';
+import { ReadingTip } from '@/components/InfoTip';
 
 export function ThemePanel() {
   const active = useDataset((state) => state.active);
@@ -58,32 +52,7 @@ export function ThemePanel() {
 
   return (
     <>
-      <Card className="border-t-4 border-t-purple-500 bg-gradient-to-br from-purple-500/[0.03] via-card to-card shadow-xs">
-        <CardHeader>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <CardTitle className="flex items-center gap-2.5 text-base font-bold text-foreground">
-              <div className="flex size-7 items-center justify-center rounded-lg bg-purple-100 text-purple-600 shadow-2xs dark:bg-purple-950 dark:text-purple-400">
-                <Sparkles className="size-4" aria-hidden />
-              </div>
-              {t('theme_title')}
-            </CardTitle>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setAiModalOpen(true)}
-              className="gap-1.5 rounded-lg text-xs font-semibold"
-            >
-              <KeyRound className="size-3.5 text-purple-600" />
-              <span>{isAiConfigured ? t('ai_configured') : t('ai_settings_btn')}</span>
-            </Button>
-          </div>
-          <CardDescription>
-            {t('theme_description')}
-          </CardDescription>
-        </CardHeader>
-
-        <CardContent className="space-y-4">
+      <div className="space-y-4">
           {!isAiConfigured && (
             <div className="rounded-xl border border-purple-200 bg-purple-50/70 p-3 text-xs text-purple-900 flex flex-wrap items-center justify-between gap-2 dark:border-purple-900 dark:bg-purple-950/40 dark:text-purple-300">
               <div className="flex items-center gap-2">
@@ -112,6 +81,18 @@ export function ThemePanel() {
               {clustering ? t('theme_btn_recalc') : t('theme_btn_identify')}
             </Button>
 
+            {isAiConfigured && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setAiModalOpen(true)}
+                className="ml-auto gap-1.5 text-xs"
+              >
+                <KeyRound className="size-3.5" aria-hidden />
+                <span>{t('ai_configured')}</span>
+              </Button>
+            )}
+
             {clustering && (
               <span className="inline-flex items-center gap-2 rounded-full border border-purple-200 bg-purple-50 px-3 py-1 text-xs font-medium text-purple-800 dark:border-purple-900 dark:bg-purple-950 dark:text-purple-300">
                 <span className="size-1.5 rounded-full bg-purple-500" />
@@ -122,7 +103,7 @@ export function ThemePanel() {
           </div>
 
           {themes.length > 0 && (
-            <div className="overflow-x-auto rounded-xl border">
+            <div className="overflow-x-auto border duration-300 animate-in fade-in-0">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -167,13 +148,8 @@ export function ThemePanel() {
             </div>
           )}
 
-          {clustering && (
-            <p className="text-xs text-muted-foreground">
-              {t('theme_ql_explanation')}
-            </p>
-          )}
-        </CardContent>
-      </Card>
+          {clustering && <ReadingTip>{t('theme_ql_explanation')}</ReadingTip>}
+      </div>
 
       <AiSettingsModal open={aiModalOpen} onOpenChange={setAiModalOpen} />
     </>

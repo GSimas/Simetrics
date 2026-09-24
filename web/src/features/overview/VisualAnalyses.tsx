@@ -3,13 +3,6 @@ import { lazy, Suspense, useState } from 'react';
 import type { Data, Trace } from '@/components/charts/plotly';
 
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -31,13 +24,17 @@ import type { KeywordGenetics } from '@/core/viz/genetics';
 import type { HistoriographData } from '@/core/viz/historiograph';
 import type { Period, SankeyData } from '@/core/viz/sankey';
 import type { ThematicMap } from '@/core/viz/thematic-map';
-import type { Dataset } from '@/lib/types';
+import type { Dataset, SearchEntityType } from '@/lib/types';
 import { useAsyncResult } from '@/lib/use-async-result';
 import { useLocale } from '@/state/locale.store';
 import { getAnalyticsWorker } from '@/workers/client';
 import { PALETTE, QUADRANT_NOTE, chartMessage } from './viz-shared';
+import { ReadingTip } from '@/components/InfoTip';
+import { openInSearch } from '@/state/navigation.store';
+import { useDataset } from '@/state/dataset.store';
 
 const PlotlyChart = lazy(() => import('@/components/charts/PlotlyChart'));
+const LotkaChart = lazy(() => import('@/components/charts/LotkaChart'));
 
 /**
  * Segunda onda de visualizações, agrupada em sub-abas.
@@ -47,7 +44,7 @@ const PlotlyChart = lazy(() => import('@/components/charts/PlotlyChart'));
  * aberta. Empilhar todos na Visão Geral dispararia sete análises pesadas de uma vez.
  */
 
-type PanelKey = 'boxplot' | 'sankey' | 'genetics' | 'concept' | 'thematic' | 'historiograph';
+type PanelKey = 'boxplot' | 'sankey' | 'genetics' | 'concept' | 'thematic' | 'historiograph' | 'lotka';
 
 const BOX_DIMENSIONS: BoxplotDimension[] = ['Países', 'Palavras-chave', 'Temas (IA)'];
 const BOX_METRICS: BoxplotMetric[] = [
@@ -67,23 +64,16 @@ export function VisualAnalyses({ dataset }: VisualAnalysesProps) {
   const t = useLocale((state) => state.t);
 
   return (
-    <Card className="border-t-4 border-t-blue-500 shadow-xs">
-      <CardHeader>
-        <CardTitle className="text-base font-bold text-foreground">{t('visual_title')}</CardTitle>
-        <CardDescription>
-          {t('visual_description')}
-        </CardDescription>
-      </CardHeader>
-
-      <CardContent>
+    <>
         <Tabs value={panel} onValueChange={(value) => setPanel(value as PanelKey)}>
-          <TabsList className="h-auto flex-wrap gap-1 bg-slate-100 dark:bg-slate-800/80 p-1.5">
+          <TabsList className="h-auto w-full flex-wrap justify-start gap-x-2">
             <TabsTrigger value="sankey">{t('visual_tab_sankey')}</TabsTrigger>
             <TabsTrigger value="boxplot">{t('visual_tab_boxplot')}</TabsTrigger>
             <TabsTrigger value="genetics">{t('visual_tab_genetics')}</TabsTrigger>
             <TabsTrigger value="concept">{t('visual_tab_concept')}</TabsTrigger>
             <TabsTrigger value="thematic">{t('visual_tab_thematic')}</TabsTrigger>
             <TabsTrigger value="historiograph">{t('visual_tab_historiograph')}</TabsTrigger>
+            <TabsTrigger value="lotka">{t('lotka_title')}</TabsTrigger>
           </TabsList>
 
           <TabsContent value="sankey">
@@ -104,21 +94,32 @@ export function VisualAnalyses({ dataset }: VisualAnalysesProps) {
           <TabsContent value="historiograph">
             {panel === 'historiograph' && <HistoriographPanel dataset={dataset} />}
           </TabsContent>
+          <TabsContent value="lotka">{panel === 'lotka' && <LotkaPanel />}</TabsContent>
         </Tabs>
-      </CardContent>
-    </Card>
+    </>
   );
 }
+
+/** Tipos de entidade do Motor de Busca para cada dimensão do boxplot. */
+const BOX_SEARCH_TYPES: Record<BoxplotDimension, SearchEntityType[]> = {
+  Países: ['País'],
+  'Palavras-chave': ['Palavra-chave'],
+  'Temas (IA)': ['Tema'],
+};
+
+const KEYWORD: SearchEntityType[] = ['Palavra-chave'];
 
 /** Distribuição estatística comparativa. */
 function BoxplotPanel({ dataset }: { dataset: Dataset }) {
   const [dimension, setDimension] = useState<BoxplotDimension>('Países');
   const [metric, setMetric] = useState<BoxplotMetric>('Citações por documento');
   const [selected, setSelected] = useState<string[] | null>(null);
-  const [logScale, setLogScale] = useState(false);
+  // Logarítmica por padrão: citações têm cauda longa e a escala linear achata as caixas.
+  const [logScale, setLogScale] = useState(true);
 
-  const { data: options } = useAsyncResult<string[]>(`box-options ${dimension}`, () =>
-    getAnalyticsWorker().boxplotOptions(dataset, dimension),
+  const { data: options, loading: loadingOptions } = useAsyncResult<string[]>(
+    `box-options ${dimension}`,
+    () => getAnalyticsWorker().boxplotOptions(dataset, dimension),
   );
 
   // Pré-seleção derivada, e não escrita em efeito: enquanto o usuário não escolher nada,
@@ -132,6 +133,8 @@ function BoxplotPanel({ dataset }: { dataset: Dataset }) {
       effectiveSelection.length === 0
         ? Promise.resolve([])
         : getAnalyticsWorker().boxplot(dataset, dimension, metric, effectiveSelection),
+    // Na troca de dimensão, `options` ainda é da dimensão anterior: espera as novas.
+    { enabled: !loadingOptions },
   );
 
   const toggle = (entity: string): void => {
@@ -237,6 +240,7 @@ function BoxplotPanel({ dataset }: { dataset: Dataset }) {
             <Suspense fallback={chartMessage('Carregando gráfico…')}>
               <PlotlyChart
                 exportName="distribuicao-comparativa"
+                onPointClick={(point) => openInSearch(point.data?.name, BOX_SEARCH_TYPES[dimension])}
                 height={440}
                 data={(series ?? []).map((entry, index): Trace => ({
                   type: 'box',
@@ -354,10 +358,10 @@ function SankeyPanel({ dataset }: { dataset: Dataset }) {
         ))}
       </div>
 
-      <p className="text-xs text-muted-foreground">
+      <ReadingTip>
         As linhas mais grossas são termos que sobreviveram de um período ao seguinte; as
         finas, termos distintos que costumam aparecer nos mesmos documentos.
-      </p>
+      </ReadingTip>
 
       {!sankey ? (
         chartMessage(
@@ -369,6 +373,7 @@ function SankeyPanel({ dataset }: { dataset: Dataset }) {
         <Suspense fallback={chartMessage('Carregando gráfico…')}>
           <PlotlyChart
             exportName="evolucao-tematica"
+            onPointClick={(point) => openInSearch(point.label, KEYWORD)}
             height={620}
             data={[
               {
@@ -387,7 +392,7 @@ function SankeyPanel({ dataset }: { dataset: Dataset }) {
                   value: sankey.links.map((link) => link.value),
                   color: sankey.links.map((link) =>
                     link.kind === 'continuidade'
-                      ? 'rgba(18, 115, 185, 0.45)'
+                      ? 'rgba(63, 174, 143, 0.45)'
                       : 'rgba(150, 160, 170, 0.25)',
                   ),
                 },
@@ -418,16 +423,17 @@ function GeneticsPanel({ dataset }: { dataset: Dataset }) {
 
   return (
     <div className="space-y-3">
-      <p className="text-xs text-muted-foreground">
+      <ReadingTip>
         Cada ponto é uma palavra-chave. O eixo X mostra quando ela apareceu pela primeira
         vez; o Y, por quantos anos permaneceu em uso; o tamanho, quantas vezes se replicou.
         Termos no alto e à esquerda são o núcleo estável da área; à direita e embaixo, as
         fronteiras recentes.
-      </p>
+      </ReadingTip>
 
       <Suspense fallback={chartMessage('Carregando gráfico…')}>
         <PlotlyChart
           exportName="genetica-das-ideias"
+          onPointClick={(point) => openInSearch(point.text, KEYWORD)}
           height={480}
           data={[
             {
@@ -513,14 +519,15 @@ function ConceptPanel({ dataset }: { dataset: Dataset }) {
         </div>
       </div>
 
-      <p className="text-xs text-muted-foreground">
+      <ReadingTip>
         Termos próximos aparecem nos mesmos documentos. As ilhas são escolas de pensamento;
         os termos entre elas são pontes conceituais.
-      </p>
+      </ReadingTip>
 
       <Suspense fallback={chartMessage('Carregando gráfico…')}>
         <PlotlyChart
           exportName={`mapa-conceitual-${dimensions}`}
+          onPointClick={(point) => openInSearch(point.text, KEYWORD)}
           height={dimensions === '3d' ? 620 : 500}
           data={groups.map((group, index) => {
             const members = terms.filter((term) => term.cluster === group);
@@ -595,11 +602,12 @@ function ThematicPanel({ dataset }: { dataset: Dataset }) {
         </div>
       </div>
 
-      <p className="text-xs text-muted-foreground">{QUADRANT_NOTE}</p>
+      <ReadingTip>{QUADRANT_NOTE}</ReadingTip>
 
       <Suspense fallback={chartMessage('Carregando gráfico…')}>
         <PlotlyChart
           exportName="mapa-tematico"
+          onPointClick={(point) => openInSearch(point.text, ['Palavra-chave', 'Tema'])}
           height={560}
           data={map.clusters.map((cluster, index): Trace => ({
             type: 'scatter',
@@ -731,16 +739,19 @@ function HistoriographPanel({ dataset }: { dataset: Dataset }) {
           </Select>
         </div>
 
-        <p className="text-xs text-muted-foreground">
+        <ReadingTip>
           {data.edges.length} citações diretas entre os {data.nodes.length} documentos mais
           citados. A detecção casa sobrenome do primeiro autor e ano dentro do texto das
           referências, então erra em homônimos e em grafias divergentes.
-        </p>
+        </ReadingTip>
       </div>
 
       <Suspense fallback={chartMessage('Carregando gráfico…')}>
         <PlotlyChart
           exportName="historiograph"
+          onPointClick={(point) =>
+            openInSearch((point.customdata as unknown[] | undefined)?.[0], ['Documento'])
+          }
           height={560}
           data={[
             {
@@ -763,7 +774,7 @@ function HistoriographPanel({ dataset }: { dataset: Dataset }) {
               customdata: data.nodes.map((node) => [node.title, node.citations]) as never,
               marker: {
                 size: data.nodes.map((node) => node.size / 2),
-                color: '#1273B9',
+                color: PALETTE[0],
                 opacity: 0.8,
                 line: { width: 1, color: 'white' },
               },
@@ -776,6 +787,21 @@ function HistoriographPanel({ dataset }: { dataset: Dataset }) {
             yaxis: { showticklabels: false, showgrid: false, zeroline: false },
           }}
         />
+      </Suspense>
+    </div>
+  );
+}
+
+/** Lei de Lotka: produtividade observada dos autores contra a curva teórica c/x². */
+function LotkaPanel() {
+  const t = useLocale((state) => state.t);
+  const lotka = useDataset((state) => state.overview?.lotka);
+  if (!lotka) return chartMessage('Calculando a distribuição de produtividade…');
+  return (
+    <div className="space-y-3">
+      <ReadingTip>{t('lotka_description')}</ReadingTip>
+      <Suspense fallback={chartMessage('Carregando gráfico…')}>
+        <LotkaChart lotka={lotka} />
       </Suspense>
     </div>
   );

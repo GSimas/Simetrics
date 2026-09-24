@@ -1,14 +1,92 @@
 /**
  * Gerador de gráficos em alta resolução (Canvas 2D / Retina 2x) para relatórios.
- * Produz imagens PNG nítidas e estilizadas para PDF, Word (.docx) e Live Preview.
+ * Produz imagens PNG nítidas na identidade Simetrics/Scientata (tema claro, papel e tinta)
+ * para PDF, Word (.docx) e Live Preview.
  * Totalmente bilíngue (Português / Inglês).
  */
+import { geoGraticule10, geoNaturalEarth1, geoPath, type GeoPermissibleObjects } from 'd3-geo';
+import { feature } from 'topojson-client';
+import type { FeatureCollection, Geometry } from 'geojson';
+import type { GeometryCollection, Topology } from 'topojson-specification';
+import world from 'world-atlas/countries-110m.json';
+
+import { PALETTE } from '@/features/overview/viz-shared';
+
+export { PALETTE };
+
+/** Tokens do tema claro Scientata — compartilhados pelos geradores de PDF e Word. */
+export const BRAND = {
+  paper: '#f0eee6',
+  card: '#f7f6f1',
+  muted: '#e6e3d8',
+  border: '#d5d2c6',
+  ink: '#07110f',
+  inkMuted: '#56625d',
+  pine: '#236e5e',
+  lime: '#b8ff4a',
+  cyan: '#53d7d0',
+  destructive: '#c2412d',
+} as const;
+
+const SANS = 'Manrope, system-ui, sans-serif';
+const MONO = '"DM Mono", ui-monospace, monospace';
+
+const pal = (i: number): string => PALETTE[i % PALETTE.length] ?? BRAND.pine;
 
 export interface ChartRenderOptions {
   width?: number;
   height?: number;
   locale?: 'pt' | 'en';
   isDark?: boolean;
+}
+
+/**
+ * Moldura comum: fundo de cartão, contorno fino, marca lima, título em tinta e,
+ * opcionalmente, uma legenda em mono maiúsculo.
+ */
+function drawFrame(ctx: CanvasRenderingContext2D, width: number, height: number, title: string, subtitle?: string): void {
+  ctx.fillStyle = BRAND.card;
+  ctx.fillRect(0, 0, width, height);
+  ctx.strokeStyle = BRAND.border;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(0.5, 0.5, width - 1, height - 1);
+
+  // Marca lima curta ao lado do título
+  ctx.fillStyle = BRAND.lime;
+  ctx.fillRect(40, 18, 18, 4);
+
+  ctx.textAlign = 'left';
+  ctx.fillStyle = BRAND.ink;
+  ctx.font = `700 22px ${SANS}`;
+  ctx.fillText(title, 40, 44);
+
+  if (subtitle) monoLabel(ctx, subtitle.toUpperCase(), 40, 64, BRAND.inkMuted, 11);
+}
+
+/** Rótulo mono espaçado (eixos, legendas). */
+function monoLabel(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  color: string = BRAND.inkMuted,
+  size = 11,
+  align: CanvasTextAlign = 'left',
+): void {
+  ctx.save();
+  ctx.font = `400 ${size}px ${MONO}`;
+  ctx.letterSpacing = '1px';
+  ctx.fillStyle = color;
+  ctx.textAlign = align;
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
+function createCanvas(width: number, height: number): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D | null } {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  return { canvas, ctx: canvas.getContext('2d') };
 }
 
 export function renderProductionTimelineCanvas(
@@ -18,30 +96,23 @@ export function renderProductionTimelineCanvas(
   const isEn = options.locale === 'en';
   const width = options.width ?? 1000;
   const height = options.height ?? 460;
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
+  const { canvas, ctx } = createCanvas(width, height);
   if (!ctx) return '';
 
-  const padding = { top: 60, right: 40, bottom: 60, left: 60 };
+  const padding = { top: 70, right: 40, bottom: 60, left: 60 };
   const chartW = width - padding.left - padding.right;
   const chartH = height - padding.top - padding.bottom;
 
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(0, 0, width, height);
-
-  ctx.fillStyle = '#0F172A';
-  ctx.font = 'bold 22px Inter, system-ui, sans-serif';
-  ctx.fillText(
+  drawFrame(
+    ctx,
+    width,
+    height,
     isEn ? 'Annual Scientific Production Evolution (Articles / Year)' : 'Evolução da Produção Científica Anual (Artigos / Ano)',
-    padding.left,
-    36,
   );
 
   if (!data || data.length === 0) {
-    ctx.fillStyle = '#64748B';
-    ctx.font = '16px Inter, system-ui, sans-serif';
+    ctx.fillStyle = BRAND.inkMuted;
+    ctx.font = `400 16px ${SANS}`;
     ctx.fillText(isEn ? 'No year data available.' : 'Sem dados de anos disponíveis.', padding.left, height / 2);
     return canvas.toDataURL('image/png');
   }
@@ -50,20 +121,19 @@ export function renderProductionTimelineCanvas(
   const maxCount = Math.max(...sorted.map((d) => d.count), 1);
   const countStep = Math.ceil(maxCount / 5);
 
-  ctx.strokeStyle = '#F1F5F9';
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = 1;
   for (let i = 0; i <= 5; i++) {
     const val = i * countStep;
-    const y = padding.top + chartH - (val / (countStep * 5)) * chartH;
+    const y = Math.round(padding.top + chartH - (val / (countStep * 5)) * chartH) + 0.5;
+    ctx.strokeStyle = i === 0 ? BRAND.ink : BRAND.border;
+    ctx.globalAlpha = i === 0 ? 0.6 : 0.7;
     ctx.beginPath();
     ctx.moveTo(padding.left, y);
     ctx.lineTo(width - padding.right, y);
     ctx.stroke();
+    ctx.globalAlpha = 1;
 
-    ctx.fillStyle = '#94A3B8';
-    ctx.font = '12px Inter, system-ui, sans-serif';
-    ctx.textAlign = 'right';
-    ctx.fillText(String(val), padding.left - 10, y + 4);
+    monoLabel(ctx, String(val), padding.left - 10, y + 4, BRAND.inkMuted, 11, 'right');
   }
 
   const barWidth = Math.max(8, Math.min(36, (chartW / sorted.length) * 0.7));
@@ -74,20 +144,16 @@ export function renderProductionTimelineCanvas(
     const barH = (d.count / (countStep * 5)) * chartH;
     const y = padding.top + chartH - barH;
 
-    const grad = ctx.createLinearGradient(x, y, x, y + barH);
-    grad.addColorStop(0, '#2563EB');
-    grad.addColorStop(1, '#3B82F6');
-    ctx.fillStyle = grad;
-
-    ctx.beginPath();
-    ctx.roundRect(x, y, barWidth, barH, [4, 4, 0, 0]);
-    ctx.fill();
+    // Barras chapadas em pinho; a última recebe o destaque lima no topo
+    ctx.fillStyle = BRAND.pine;
+    ctx.fillRect(x, y, barWidth, barH);
+    if (idx === sorted.length - 1 && barH > 3) {
+      ctx.fillStyle = BRAND.lime;
+      ctx.fillRect(x, y, barWidth, 3);
+    }
 
     if (sorted.length <= 15 || idx % Math.ceil(sorted.length / 12) === 0 || idx === sorted.length - 1) {
-      ctx.fillStyle = '#64748B';
-      ctx.font = '12px Inter, system-ui, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(String(d.year), x + barWidth / 2, height - padding.bottom + 22);
+      monoLabel(ctx, String(d.year), x + barWidth / 2, height - padding.bottom + 22, BRAND.inkMuted, 11, 'center');
     }
   });
 
@@ -101,22 +167,14 @@ export function renderHorizontalBarChart(
 ): string {
   const width = options.width ?? 1000;
   const height = options.height ?? Math.max(400, items.length * 36 + 100);
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
+  const { canvas, ctx } = createCanvas(width, height);
   if (!ctx) return '';
 
-  const padding = { top: 60, right: 70, bottom: 40, left: 240 };
+  const padding = { top: 76, right: 70, bottom: 30, left: 240 };
   const chartW = width - padding.left - padding.right;
   const chartH = height - padding.top - padding.bottom;
 
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(0, 0, width, height);
-
-  ctx.fillStyle = '#0F172A';
-  ctx.font = 'bold 22px Inter, system-ui, sans-serif';
-  ctx.fillText(title, 40, 36);
+  drawFrame(ctx, width, height, title);
 
   if (items.length === 0) return canvas.toDataURL('image/png');
 
@@ -128,29 +186,29 @@ export function renderHorizontalBarChart(
     const y = padding.top + idx * rowHeight + (rowHeight - barH) / 2;
     const barW = (item.value / maxVal) * chartW;
 
-    ctx.fillStyle = '#1E293B';
-    ctx.font = 'bold 13px Inter, system-ui, sans-serif';
+    ctx.fillStyle = BRAND.ink;
+    ctx.font = `600 13px ${SANS}`;
     ctx.textAlign = 'right';
     const truncatedLabel = item.label.length > 28 ? item.label.slice(0, 26) + '…' : item.label;
     ctx.fillText(truncatedLabel, padding.left - 15, y + barH / 2 + 5);
 
-    ctx.fillStyle = '#F1F5F9';
-    ctx.beginPath();
-    ctx.roundRect(padding.left, y, chartW, barH, 4);
-    ctx.fill();
+    // Trilho em tom neutro e barra chapada em pinho
+    ctx.fillStyle = BRAND.muted;
+    ctx.fillRect(padding.left, y, chartW, barH);
+    ctx.fillStyle = BRAND.pine;
+    ctx.fillRect(padding.left, y, Math.max(3, barW), barH);
 
-    const grad = ctx.createLinearGradient(padding.left, y, padding.left + barW, y);
-    grad.addColorStop(0, '#4F46E5');
-    grad.addColorStop(1, '#7C3AED');
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.roundRect(padding.left, y, Math.max(8, barW), barH, 4);
-    ctx.fill();
-
-    ctx.fillStyle = '#0F172A';
-    ctx.font = 'bold 12px Inter, system-ui, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText(`${item.value.toLocaleString(options.locale === 'en' ? 'en-US' : 'pt-BR')}${item.sub ? ` (${item.sub})` : ''}`, padding.left + barW + 10, y + barH / 2 + 4);
+    // Barras longas levam o valor por dentro (papel sobre pinho); curtas, por fora
+    const inside = barW > chartW * 0.6;
+    monoLabel(
+      ctx,
+      `${item.value.toLocaleString(options.locale === 'en' ? 'en-US' : 'pt-BR')}${item.sub ? ` · ${item.sub}` : ''}`,
+      inside ? padding.left + barW - 10 : padding.left + barW + 10,
+      y + barH / 2 + 4,
+      inside ? BRAND.card : BRAND.ink,
+      11,
+      inside ? 'right' : 'left',
+    );
   });
 
   return canvas.toDataURL('image/png');
@@ -163,34 +221,22 @@ export function renderThemesPieChart(
   const isEn = options.locale === 'en';
   const width = options.width ?? 1000;
   const height = options.height ?? 460;
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
+  const { canvas, ctx } = createCanvas(width, height);
   if (!ctx) return '';
 
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(0, 0, width, height);
-
-  ctx.fillStyle = '#0F172A';
-  ctx.font = 'bold 22px Inter, system-ui, sans-serif';
-  ctx.fillText(
+  drawFrame(
+    ctx,
+    width,
+    height,
     isEn ? 'AI Thematic Distribution Across Articles' : 'Distribuição Temática dos Artigos por IA',
-    40,
-    36,
   );
 
   if (clusters.length === 0) return canvas.toDataURL('image/png');
 
   const centerX = 260;
-  const centerY = height / 2 + 10;
+  const centerY = height / 2 + 20;
   const outerRadius = 140;
   const innerRadius = 75;
-
-  const colors = [
-    '#3B82F6', '#8B5CF6', '#10B981', '#F59E0B', '#EC4899',
-    '#06B6D4', '#6366F1', '#14B8A6', '#F97316', '#84CC16',
-  ];
 
   const total = clusters.reduce((acc, c) => acc + c.docCount, 0) || 1;
   let currentAngle = -Math.PI / 2;
@@ -203,29 +249,43 @@ export function renderThemesPieChart(
     ctx.arc(centerX, centerY, outerRadius, currentAngle, endAngle);
     ctx.arc(centerX, centerY, innerRadius, endAngle, currentAngle, true);
     ctx.closePath();
-    ctx.fillStyle = colors[idx % colors.length] ?? '#3B82F6';
+    ctx.fillStyle = pal(idx);
     ctx.fill();
+    // Separador fino em papel entre as fatias
+    ctx.strokeStyle = BRAND.card;
+    ctx.lineWidth = 2;
+    ctx.stroke();
 
     currentAngle = endAngle;
   });
 
+  // Total no centro do anel
+  ctx.fillStyle = BRAND.ink;
+  ctx.font = `700 28px ${SANS}`;
+  ctx.textAlign = 'center';
+  ctx.fillText(total.toLocaleString(isEn ? 'en-US' : 'pt-BR'), centerX, centerY + 6);
+  monoLabel(ctx, 'DOCS', centerX, centerY + 26, BRAND.inkMuted, 10, 'center');
+
   const legendX = 480;
-  let legendY = 80;
+  let legendY = 84;
   const rowH = Math.min(36, (height - 100) / clusters.length);
 
   clusters.forEach((c, idx) => {
-    const color = colors[idx % colors.length] ?? '#3B82F6';
+    ctx.fillStyle = pal(idx);
+    ctx.fillRect(legendX, legendY + 4, 14, 14);
 
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.roundRect(legendX, legendY + 4, 14, 14, 3);
-    ctx.fill();
-
-    ctx.fillStyle = '#0F172A';
-    ctx.font = 'bold 13px Inter, system-ui, sans-serif';
+    ctx.fillStyle = BRAND.ink;
+    ctx.font = `600 13px ${SANS}`;
     ctx.textAlign = 'left';
-    const label = `${c.name} — ${c.docCount} docs (${((c.docCount / total) * 100).toFixed(1)}%)`;
-    ctx.fillText(label, legendX + 24, legendY + 16);
+    ctx.fillText(c.name, legendX + 24, legendY + 16);
+    monoLabel(
+      ctx,
+      `${c.docCount} DOCS · ${((c.docCount / total) * 100).toFixed(1)}%`,
+      legendX + 24 + ctx.measureText(c.name).width + 12,
+      legendY + 16,
+      BRAND.inkMuted,
+      11,
+    );
 
     legendY += rowH;
   });
@@ -240,21 +300,14 @@ export function renderWordCloudCanvas(
   const isEn = options.locale === 'en';
   const width = options.width ?? 1000;
   const height = options.height ?? 460;
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
+  const { canvas, ctx } = createCanvas(width, height);
   if (!ctx) return '';
 
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(0, 0, width, height);
-
-  ctx.fillStyle = '#0F172A';
-  ctx.font = 'bold 22px Inter, system-ui, sans-serif';
-  ctx.fillText(
+  drawFrame(
+    ctx,
+    width,
+    height,
     isEn ? 'Keyword Cloud & Scientific Lexicometrics' : 'Nuvem de Termos & Lexicometria Científica',
-    40,
-    36,
   );
 
   if (!terms || terms.length === 0) return canvas.toDataURL('image/png');
@@ -262,11 +315,6 @@ export function renderWordCloudCanvas(
   const topTerms = terms.slice(0, 30);
   const maxCount = Math.max(...topTerms.map((t) => t.docCount), 1);
   const minCount = Math.min(...topTerms.map((t) => t.docCount), 1);
-
-  const colors = [
-    '#2563EB', '#7C3AED', '#0D9488', '#0284C7', '#4F46E5',
-    '#059669', '#D97706', '#DC2626', '#4338CA', '#0891B2',
-  ];
 
   const cols = 5;
   const cellW = (width - 80) / cols;
@@ -277,15 +325,21 @@ export function renderWordCloudCanvas(
     const col = idx % cols;
     const row = Math.floor(idx / cols);
     const x = 50 + col * cellW + cellW / 2;
-    const y = 80 + row * cellH + cellH / 2;
+    const y = 84 + row * cellH + cellH / 2;
 
     const normalized = (t.docCount - minCount) / (maxCount - minCount || 1);
-    const fontSize = Math.floor(13 + normalized * 18);
+    // Reduz a fonte até o termo caber na célula
+    let fontSize = Math.floor(13 + normalized * 18);
+    ctx.font = `700 ${fontSize}px ${SANS}`;
+    while (fontSize > 10 && ctx.measureText(t.entity).width > cellW - 16) {
+      fontSize -= 1;
+      ctx.font = `700 ${fontSize}px ${SANS}`;
+    }
 
-    ctx.fillStyle = colors[idx % colors.length] ?? '#2563EB';
-    ctx.font = `bold ${fontSize}px Inter, system-ui, sans-serif`;
+    ctx.fillStyle = pal(idx);
     ctx.textAlign = 'center';
-    ctx.fillText(`${t.entity} (${t.docCount})`, x, y);
+    ctx.fillText(t.entity, x, y);
+    monoLabel(ctx, String(t.docCount), x, y + 14, BRAND.inkMuted, 10, 'center');
   });
 
   return canvas.toDataURL('image/png');
@@ -302,40 +356,21 @@ export function renderNetworkGraphCanvas(
   const isEn = options.locale === 'en';
   const width = options.width ?? 1000;
   const height = options.height ?? 540;
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
+  const { canvas, ctx } = createCanvas(width, height);
   if (!ctx) return '';
 
-  ctx.fillStyle = '#0F172A'; // Fundo Dark Slate executivo para contraste de grafos
-  ctx.fillRect(0, 0, width, height);
-
-  ctx.fillStyle = '#F8FAFC';
-  ctx.font = 'bold 22px Inter, system-ui, sans-serif';
-  ctx.fillText(
+  drawFrame(
+    ctx,
+    width,
+    height,
     isEn ? 'Co-occurrence Network & Scientific Communities (Louvain)' : 'Rede de Coocorrência & Comunidades Científicas (Louvain)',
-    40,
-    38,
-  );
-
-  ctx.fillStyle = '#94A3B8';
-  ctx.font = '12px Inter, system-ui, sans-serif';
-  ctx.fillText(
     isEn ? `${nodes.length} nodes · ${edges.length} edges · Topological clustering` : `${nodes.length} nós · ${edges.length} arestas · Agrupamento topológico`,
-    40,
-    58,
   );
 
   if (nodes.length === 0) return canvas.toDataURL('image/png');
 
   const topNodes = nodes.slice(0, 35);
   const nodeMap = new Map<string, { x: number; y: number; label: string; radius: number; color: string; comm: number }>();
-
-  const communityColors = [
-    '#38BDF8', '#A855F7', '#34D399', '#FBBF24', '#F43F5E',
-    '#818CF8', '#2DD4BF', '#FB923C', '#A3E635', '#E879F9',
-  ];
 
   const centerX = width / 2;
   const centerY = height / 2 + 25;
@@ -349,19 +384,18 @@ export function renderNetworkGraphCanvas(
     const x = centerX + rVar * Math.cos(angle);
     const y = centerY + rVar * Math.sin(angle);
     const comm = n.community ?? (idx % 5);
-    const color = communityColors[comm % communityColors.length] ?? '#38BDF8';
     const nodeR = Math.max(6, Math.min(18, 6 + (n.count ? Math.sqrt(n.count) * 1.5 : 4)));
 
-    nodeMap.set(n.label, { x, y, label: n.label, radius: nodeR, color, comm });
+    nodeMap.set(n.label, { x, y, label: n.label, radius: nodeR, color: pal(comm), comm });
   });
 
-  // Desenha Arestas
-  ctx.lineWidth = 1.2;
+  // Desenha Arestas em tinta translúcida
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(7, 17, 15, 0.15)';
   edges.slice(0, 100).forEach((edge) => {
     const s = nodeMap.get(edge.source);
     const t = nodeMap.get(edge.target);
     if (s && t) {
-      ctx.strokeStyle = s.comm === t.comm ? `${s.color}55` : 'rgba(148, 163, 184, 0.25)';
       ctx.beginPath();
       ctx.moveTo(s.x, s.y);
       ctx.lineTo(t.x, t.y);
@@ -369,36 +403,35 @@ export function renderNetworkGraphCanvas(
     }
   });
 
-  // Desenha Nós com Glow e Rótulos
+  // Desenha Nós chapados com contorno em papel e rótulos com halo
   nodeMap.forEach((n, label) => {
-    // Glow do nó
-    const glow = ctx.createRadialGradient(n.x, n.y, n.radius * 0.2, n.x, n.y, n.radius * 2);
-    glow.addColorStop(0, `${n.color}DD`);
-    glow.addColorStop(1, `${n.color}00`);
-    ctx.fillStyle = glow;
-    ctx.beginPath();
-    ctx.arc(n.x, n.y, n.radius * 2, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Nó central
     ctx.fillStyle = n.color;
     ctx.beginPath();
     ctx.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = '#FFFFFF';
+    ctx.strokeStyle = BRAND.card;
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
-    // Rótulo do nó
-    ctx.font = 'bold 11px Inter, system-ui, sans-serif';
-    ctx.fillStyle = '#F8FAFC';
-    ctx.textAlign = 'center';
     const cleanLabel = label.length > 20 ? label.slice(0, 18) + '…' : label;
+    ctx.font = `600 11px ${SANS}`;
+    ctx.textAlign = 'center';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = BRAND.card;
+    ctx.lineWidth = 3;
+    ctx.strokeText(cleanLabel, n.x, n.y + n.radius + 14);
+    ctx.fillStyle = BRAND.ink;
     ctx.fillText(cleanLabel, n.x, n.y + n.radius + 14);
   });
 
   return canvas.toDataURL('image/png');
 }
+
+// Geometria dos países (world-atlas 1:110m): decodificada uma única vez por sessão.
+const COUNTRIES = feature(
+  world as unknown as Topology,
+  (world as unknown as Topology).objects.countries as GeometryCollection,
+) as FeatureCollection<Geometry>;
 
 /**
  * Gráfico de Mapa Global de Colaboração Internacional.
@@ -413,88 +446,74 @@ export function renderWorldCollaborationMapCanvas(
   const isEn = options.locale === 'en';
   const width = options.width ?? 1000;
   const height = options.height ?? 500;
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d');
+  const { canvas, ctx } = createCanvas(width, height);
   if (!ctx) return '';
 
-  ctx.fillStyle = '#090D16'; // Fundo Ocean Navy
-  ctx.fillRect(0, 0, width, height);
-
-  ctx.fillStyle = '#F8FAFC';
-  ctx.font = 'bold 22px Inter, system-ui, sans-serif';
-  ctx.fillText(
+  drawFrame(
+    ctx,
+    width,
+    height,
     isEn ? 'Global International Scientific Collaboration Map' : 'Mapa Global de Colaboração Científica Internacional',
-    40,
-    38,
-  );
-
-  ctx.fillStyle = '#94A3B8';
-  ctx.font = '12px Inter, system-ui, sans-serif';
-  ctx.fillText(
     isEn ? 'Cross-border partnerships, international co-authorship arcs & output hubs' : 'Parcerias transfronteiriças, arcos de coautoria e centros de produção',
-    40,
-    58,
   );
 
-  const padding = { top: 80, right: 50, bottom: 40, left: 50 };
-  const mapW = width - padding.left - padding.right;
-  const mapH = height - padding.top - padding.bottom;
+  const padding = { top: 80, right: 30, bottom: 20, left: 30 };
+  const projection = geoNaturalEarth1().fitExtent(
+    [
+      [padding.left, padding.top],
+      [width - padding.right, height - padding.bottom],
+    ],
+    { type: 'Sphere' },
+  );
+  const path = geoPath(projection, ctx);
 
-  // Grade Cartográfica de Fundo (Meridianos & Paralelos)
-  ctx.strokeStyle = '#1E293B';
-  ctx.lineWidth = 0.8;
-  for (let lon = -180; lon <= 180; lon += 60) {
-    const x = padding.left + ((lon + 180) / 360) * mapW;
-    ctx.beginPath();
-    ctx.moveTo(x, padding.top);
-    ctx.lineTo(x, height - padding.bottom);
-    ctx.stroke();
-  }
-  for (let lat = -60; lat <= 80; lat += 30) {
-    const y = padding.top + ((90 - lat) / 180) * mapH;
-    ctx.beginPath();
-    ctx.moveTo(padding.left, y);
-    ctx.lineTo(width - padding.right, y);
-    ctx.stroke();
-  }
-
-  // Linha do Equador
-  const equatorY = padding.top + (90 / 180) * mapH;
-  ctx.strokeStyle = '#334155';
-  ctx.lineWidth = 1.2;
-  ctx.setLineDash([4, 4]);
+  // Oceano em papel, graticulado e países em tom neutro com fronteiras finas
   ctx.beginPath();
-  ctx.moveTo(padding.left, equatorY);
-  ctx.lineTo(width - padding.right, equatorY);
+  path({ type: 'Sphere' });
+  ctx.fillStyle = BRAND.paper;
+  ctx.fill();
+
+  ctx.beginPath();
+  path(geoGraticule10());
+  ctx.strokeStyle = BRAND.border;
+  ctx.globalAlpha = 0.5;
+  ctx.lineWidth = 0.5;
   ctx.stroke();
-  ctx.setLineDash([]);
+  ctx.globalAlpha = 1;
+
+  ctx.beginPath();
+  path(COUNTRIES as GeoPermissibleObjects);
+  ctx.fillStyle = BRAND.muted;
+  ctx.fill();
+  ctx.strokeStyle = BRAND.border;
+  ctx.lineWidth = 0.6;
+  ctx.stroke();
+
+  ctx.beginPath();
+  path({ type: 'Sphere' });
+  ctx.strokeStyle = BRAND.border;
+  ctx.lineWidth = 1;
+  ctx.stroke();
 
   // Projeção dos Países
   const countryCoords = new Map<string, { x: number; y: number; label: string; docs: number }>();
   network.nodes.forEach((n) => {
     if (n.latitude !== null && n.longitude !== null) {
-      const x = padding.left + ((n.longitude + 180) / 360) * mapW;
-      const y = padding.top + ((90 - n.latitude) / 180) * mapH;
-      countryCoords.set(n.country, { x, y, label: n.label, docs: n.documents });
+      const p = projection([n.longitude, n.latitude]);
+      if (p) countryCoords.set(n.country, { x: p[0], y: p[1], label: n.label, docs: n.documents });
     }
   });
 
-  // Arcos de Colaboração (Curvas de Bézier)
-  ctx.lineWidth = 1.5;
-  network.edges.slice(0, 40).forEach((edge) => {
+  // Arcos de Colaboração (Curvas de Bézier) em pinho, alternando com ciano
+  ctx.lineWidth = 1.4;
+  network.edges.slice(0, 40).forEach((edge, idx) => {
     const s = countryCoords.get(edge.source);
     const t = countryCoords.get(edge.target);
     if (s && t) {
       const midX = (s.x + t.x) / 2;
       const midY = Math.min(s.y, t.y) - Math.abs(s.x - t.x) * 0.18;
 
-      const grad = ctx.createLinearGradient(s.x, s.y, t.x, t.y);
-      grad.addColorStop(0, 'rgba(56, 189, 248, 0.7)');
-      grad.addColorStop(1, 'rgba(168, 85, 247, 0.7)');
-      ctx.strokeStyle = grad;
-
+      ctx.strokeStyle = idx % 3 === 2 ? 'rgba(83, 215, 208, 0.85)' : 'rgba(35, 110, 94, 0.55)';
       ctx.beginPath();
       ctx.moveTo(s.x, s.y);
       ctx.quadraticCurveTo(midX, midY, t.x, t.y);
@@ -502,33 +521,28 @@ export function renderWorldCollaborationMapCanvas(
     }
   });
 
-  // Nós dos Países
+  // Marcadores dos Países
   countryCoords.forEach((node) => {
-    const radius = Math.max(5, Math.min(16, 4 + Math.sqrt(node.docs) * 1.2));
+    const radius = Math.max(4, Math.min(14, 3 + Math.sqrt(node.docs) * 1.1));
 
-    // Glow
-    const glow = ctx.createRadialGradient(node.x, node.y, radius * 0.3, node.x, node.y, radius * 2.5);
-    glow.addColorStop(0, 'rgba(52, 211, 153, 0.8)');
-    glow.addColorStop(1, 'rgba(52, 211, 153, 0)');
-    ctx.fillStyle = glow;
-    ctx.beginPath();
-    ctx.arc(node.x, node.y, radius * 2.5, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Ponto Central
-    ctx.fillStyle = '#34D399';
+    ctx.fillStyle = BRAND.pine;
     ctx.beginPath();
     ctx.arc(node.x, node.y, radius, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = '#FFFFFF';
+    ctx.strokeStyle = BRAND.card;
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
-    // Nome do País
-    ctx.font = 'bold 10px Inter, system-ui, sans-serif';
-    ctx.fillStyle = '#F1F5F9';
+    // Nome do País com halo em papel
+    const text = `${node.label} (${node.docs})`;
+    ctx.font = `600 10px ${SANS}`;
     ctx.textAlign = 'center';
-    ctx.fillText(`${node.label} (${node.docs})`, node.x, node.y - radius - 4);
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = BRAND.card;
+    ctx.lineWidth = 3;
+    ctx.strokeText(text, node.x, node.y - radius - 4);
+    ctx.fillStyle = BRAND.ink;
+    ctx.fillText(text, node.x, node.y - radius - 4);
   });
 
   return canvas.toDataURL('image/png');
