@@ -1,4 +1,9 @@
 import { downloadBlob, timestampedFilename } from '@/core/export';
+import { useLocale } from '@/state/locale.store';
+
+function fail(pt: string, en: string): Error {
+  return new Error(useLocale.getState().locale === 'en' ? en : pt);
+}
 
 /**
  * Exportação de gráficos como imagem: SVG (vetorial), JPG (com o fundo do tema) ou PNG
@@ -56,7 +61,7 @@ export async function exportChartImage(
     const element = new Image();
     await new Promise<void>((resolve, reject) => {
       element.onload = () => resolve();
-      element.onerror = () => reject(new Error('Não foi possível converter o gráfico em imagem.'));
+      element.onerror = () => reject(fail('Não foi possível converter o gráfico em imagem.', 'Could not convert the chart to an image.'));
       element.src = url;
     });
 
@@ -64,7 +69,7 @@ export async function exportChartImage(
     canvas.width = image.width * RASTER_SCALE;
     canvas.height = image.height * RASTER_SCALE;
     const context = canvas.getContext('2d');
-    if (!context) throw new Error('Canvas indisponível neste navegador.');
+    if (!context) throw fail('Canvas indisponível neste navegador.', 'Canvas is not available in this browser.');
 
     // JPG não tem transparência: leva o fundo do tema, como o gráfico aparece na tela.
     if (format === 'jpg') {
@@ -76,7 +81,7 @@ export async function exportChartImage(
     const blob = await new Promise<Blob | null>((resolve) =>
       canvas.toBlob(resolve, format === 'jpg' ? 'image/jpeg' : 'image/png', 0.92),
     );
-    if (!blob) throw new Error('Falha ao gerar a imagem.');
+    if (!blob) throw fail('Falha ao gerar a imagem.', 'Failed to generate the image.');
     downloadBlob(timestampedFilename(filename, format), blob);
   } finally {
     URL.revokeObjectURL(url);

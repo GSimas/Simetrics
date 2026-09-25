@@ -3,6 +3,7 @@ import { Check, ChevronDown, Search, X } from 'lucide-react';
 
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { useLocale } from '@/state/locale.store';
 
 export interface SearchableSelectProps {
   options: readonly string[];
@@ -19,12 +20,17 @@ export function SearchableSelect({
   options,
   value,
   onChange,
-  placeholder = 'Selecione uma opção...',
-  searchPlaceholder = 'Buscar...',
-  emptyText = 'Nenhuma opção encontrada.',
+  placeholder,
+  searchPlaceholder,
+  emptyText,
   className,
   disabled = false,
 }: SearchableSelectProps) {
+  const isEn = useLocale((s) => s.locale) === 'en';
+  const placeholderText = placeholder ?? (isEn ? 'Select an option...' : 'Selecione uma opção...');
+  const searchText = searchPlaceholder ?? (isEn ? 'Search...' : 'Buscar...');
+  const emptyMessage = emptyText ?? (isEn ? 'No options found.' : 'Nenhuma opção encontrada.');
+  const clearLabel = isEn ? 'Clear selection' : 'Limpar seleção';
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -105,7 +111,7 @@ export function SearchableSelect({
         )}
       >
         <span className={cn('truncate', !value && 'text-muted-foreground')}>
-          {value || placeholder}
+          {value || placeholderText}
         </span>
         <div className="flex items-center gap-1.5 pl-2 text-muted-foreground">
           {/* Reserva o lugar do botão de limpar, que fica fora do seletor (abaixo): um
@@ -122,8 +128,8 @@ export function SearchableSelect({
         <button
           type="button"
           onClick={handleClear}
-          aria-label="Limpar seleção"
-          title="Limpar seleção"
+          aria-label={clearLabel}
+          title={clearLabel}
           className="absolute right-[34px] top-1/2 -translate-y-1/2 rounded-full p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
         >
           <X className="size-3.5" aria-hidden />
@@ -140,8 +146,8 @@ export function SearchableSelect({
               ref={searchInputRef}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder={searchPlaceholder}
-              aria-label={searchPlaceholder}
+              placeholder={searchText}
+              aria-label={searchText}
               aria-controls={listId}
               onKeyDown={handleKeyDown}
               className="h-8 pl-8 pr-3 text-xs bg-muted/30 rounded-lg"
@@ -151,7 +157,7 @@ export function SearchableSelect({
           {/* Opções Roláveis */}
           <div id={listId} role="listbox" tabIndex={-1} onKeyDown={handleKeyDown} className="max-h-60 overflow-y-auto space-y-0.5 pr-1">
             {filteredOptions.length === 0 ? (
-              <p className="p-3 text-center text-xs text-muted-foreground">{emptyText}</p>
+              <p className="p-3 text-center text-xs text-muted-foreground">{emptyMessage}</p>
             ) : (
               filteredOptions.map((option) => {
                 const isSelected = value === option;
@@ -181,11 +187,13 @@ export function SearchableSelect({
           {/* Rodapé informativo */}
           <div className="mt-2 border-t border-border/60 pt-1.5 px-1 flex items-center justify-between text-[11px] text-muted-foreground">
             <span>
-              {options.length} {options.length === 1 ? 'item disponível' : 'itens disponíveis'}
+              {options.length} {isEn
+                ? options.length === 1 ? 'item available' : 'items available'
+                : options.length === 1 ? 'item disponível' : 'itens disponíveis'}
             </span>
             {search && filteredOptions.length >= 150 && (
               <span className="text-[10px] text-amber-600 dark:text-amber-400">
-                Refine a busca
+                {isEn ? 'Refine the search' : 'Refine a busca'}
               </span>
             )}
           </div>

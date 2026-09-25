@@ -243,7 +243,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
     let parsed: ProjectRecord;
     try {
-      parsed = parseProjectEnvelope(raw);
+      parsed = parseProjectEnvelope(raw, useLocale.getState().locale);
     } catch (cause) {
       set({ error: describeError(cause) });
       return;

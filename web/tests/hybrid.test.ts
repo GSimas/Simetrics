@@ -266,7 +266,9 @@ describe('applyHybridThemes', () => {
     const themed = applyHybridThemes(rows, decisions, CATEGORIES, { accept: 0.7, review: 0.4 }, 'pt');
     expect(themed[0]).toMatchObject({ [FIELD.THEME]: 'Vacinas', [FIELD.THEME_CONFIDENCE]: 0.912, [FIELD.THEME_STATUS]: 'auto' });
     expect(themed[1]).toMatchObject({ [FIELD.THEME]: 'Não classificado', [FIELD.THEME_STATUS]: 'nao_classificado' });
-    expect(themed[2]).toMatchObject({ [FIELD.THEME]: 'Outros', [FIELD.THEME_STATUS]: 'auto' });
+    // "Nenhuma categoria serve" nunca vira um tema "Outros", mesmo com confiança alta.
+    expect(themed[2]).toMatchObject({ [FIELD.THEME]: 'Não classificado', [FIELD.THEME_STATUS]: 'nao_classificado' });
+    expect(themed.some((doc) => doc[FIELD.THEME] === 'Outros')).toBe(false);
   });
 
   it('reads only title, keywords, abstract and year', () => {
@@ -325,5 +327,23 @@ describe('hybridMethodsText', () => {
     const text = hybridMethodsText(manual, 'en');
     expect(text).toContain('defined by the researcher');
     expect(text).not.toContain('agreement');
+  });
+});
+
+describe('free document cap', () => {
+  it('blocks only runs that would use a server key on a larger dataset', async () => {
+    const { freeDocsLimitError } = await import('@/state/hybrid.store');
+    const { useFreeTier } = await import('@/state/free-tier.store');
+    const { DEFAULT_HYBRID_CONFIG } = await import('@/state/hybrid-config.store');
+    useFreeTier.setState({ status: { freeMaxDocs: 1000 } as never });
+    const free = DEFAULT_HYBRID_CONFIG;
+    const ownJev = { ...free, jev: { ...free.jev, apiKey: 'jev' } };
+    const ownBoth = { ...ownJev, generative: { ...free.generative, apiKey: 'ds' } };
+
+    expect(freeDocsLimitError(free, 1000, true)).toBeNull();
+    expect(freeDocsLimitError(free, 1001, true)).toContain('1.000');
+    expect(freeDocsLimitError(ownJev, 1001, false)).toBeNull(); // manual: só o Jev
+    expect(freeDocsLimitError(ownJev, 1001, true)).not.toBeNull(); // descoberta pelo DeepSeek do servidor
+    expect(freeDocsLimitError(ownBoth, 50_000, true)).toBeNull();
   });
 });

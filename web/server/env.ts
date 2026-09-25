@@ -14,6 +14,8 @@ export interface ServerEnv {
   simiFreeQuestions: number;
   /** Classificações híbridas grátis (descoberta pelo DeepSeek) por dispositivo. */
   hybridFreeRuns: number;
+  /** Maior base (em documentos) que pode usar o DeepSeek e o Jev do servidor. */
+  hybridFreeMaxDocs: number;
   /** Tetos diários por IP — contêm quem apaga o armazenamento local para zerar a cota. */
   simiIpDaily: number;
   hybridIpDaily: number;
@@ -37,6 +39,7 @@ export function readServerEnv(source: EnvSource): ServerEnv {
     typesafeKey: source['TYPESAFE_API_KEY']?.trim() ?? '',
     simiFreeQuestions: integer(source['SIMI_FREE_QUESTIONS'], 10),
     hybridFreeRuns: integer(source['HYBRID_FREE_RUNS'], 3),
+    hybridFreeMaxDocs: integer(source['HYBRID_FREE_MAX_DOCS'], 1000),
     simiIpDaily: integer(source['SIMI_IP_DAILY_LIMIT'], 100),
     hybridIpDaily: integer(source['HYBRID_IP_DAILY_LIMIT'], 20),
     labelIpDaily: integer(source['LABEL_IP_DAILY_LIMIT'], 400),

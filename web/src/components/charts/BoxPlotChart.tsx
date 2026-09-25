@@ -87,6 +87,7 @@ function stats(values: readonly number[]): BoxStats | null {
 function BoxPlotChart(props: BoxPlotChartProps) {
   const { series, yLabel, log = false, height = 440, exportName, onSeriesClick, expanded, className } = props;
   const t = useLocale((state) => state.t);
+  const locale = useLocale((state) => state.locale);
   const svgRef = useRef<SVGSVGElement>(null);
   const [containerRef, width] = useElementWidth<HTMLDivElement>();
   const { tooltip, show, hide } = useTooltip(containerRef);
@@ -113,7 +114,7 @@ function BoxPlotChart(props: BoxPlotChartProps) {
     : niceDomain(Math.min(0, dataMin), dataMax, 5);
   if (log && yDomain[0] === yDomain[1]) yDomain[1] = yDomain[0] * 10;
   const yTicks = log ? logTicks(yDomain[0], yDomain[1]) : linearTicks(yDomain[0], yDomain[1], 5);
-  const tickWidth = Math.max(...yTicks.map((value) => measureText(formatTick(value), 11, FONT_MONO)), 10);
+  const tickWidth = Math.max(...yTicks.map((value) => measureText(formatTick(value, locale), 11, FONT_MONO)), 10);
 
   const left = Math.round(tickWidth + 40);
   const right = 16;
@@ -135,7 +136,7 @@ function BoxPlotChart(props: BoxPlotChartProps) {
     .map((entry) =>
       t('chart_summary_box')
         .replace('{name}', entry.name)
-        .replace('{median}', formatNumber(entry.stats?.median ?? 0))
+        .replace('{median}', formatNumber(entry.stats?.median ?? 0, undefined, locale))
         .replace('{count}', String(entry.stats?.n ?? 0)),
     )
     .join('; ');
@@ -173,7 +174,7 @@ function BoxPlotChart(props: BoxPlotChartProps) {
             <g key={`y${value}`}>
               <line x1={left} x2={left + plotWidth} y1={sy(value)} y2={sy(value)} stroke="var(--border)" strokeWidth={0.6} />
               <text x={left - 8} y={sy(value)} dy="0.32em" textAnchor="end">
-                {formatTick(value)}
+                {formatTick(value, locale)}
               </text>
             </g>
           ))}
@@ -200,13 +201,13 @@ function BoxPlotChart(props: BoxPlotChartProps) {
               event,
               <>
                 <p className="mb-1 font-semibold">{entry.name}</p>
-                <TipRow label="n" value={formatNumber(s.n)} />
-                <TipRow label="Máximo" value={formatNumber(s.max)} />
-                <TipRow label="3º quartil" value={formatNumber(s.q3)} />
-                <TipRow label="Mediana" value={formatNumber(s.median)} />
-                <TipRow label="Média" value={formatNumber(s.mean)} />
-                <TipRow label="1º quartil" value={formatNumber(s.q1)} />
-                <TipRow label="Mínimo" value={formatNumber(s.min)} />
+                <TipRow label="n" value={formatNumber(s.n, undefined, locale)} />
+                <TipRow label={locale === 'en' ? 'Maximum' : 'Máximo'} value={formatNumber(s.max, undefined, locale)} />
+                <TipRow label={locale === 'en' ? '3rd quartile' : '3º quartil'} value={formatNumber(s.q3, undefined, locale)} />
+                <TipRow label={locale === 'en' ? 'Median' : 'Mediana'} value={formatNumber(s.median, undefined, locale)} />
+                <TipRow label={locale === 'en' ? 'Mean' : 'Média'} value={formatNumber(s.mean, undefined, locale)} />
+                <TipRow label={locale === 'en' ? '1st quartile' : '1º quartil'} value={formatNumber(s.q1, undefined, locale)} />
+                <TipRow label={locale === 'en' ? 'Minimum' : 'Mínimo'} value={formatNumber(s.min, undefined, locale)} />
               </>,
             );
           };
@@ -251,7 +252,7 @@ function BoxPlotChart(props: BoxPlotChartProps) {
                       event,
                       <>
                         {point.label && <p className="mb-1 font-semibold break-words">{point.label}</p>}
-                        <TipRow label={entry.name} value={formatNumber(point.value)} color={entry.color} />
+                        <TipRow label={entry.name} value={formatNumber(point.value, undefined, locale)} color={entry.color} />
                       </>,
                     );
                   }}

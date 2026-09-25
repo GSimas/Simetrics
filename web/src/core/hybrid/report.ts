@@ -76,8 +76,8 @@ export function hybridMethodsText(run: HybridRun, locale: 'pt' | 'en'): string {
     const added = run.finalTaxonomy.length - (run.taxonomyVersions.filter((v) => v.origin !== 'expand').at(-1)?.categories.length ?? run.finalTaxonomy.length);
     parts.push(
       pt
-        ? `Uma rodada de expansão sobre os documentos remanescentes (classificados como "outros" ou com baixa confiança) acrescentou ${added} categoria(s), e a base foi reclassificada integralmente com a taxonomia final de ${run.finalTaxonomy.length} categorias.`
-        : `An expansion round over the remaining documents (classified as "other" or with low confidence) added ${added} category(ies), and the whole corpus was reclassified with the final taxonomy of ${run.finalTaxonomy.length} categories.`,
+        ? `Uma rodada de expansão sobre os documentos remanescentes (sem categoria ou com baixa confiança) acrescentou ${added} categoria(s), e a base foi reclassificada integralmente com a taxonomia final de ${run.finalTaxonomy.length} categorias.`
+        : `An expansion round over the remaining documents (with no fitting category or low confidence) added ${added} category(ies), and the whole corpus was reclassified with the final taxonomy of ${run.finalTaxonomy.length} categories.`,
     );
   }
 

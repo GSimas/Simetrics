@@ -16,19 +16,19 @@ export const HYBRID_COPY = {
     manual: 'Definir categorias manualmente',
     missingGenerative: 'Informe a chave do modelo gerativo (DeepSeek) nas configurações para descobrir categorias.',
     missingJev: 'Jev indisponível: o servidor não tem TYPESAFE_API_KEY. Informe uma chave do Jev nas configurações.',
-    jevFree: 'Classificação pelo Jev: gratuita e sem limite.',
-    freeDiscovery: 'Descoberta gratuita (DeepSeek do Simetrics): restam {remaining} de {limit} classificações neste dispositivo.',
+    jevFree: 'Classificação pelo Jev: gratuita para bases de até {max} documentos.',
+    freeDiscovery: 'Classificações gratuitas (DeepSeek e Jev do Simetrics): restam {remaining} de {limit} neste dispositivo.',
     freeDiscoveryExhausted:
-      'As {limit} classificações gratuitas deste dispositivo acabaram. Informe sua chave do modelo gerativo, ou defina as categorias manualmente (o Jev continua livre).',
+      'As {limit} classificações gratuitas deste dispositivo acabaram. Informe suas próprias chaves do DeepSeek e do Jev nas configurações.',
     apiKeyOptional: 'Chave de API (opcional)',
     generativeKeyHint: 'Sem chave própria, a descoberta usa o DeepSeek do Simetrics, com cota gratuita por dispositivo.',
-    jevKeyHint: 'Sem chave própria, o Jev do Simetrics é livre.',
+    jevKeyHint: 'Sem chave própria, o Jev do Simetrics é gratuito para bases de até {max} documentos, dentro da cota de classificações por dispositivo.',
     privacy:
       'Título, palavras-chave e resumo dos documentos saem do navegador: a amostra vai ao modelo gerativo, e cada documento vai ao Jev (via proxy, porque a API do Jev não aceita chamadas diretas do navegador).',
     cancel: 'Cancelar',
     reviewTitle: 'Revise as categorias',
     reviewHint:
-      'Ajuste nomes e descrições antes de classificar. "O que é" e "o que não é" em inglês dão mais acurácia ao Jev; a categoria "Outros" é incluída automaticamente.',
+      'Ajuste nomes e descrições antes de classificar. "O que é" e "o que não é" em inglês dão mais acurácia ao Jev; documentos que não se encaixam em nenhuma categoria ficam como "Não classificado".',
     manualHint:
       'Defina as categorias da sua pesquisa (ex.: critérios de uma revisão sistemática). Sem o modelo gerativo não há validação na amostra: o Jev classifica a base direto.',
     name: 'Nome',
@@ -107,19 +107,19 @@ export const HYBRID_COPY = {
     manual: 'Define categories manually',
     missingGenerative: 'Set the generative model (DeepSeek) key in the settings to discover categories.',
     missingJev: 'Jev unavailable: the server has no TYPESAFE_API_KEY. Set a Jev key in the settings.',
-    jevFree: 'Classification by Jev: free and unlimited.',
-    freeDiscovery: 'Free discovery (Simetrics DeepSeek): {remaining} of {limit} classifications left on this device.',
+    jevFree: 'Classification by Jev: free for datasets of up to {max} documents.',
+    freeDiscovery: 'Free classifications (Simetrics DeepSeek and Jev): {remaining} of {limit} left on this device.',
     freeDiscoveryExhausted:
-      'The {limit} free classifications on this device are used up. Set your generative model key, or define the categories manually (Jev stays free).',
+      'The {limit} free classifications on this device are used up. Set your own DeepSeek and Jev keys in the settings.',
     apiKeyOptional: 'API key (optional)',
     generativeKeyHint: 'Without your own key, discovery uses the Simetrics DeepSeek with a free per-device quota.',
-    jevKeyHint: 'Without your own key, the Simetrics Jev is free.',
+    jevKeyHint: 'Without your own key, the Simetrics Jev is free for datasets of up to {max} documents, within the per-device classification quota.',
     privacy:
       'Document titles, keywords and abstracts leave the browser: the sample goes to the generative model, and each document goes to Jev (through a proxy, because the Jev API does not accept direct browser calls).',
     cancel: 'Cancel',
     reviewTitle: 'Review the categories',
     reviewHint:
-      'Adjust names and descriptions before classifying. English "what" and "not for" give Jev better accuracy; the "Other" category is added automatically.',
+      'Adjust names and descriptions before classifying. English "what" and "not for" give Jev better accuracy; documents that fit no category are left as "Unclassified".',
     manualHint:
       'Define your study categories (e.g. systematic review criteria). Without the generative model there is no sample validation: Jev classifies the corpus directly.',
     name: 'Name',

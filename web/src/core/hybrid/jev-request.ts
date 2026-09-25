@@ -1,4 +1,5 @@
 import { truncate, type HybridDoc } from './documents';
+import { TaxonomyParseError } from './prompts';
 import { OTHER_CATEGORY_ID, type DocumentDecision, type HybridCategory } from './types';
 
 /**
@@ -83,7 +84,7 @@ export function parseJevDecision(
 ): DocumentDecision {
   const answer = response.answers?.[JEV_QUESTION_ID];
   if (!answer || answer.type !== 'choice') {
-    throw new Error('Resposta do Jev sem a pergunta de tema.');
+    throw new TaxonomyParseError('Resposta do Jev sem a pergunta de tema.', 'Jev response is missing the theme question.');
   }
   const { choice, probabilities, confidence } = answer as JevChoiceAnswer;
   const categoryId =

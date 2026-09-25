@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 
+import type { Locale } from '@/lib/i18n/translations';
+
 /**
  * Provedores e modelos do chat BYOK.
  *
@@ -42,6 +44,38 @@ export interface ModelOption {
   id: string;
   name: string;
   badge?: string;
+}
+
+/** Termos dos selos de modelo em inglês; os selos combinam termos separados por " · ". */
+const BADGE_TERMS_EN: Record<string, string> = {
+  Recomendado: 'Recommended',
+  '1M contexto': '1M context',
+  Estável: 'Stable',
+  Raciocínio: 'Reasoning',
+  Econômico: 'Budget',
+  Ultrarrápido: 'Ultra-fast',
+  'Pesos abertos': 'Open weights',
+  'Topo de linha': 'Flagship',
+  Agentes: 'Agents',
+  'Alto volume': 'High volume',
+  'Geração anterior': 'Previous generation',
+  'Mais recente': 'Latest',
+  Equilíbrio: 'Balanced',
+  'Mais capaz': 'Most capable',
+  Rápido: 'Fast',
+  Legado: 'Legacy',
+  Leve: 'Lightweight',
+  Gratuito: 'Free',
+  'Custo baixo': 'Low cost',
+  'MoE rápido': 'Fast MoE',
+};
+
+export function modelBadgeLabel(badge: string, locale: Locale): string {
+  if (locale !== 'en') return badge;
+  return badge
+    .split(' · ')
+    .map((term) => BADGE_TERMS_EN[term] ?? term)
+    .join(' · ');
 }
 
 export const DEFAULT_MODELS: Record<AiProvider, string> = {
@@ -183,6 +217,9 @@ export interface ProviderOption {
   id: AiProvider;
   label: string;
   placeholder: string;
+  /** Variantes em inglês, só onde o texto em português difere. */
+  labelEn?: string;
+  placeholderEn?: string;
   helpUrl: string;
   /** Endpoint compatível com a OpenAI; ausente em Gemini e Anthropic (protocolos próprios). */
   baseUrl?: string;
@@ -209,6 +246,7 @@ export const PROVIDER_OPTIONS: ProviderOption[] = [
     id: 'mistral',
     label: 'Mistral AI',
     placeholder: 'Chave da Mistral',
+    placeholderEn: 'Mistral key',
     helpUrl: 'https://console.mistral.ai/api-keys',
     baseUrl: 'https://api.mistral.ai/v1',
   },
@@ -231,6 +269,7 @@ export const PROVIDER_OPTIONS: ProviderOption[] = [
     id: 'together',
     label: 'Together AI',
     placeholder: 'Chave da Together',
+    placeholderEn: 'Together key',
     helpUrl: 'https://api.together.ai/settings/api-keys',
     baseUrl: 'https://api.together.xyz/v1',
   },
@@ -259,6 +298,7 @@ export const PROVIDER_OPTIONS: ProviderOption[] = [
     id: 'zhipu',
     label: 'Zhipu GLM (BigModel)',
     placeholder: 'Chave da BigModel',
+    placeholderEn: 'BigModel key',
     helpUrl: 'https://open.bigmodel.cn/usercenter/proj-mgmt/apikeys',
     baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
   },
@@ -266,6 +306,7 @@ export const PROVIDER_OPTIONS: ProviderOption[] = [
     id: 'cohere',
     label: 'Cohere',
     placeholder: 'Chave da Cohere',
+    placeholderEn: 'Cohere key',
     helpUrl: 'https://dashboard.cohere.com/api-keys',
     baseUrl: 'https://api.cohere.ai/compatibility/v1',
   },
@@ -279,6 +320,7 @@ export const PROVIDER_OPTIONS: ProviderOption[] = [
   {
     id: 'openrouter',
     label: 'OpenRouter (multimodelos)',
+    labelEn: 'OpenRouter (multi-model)',
     placeholder: 'sk-or-...',
     helpUrl: 'https://openrouter.ai/keys',
     baseUrl: 'https://openrouter.ai/api/v1',
@@ -286,7 +328,9 @@ export const PROVIDER_OPTIONS: ProviderOption[] = [
   {
     id: 'custom',
     label: 'Local / compatível com OpenAI (Ollama, LM Studio, vLLM)',
+    labelEn: 'Local / OpenAI-compatible (Ollama, LM Studio, vLLM)',
     placeholder: 'sk-... (opcional para local)',
+    placeholderEn: 'sk-... (optional for local)',
     helpUrl: 'https://ollama.com/',
   },
 ];

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import type { ServerEnv } from './env.ts';
-import { consume, readUsage, refund, validId, type Identity, type QuotaPolicy, type QuotaStore } from './quota.ts';
+import { consume, hashId, readUsage, refund, validId, type Identity, type QuotaPolicy, type QuotaStore } from './quota.ts';
 
 /**
  * Endpoints do Simetrics, escritos uma vez só sobre `Request`/`Response` da web: as
@@ -13,7 +13,9 @@ import { consume, readUsage, refund, validId, type Identity, type QuotaPolicy, t
  *   POST /api/simi/chat/completions    — Simi grátis (DeepSeek), 10 perguntas/dispositivo
  *   POST /api/hybrid/chat/completions  — descoberta de categorias grátis, 3 execuções/dispositivo
  *   POST /api/themes/label             — nome de tema do k-means (prompt montado aqui)
- *   POST /api/jev/systemone            — Jev, livre, com a chave do servidor
+ *   POST /api/hybrid/runs              — abre uma execução gratuita: confere o tamanho da base e
+ *                                        desconta da cota; dá ao Jev um orçamento de chamadas
+ *   POST /api/jev/systemone            — Jev; com a chave do servidor, só dentro de uma execução aberta
  *
  * Os dois proxies do DeepSeek falam o formato da OpenAI, então o cliente reaproveita o
  * mesmo código de streaming e de ferramentas que usa com chave própria. O que torna isso
@@ -51,13 +53,44 @@ function json(status: number, body: unknown, headers: Record<string, string> = {
   });
 }
 
+/**
+ * Versão em inglês das mensagens fixas lançadas em português. As que dependem do idioma
+ * já são montadas com `localeOf` e passam direto.
+ */
+const MESSAGES_EN: Record<string, string> = {
+  'Payload grande demais.': 'Payload too large.',
+  'Corpo da requisição não é um JSON válido.': 'The request body is not valid JSON.',
+  'Lista de mensagens inválida.': 'Invalid message list.',
+  'Mensagem com papel inválido.': 'Message with an invalid role.',
+  'Identificador da pergunta ausente.': 'Missing question identifier.',
+  'DEEPSEEK_API_KEY não configurada no servidor.': 'DEEPSEEK_API_KEY is not configured on the server.',
+  'Envie amostras ou termos.': 'Send samples or terms.',
+  'O modelo devolveu uma resposta vazia.': 'The model returned an empty response.',
+  'Uso gratuito indisponível.': 'Free use is unavailable.',
+  'Número de documentos inválido.': 'Invalid number of documents.',
+  'Identificador da execução ausente.': 'Missing run identifier.',
+  'Jev indisponível: nenhuma chave informada e TYPESAFE_API_KEY não configurada no servidor.':
+    'Jev unavailable: no key provided and TYPESAFE_API_KEY is not configured on the server.',
+  'Perguntas do Jev ausentes ou em excesso.': 'Jev questions missing or too many.',
+  'A chave DeepSeek do servidor foi recusada pelo provedor.': "The provider rejected the server's DeepSeek key.",
+  'Cota esgotada.': 'Quota exhausted.',
+  'Falha ao contatar o provedor. Tente novamente em instantes.': 'Could not reach the provider. Try again shortly.',
+};
+
+function translateMessage(message: string, locale: Locale): string {
+  if (locale === 'pt') return message;
+  return MESSAGES_EN[message] ?? message.replace(/^DeepSeek: erro HTTP (\d+)$/, 'DeepSeek: HTTP error $1');
+}
+
 /** Erros no formato da OpenAI (`error.message`), que o cliente já sabe exibir. */
-function errorResponse(cause: unknown): Response {
+function errorResponse(cause: unknown, locale: Locale): Response {
   if (cause instanceof HttpError) {
-    return json(cause.status, { error: { message: cause.message, code: cause.code } }, cause.headers);
+    const message = translateMessage(cause.message, locale);
+    return json(cause.status, { error: { message, code: cause.code } }, cause.headers);
   }
   console.error('Falha na API do Simetrics:', cause instanceof Error ? cause.message : cause);
-  return json(502, { error: { message: 'Falha ao contatar o provedor. Tente novamente em instantes.', code: 'upstream' } });
+  const message = translateMessage('Falha ao contatar o provedor. Tente novamente em instantes.', locale);
+  return json(502, { error: { message, code: 'upstream' } });
 }
 
 function localeOf(request: Request): Locale {
@@ -90,8 +123,9 @@ export function simiPolicy(env: ServerEnv): QuotaPolicy {
 }
 
 export function hybridPolicy(env: ServerEnv): QuotaPolicy {
-  // 1 execução = descoberta + até 2 esclarecimentos + até 2 expansões, com folga.
-  return { scope: 'hybrid', deviceLimit: env.hybridFreeRuns, ipDailyLimit: env.hybridIpDaily, maxRequestsPerUnit: 8 };
+  // 1 execução = abertura (/api/hybrid/runs) + descoberta + até 2 esclarecimentos + até 2
+  // expansões, com folga para novas tentativas.
+  return { scope: 'hybrid', deviceLimit: env.hybridFreeRuns, ipDailyLimit: env.hybridIpDaily, maxRequestsPerUnit: 10 };
 }
 
 const QUOTA_MESSAGES: Record<string, Record<Locale, (limit: number) => string>> = {
@@ -123,16 +157,19 @@ const QUOTA_MESSAGES: Record<string, Record<Locale, (limit: number) => string>> 
 const handleStatus: Handler = async (request, ctx) => {
   const identity = identityOf(request, ctx);
   const deepseek = Boolean(ctx.env.deepseekKey);
-  const usage = async (policy: QuotaPolicy) => {
-    if (!deepseek || policy.deviceLimit === 0) return { limit: 0, used: 0, remaining: 0 };
+  const usage = async (policy: QuotaPolicy, available: boolean) => {
+    if (!available || policy.deviceLimit === 0) return { limit: 0, used: 0, remaining: 0 };
     const { used, limit } = await readUsage(ctx.store, policy, identity, ctx.env.quotaSalt);
     return { limit, used, remaining: Math.max(0, limit - used) };
   };
   return json(200, {
     deepseek: { available: deepseek, model: deepseek ? ctx.env.deepseekModel : null },
     jev: { available: Boolean(ctx.env.typesafeKey) },
-    simi: await usage(simiPolicy(ctx.env)),
-    hybrid: await usage(hybridPolicy(ctx.env)),
+    simi: await usage(simiPolicy(ctx.env), deepseek),
+    // A cota de classificações vale tanto para o DeepSeek quanto para o Jev do servidor.
+    hybrid: await usage(hybridPolicy(ctx.env), deepseek || Boolean(ctx.env.typesafeKey)),
+    // O Jev cobra por documento: 10 mil documentos custaram ~30 milhões de tokens.
+    freeMaxDocs: ctx.env.hybridFreeMaxDocs,
   });
 };
 
@@ -189,6 +226,8 @@ function deepseekProxy(policyOf: (env: ServerEnv) => QuotaPolicy, options: { max
 
     const tools = options.allowTools && Array.isArray(body['tools']) && body['tools'].length <= 16 ? body['tools'] : undefined;
     const responseFormat = (body['response_format'] as { type?: unknown } | undefined)?.type === 'json_object';
+    const thinkingType = (body['thinking'] as { type?: unknown } | undefined)?.type;
+    const thinking = thinkingType === 'enabled' || thinkingType === 'disabled' ? { type: thinkingType } : undefined;
     const upstreamBody = {
       model: ctx.env.deepseekModel,
       messages,
@@ -197,6 +236,7 @@ function deepseekProxy(policyOf: (env: ServerEnv) => QuotaPolicy, options: { max
       max_tokens: Math.round(clampNumber(body['max_tokens'], 1, options.maxTokens, options.maxTokens)),
       ...(tools ? { tools, tool_choice: body['tool_choice'] ?? 'auto' } : {}),
       ...(responseFormat ? { response_format: { type: 'json_object' } } : {}),
+      ...(thinking ? { thinking } : {}),
     };
 
     let upstream: Response;
@@ -319,16 +359,102 @@ const handleThemeLabel: Handler = async (request, ctx) => {
 // ---------------------------------------------------------------------------------------
 // Jev — livre para os usuários, com a chave do servidor
 
-const handleJev: Handler = async (request, ctx) => {
-  const authorization =
-    request.headers.get('authorization')?.trim() || (ctx.env.typesafeKey ? `Bearer ${ctx.env.typesafeKey}` : '');
-  if (!authorization) {
+/**
+ * Chamadas ao Jev que uma execução gratuita pode fazer: validação da amostra (até 300
+ * documentos, com até 2 revalidações) mais a base e até 2 reclassificações dela. O número
+ * de documentos vem do cliente, mas o teto de HYBRID_FREE_MAX_DOCS limita o orçamento de
+ * qualquer forma — mentir sobre o tamanho só encolhe o próprio orçamento.
+ */
+export function jevCallBudget(docCount: number): number {
+  return 3 * (docCount + 300);
+}
+
+function jevRunKey(identity: Identity, unit: string, salt: string): string {
+  return `jev-run/${hashId(`${identity.device}:${unit}`, salt)}`;
+}
+
+const handleOpenRun: Handler = async (request, ctx) => {
+  const locale = localeOf(request);
+  if (!ctx.env.typesafeKey && !ctx.env.deepseekKey) throw new HttpError(503, 'Uso gratuito indisponível.', 'unavailable');
+  const body = await readJson(request);
+  const docCount = Math.floor(Number(body['docCount']));
+  if (!Number.isFinite(docCount) || docCount < 1) throw new HttpError(400, 'Número de documentos inválido.', 'docCount');
+  const max = ctx.env.hybridFreeMaxDocs;
+  if (docCount > max) {
     throw new HttpError(
-      401,
-      'Jev indisponível: nenhuma chave informada e TYPESAFE_API_KEY não configurada no servidor.',
-      'unavailable',
+      413,
+      locale === 'en'
+        ? `Free classification is limited to datasets of up to ${max} documents. Set your own DeepSeek and Jev keys.`
+        : `A classificação gratuita vale para bases de até ${max} documentos. Informe suas próprias chaves do DeepSeek e do Jev.`,
+      'too_many_docs',
     );
   }
+  const unit = validId(request.headers.get('x-simetrics-unit'));
+  if (!unit) throw new HttpError(400, 'Identificador da execução ausente.', 'unit');
+
+  const policy = hybridPolicy(ctx.env);
+  const identity = identityOf(request, ctx);
+  const decision = await consume(ctx.store, policy, identity, unit, ctx.env.quotaSalt);
+  if (!decision.ok) {
+    const messageKey = decision.reason === 'device' ? 'hybrid:device' : decision.reason;
+    const message = QUOTA_MESSAGES[messageKey]?.[locale](decision.limit) ?? 'Cota esgotada.';
+    throw new HttpError(429, message, `quota_${decision.reason}`, {
+      'X-Free-Limit': String(decision.limit),
+      'X-Free-Used': String(decision.used),
+    });
+  }
+
+  // Reabrir a mesma execução (nova tentativa depois de uma falha) não zera o orçamento.
+  const key = jevRunKey(identity, unit, ctx.env.quotaSalt);
+  if (!(await ctx.store.read(key))) await ctx.store.write(key, { units: { calls: 0, max: jevCallBudget(docCount) } });
+  return json(200, { ok: true }, { 'X-Free-Limit': String(decision.limit), 'X-Free-Used': String(decision.used) });
+};
+
+/** Desconta uma chamada do orçamento da execução; sem execução aberta, recusa. */
+async function spendJevCall(request: Request, ctx: ApiContext): Promise<void> {
+  const locale = localeOf(request);
+  const identity = identityOf(request, ctx);
+  const unit = validId(request.headers.get('x-simetrics-unit'));
+  const key = identity.device && unit ? jevRunKey(identity, unit, ctx.env.quotaSalt) : null;
+  const record = key ? await ctx.store.read(key) : null;
+  if (!key || !record) {
+    throw new HttpError(
+      403,
+      locale === 'en'
+        ? 'The free Jev only answers inside a classification started in Simetrics.'
+        : 'O Jev gratuito só responde dentro de uma classificação iniciada no Simetrics.',
+      'no_run',
+    );
+  }
+  const calls = record.units['calls'] ?? 0;
+  if (calls >= (record.units['max'] ?? 0)) {
+    throw new HttpError(
+      429,
+      locale === 'en'
+        ? 'This classification used up its free Jev calls. Set your own Jev key to continue.'
+        : 'Esta classificação esgotou as chamadas gratuitas ao Jev. Informe sua própria chave do Jev para continuar.',
+      'quota_jev',
+      { 'X-Free-Limit': String(record.units['max']) },
+    );
+  }
+  // ponytail: ler-e-gravar sem atomicidade; chamadas simultâneas (até 24) podem perder
+  // incrementos e passar do orçamento. Um contador atômico (Blobs com ETag) resolve se pesar.
+  await ctx.store.write(key, { units: { ...record.units, calls: calls + 1 } });
+}
+
+const handleJev: Handler = async (request, ctx) => {
+  const own = request.headers.get('authorization')?.trim();
+  if (!own) {
+    if (!ctx.env.typesafeKey) {
+      throw new HttpError(
+        401,
+        'Jev indisponível: nenhuma chave informada e TYPESAFE_API_KEY não configurada no servidor.',
+        'unavailable',
+      );
+    }
+    await spendJevCall(request, ctx);
+  }
+  const authorization = own || `Bearer ${ctx.env.typesafeKey}`;
 
   const body = await readJson(request, JEV_MAX_PAYLOAD_BYTES);
   const questions = body['questions'];
@@ -357,6 +483,7 @@ const ROUTES: Record<`/${string}`, Handler> = {
   '/api/status': handleStatus,
   '/api/simi/chat/completions': deepseekProxy(simiPolicy, { maxTokens: 8192, allowTools: true }),
   '/api/hybrid/chat/completions': deepseekProxy(hybridPolicy, { maxTokens: 8192, allowTools: false }),
+  '/api/hybrid/runs': handleOpenRun,
   '/api/themes/label': handleThemeLabel,
   '/api/jev/systemone': handleJev,
 };
@@ -370,6 +497,6 @@ export async function handleApi(request: Request, ctx: ApiContext): Promise<Resp
   try {
     return await handler(request, ctx);
   } catch (cause) {
-    return errorResponse(cause);
+    return errorResponse(cause, localeOf(request));
   }
 }

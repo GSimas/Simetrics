@@ -203,6 +203,7 @@ function layout(
 function SankeyChart(props: SankeyChartProps) {
   const { nodes, links, columnLabels, height = 620, exportName, onNodeClick, expanded, className } = props;
   const t = useLocale((state) => state.t);
+  const locale = useLocale((state) => state.locale);
   const svgRef = useRef<SVGSVGElement>(null);
   const [containerRef, width] = useElementWidth<HTMLDivElement>();
   const { tooltip, show, hide } = useTooltip(containerRef);
@@ -292,7 +293,7 @@ function SankeyChart(props: SankeyChartProps) {
                       <p className="mb-1 font-semibold break-words">
                         {source?.term} → {target?.term}
                       </p>
-                      <TipRow label={entry.link.kind ?? 'Fluxo'} value={formatNumber(entry.link.value)} color={entry.link.color} />
+                      <TipRow label={entry.link.kind ?? (locale === 'en' ? 'Flow' : 'Fluxo')} value={formatNumber(entry.link.value, undefined, locale)} color={entry.link.color} />
                     </>,
                   );
                 }}
@@ -326,8 +327,8 @@ function SankeyChart(props: SankeyChartProps) {
                     <>
                       <p className="mb-1 font-semibold break-words">{item.node.term}</p>
                       <p className="eyebrow mb-1">{columnLabels[item.node.column]}</p>
-                      <TipRow label="Entrada" value={formatNumber(item.inValue)} />
-                      <TipRow label="Saída" value={formatNumber(item.outValue)} />
+                      <TipRow label={locale === 'en' ? 'Inflow' : 'Entrada'} value={formatNumber(item.inValue, undefined, locale)} />
+                      <TipRow label={locale === 'en' ? 'Outflow' : 'Saída'} value={formatNumber(item.outValue, undefined, locale)} />
                     </>,
                   );
                 }}

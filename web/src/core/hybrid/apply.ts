@@ -16,12 +16,16 @@ export const TIER_STATUS: Record<ConfidenceTier, string> = {
   unclassified: 'nao_classificado',
 };
 
-export function otherCategoryName(locale: 'pt' | 'en'): string {
-  return locale === 'pt' ? 'Outros' : 'Other';
-}
-
 export function unclassifiedName(locale: 'pt' | 'en'): string {
   return locale === 'pt' ? 'Não classificado' : 'Unclassified';
+}
+
+/**
+ * Nome da opção "nenhuma categoria serve". Nunca vira um tema "Outros": o documento que
+ * cai nela fica não classificado, igual ao de baixa confiança.
+ */
+export function otherCategoryName(locale: 'pt' | 'en'): string {
+  return unclassifiedName(locale);
 }
 
 /**
@@ -37,7 +41,6 @@ export function applyHybridThemes(
   locale: 'pt' | 'en',
 ): Dataset {
   const names = new Map(categories.map((category) => [category.id, category.name]));
-  names.set(OTHER_CATEGORY_ID, otherCategoryName(locale));
   const unclassified = unclassifiedName(locale);
 
   return rows.map((doc, index) => {
@@ -45,7 +48,7 @@ export function applyHybridThemes(
     if (!decision) {
       return { ...doc, [FIELD.THEME]: unclassified, [FIELD.THEME_CONFIDENCE]: null, [FIELD.THEME_STATUS]: TIER_STATUS.unclassified };
     }
-    const tier = tierOf(decision, thresholds);
+    const tier = decision.categoryId === OTHER_CATEGORY_ID ? 'unclassified' : tierOf(decision, thresholds);
     return {
       ...doc,
       [FIELD.THEME]: tier === 'unclassified' ? unclassified : (names.get(decision.categoryId) ?? unclassified),

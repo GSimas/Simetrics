@@ -1,6 +1,8 @@
 import type { ReactElement } from 'react';
 import { createElement } from 'react';
 
+import type { Locale } from '@/lib/i18n/translations';
+
 /**
  * Constantes e helpers compartilhados pelos painéis de visualização.
  */
@@ -38,12 +40,19 @@ export function communityColor(community: number): string {
   return COMMUNITY_COLORS[community % COMMUNITY_COLORS.length] as string;
 }
 
-/** Leitura dos quadrantes do mapa temático. */
-export const QUADRANT_NOTE =
-  'As linhas tracejadas marcam as médias e formam quatro quadrantes. Alta centralidade e ' +
-  'alta densidade são temas motores; baixa centralidade e alta densidade são nichos ' +
-  'isolados; alta centralidade e baixa densidade são temas básicos e transversais; ' +
-  'baixa em ambas são temas emergentes ou em declínio.';
+/** Leitura dos quadrantes do mapa temático, por idioma. */
+export const QUADRANT_NOTE: Record<Locale, string> = {
+  pt:
+    'As linhas tracejadas marcam as médias e formam quatro quadrantes. Alta centralidade e ' +
+    'alta densidade são temas motores; baixa centralidade e alta densidade são nichos ' +
+    'isolados; alta centralidade e baixa densidade são temas básicos e transversais; ' +
+    'baixa em ambas são temas emergentes ou em declínio.',
+  en:
+    'The dashed lines mark the means and form four quadrants. High centrality and high ' +
+    'density are motor themes; low centrality and high density are isolated niche themes; ' +
+    'high centrality and low density are basic, transversal themes; low in both are ' +
+    'emerging or declining themes.',
+};
 
 /** Mensagem centralizada, no lugar de um gráfico que não pôde ser desenhado. */
 export function chartMessage(text: string): ReactElement {

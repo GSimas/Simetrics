@@ -11,7 +11,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { topQuotientsByTheme } from '@/core/locational-quotient';
+import { topQuotientsByTheme, type QuotientEntry } from '@/core/locational-quotient';
+import { numberLocale } from '@/lib/i18n/labels';
 import { FIELD } from '@/lib/schema';
 import { useAiConfig } from '@/state/ai-config.store';
 import { useDataset } from '@/state/dataset.store';
@@ -29,6 +30,10 @@ export function ThemePanel() {
   const isCategorizingThemes = useDataset((state) => state.isCategorizingThemes);
   const busy = isCategorizingThemes;
   const t = useLocale((state) => state.t);
+  const locale = useLocale((state) => state.locale);
+  // O rótulo vem pronto do core como "QL"; em inglês a sigla é "LQ" (location quotient).
+  const qlLabel = (entry: QuotientEntry | undefined) =>
+    entry && locale === 'en' ? `${entry.entity} (LQ: ${entry.quotient.toFixed(2)})` : entry?.label;
   const isAiConfigured = useAiConfig((state) => state.isConfigured());
   const [aiModalOpen, setAiModalOpen] = useState(false);
 
@@ -123,26 +128,26 @@ export function ThemePanel() {
                       <TableCell className="font-medium text-foreground">{theme.name}</TableCell>
                       <TableCell>
                         <Badge variant="purple" className="tabular-nums font-semibold">
-                          {theme.documents.toLocaleString('pt-BR')}
+                          {theme.documents.toLocaleString(numberLocale(locale))}
                         </Badge>
                       </TableCell>
                       <TableCell
                         className="max-w-56 truncate text-xs text-muted-foreground"
-                        title={quotients?.authors.get(theme.name)?.label}
+                        title={qlLabel(quotients?.authors.get(theme.name))}
                       >
-                        {quotients?.authors.get(theme.name)?.label ?? '—'}
+                        {qlLabel(quotients?.authors.get(theme.name)) ?? '—'}
                       </TableCell>
                       <TableCell
                         className="max-w-48 truncate text-xs text-muted-foreground"
-                        title={quotients?.countries.get(theme.name)?.label}
+                        title={qlLabel(quotients?.countries.get(theme.name))}
                       >
-                        {quotients?.countries.get(theme.name)?.label ?? '—'}
+                        {qlLabel(quotients?.countries.get(theme.name)) ?? '—'}
                       </TableCell>
                       <TableCell
                         className="max-w-64 truncate text-xs text-muted-foreground"
-                        title={quotients?.venues.get(theme.name)?.label}
+                        title={qlLabel(quotients?.venues.get(theme.name))}
                       >
-                        {quotients?.venues.get(theme.name)?.label ?? '—'}
+                        {qlLabel(quotients?.venues.get(theme.name)) ?? '—'}
                       </TableCell>
                     </TableRow>
                   ))}

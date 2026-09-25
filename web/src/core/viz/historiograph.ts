@@ -49,7 +49,11 @@ function firstAuthorSurname(value: unknown): string {
   return (first.split(',')[0] ?? '').trim().toLowerCase();
 }
 
-export function historiograph(rows: Dataset, topN = 30): HistoriographData | null {
+export function historiograph(
+  rows: Dataset,
+  topN = 30,
+  locale: 'pt' | 'en' = 'pt',
+): HistoriographData | null {
   const columns = collectColumns(rows);
   const titleColumn = pickColumn(columns, FIELD_CANDIDATES.title);
   const authorsColumn = pickColumn(columns, FIELD_CANDIDATES.authors);
@@ -88,7 +92,7 @@ export function historiograph(rows: Dataset, topN = 30): HistoriographData | nul
 
     return {
       doc,
-      id: `${titleCase(surname) || 'Anônimo'}, ${year}`,
+      id: `${titleCase(surname) || (locale === 'en' ? 'Anonymous' : 'Anônimo')}, ${year}`,
       year,
       citations: toNumeric(doc[FIELD.TOTAL_CITATIONS]) ?? 0,
       surname,

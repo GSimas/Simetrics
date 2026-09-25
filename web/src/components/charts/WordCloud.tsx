@@ -5,6 +5,7 @@ import type { WordFrequency } from '@/core/wordcloud';
 import { ExpandChartButton, expandedHeight } from '@/components/charts/ExpandChartButton';
 import { ExportImageButton } from '@/components/charts/ExportImageButton';
 import { imageFromSvgElement } from '@/lib/export-image';
+import { numberLocale } from '@/lib/i18n/labels';
 import { cn } from '@/lib/utils';
 import { useLocale } from '@/state/locale.store';
 import { withChartBoundary } from '@/components/with-chart-boundary';
@@ -103,7 +104,7 @@ function WordCloud(props: WordCloudProps) {
     width: fallbackWidth = 900,
     height = 420,
     className,
-    exportName = 'nuvem-de-palavras',
+    exportName: exportNameProp,
     onWordClick,
     isClickable,
     expanded,
@@ -112,6 +113,7 @@ function WordCloud(props: WordCloudProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const { locale } = useLocale();
   const isEn = locale === 'en';
+  const exportName = exportNameProp ?? (isEn ? 'word-cloud' : 'nuvem-de-palavras');
 
   const [hovered, setHovered] = useState<HoverState | null>(null);
   // O layout usa a largura real do quadro: com uma largura fixa, numa coluna estreita o
@@ -259,7 +261,11 @@ function WordCloud(props: WordCloudProps) {
           width="100%"
           height={height}
           role="img"
-          aria-label={`Nuvem com ${placed.length} palavras mais frequentes`}
+          aria-label={
+            isEn
+              ? `Cloud of the ${placed.length} most frequent words`
+              : `Nuvem com ${placed.length} palavras mais frequentes`
+          }
           xmlns="http://www.w3.org/2000/svg"
           className="mx-auto select-none"
         >
@@ -305,7 +311,7 @@ function WordCloud(props: WordCloudProps) {
             <div className="flex items-center gap-1.5">
               <span className="font-bold text-primary">&ldquo;{hovered.text}&rdquo;:</span>
               <span className="tabular-nums font-semibold">
-                {hovered.value.toLocaleString('pt-BR')}
+                {hovered.value.toLocaleString(numberLocale(locale))}
               </span>
               <span className="text-muted-foreground">
                 {hovered.value === 1

@@ -11,6 +11,8 @@ import { hybridReportRows, hybridReportTitle } from '@/core/hybrid/report-rows';
 import type { Dataset } from '@/lib/types';
 import { FIELD, FIELD_CANDIDATES } from '@/lib/schema';
 import { collectColumns, pickColumn, toNumeric } from '@/core/text';
+import { localizeMetricText } from '@/core/graph/metrics';
+import { localizeTableText } from '@/core/tables';
 import {
   BRAND,
   reportAuthorsChart,
@@ -352,7 +354,7 @@ export function generatePdfReport({
       c.citations.toLocaleString(isEn ? 'en-US' : 'pt-BR'),
       String(c.h),
       c.meanCitations.toFixed(1),
-      c.topDocument ? c.topDocument.slice(0, 50) + '...' : '—',
+      c.topDocument ? localizeTableText(c.topDocument, locale).slice(0, 50) + '...' : '—',
     ]);
 
     autoTable(doc, {
@@ -498,7 +500,7 @@ export function generatePdfReport({
       const share = dataset.length > 0 ? (c.size / dataset.length) * 100 : 0;
       return [
         String(c.clusterId + 1),
-        `Tema ${c.clusterId + 1}`,
+        `${isEn ? 'Theme' : 'Tema'} ${c.clusterId + 1}`,
         c.size.toLocaleString(isEn ? 'en-US' : 'pt-BR'),
         `${share.toFixed(1)}%`,
         c.topTerms.slice(0, 5).join(', '),
@@ -603,7 +605,7 @@ export function generatePdfReport({
         { content: isEn ? 'Shannon Entropy' : 'Entropia de Shannon', styles: { fontStyle: 'bold' as const } },
         formatMetricVal(g.entropy, 3),
         { content: isEn ? 'Global Efficiency' : 'Eficiência Global', styles: { fontStyle: 'bold' as const } },
-        formatMetricVal(g.efficiency, 4),
+        formatMetricVal(localizeMetricText(g.efficiency, locale), 4),
       ],
       [
         { content: isEn ? 'Mean Degree' : 'Grau Médio', styles: { fontStyle: 'bold' as const } },

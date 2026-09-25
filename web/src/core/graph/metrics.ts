@@ -175,6 +175,14 @@ export function degreeAssortativity(graph: CompactGraph): number {
   return deviation === 0 ? Number.NaN : covariance / deviation;
 }
 
+/** Valor de `efficiency` quando o grafo é grande demais para calculá-la. */
+export const DENSE_GRAPH_NA = 'N/A (Grafo Denso)';
+
+/** Versão de exibição dos valores textuais das métricas (o worker grava em português). */
+export function localizeMetricText(value: number | string, locale: 'pt' | 'en' = 'pt'): number | string {
+  return locale === 'en' && value === DENSE_GRAPH_NA ? 'N/A (dense graph)' : value;
+}
+
 /**
  * Expoente da lei de potência, por regressão log-log no histograma de graus — ⇄
  * utils.py:2111. Valores próximos de 2-3 indicam rede livre de escala.
@@ -279,7 +287,7 @@ export function globalMetrics(
     clustering: averageClustering(graph),
     entropy: degreeEntropy(graph),
     efficiency:
-      graph.order < EFFICIENCY_NODE_LIMIT ? globalEfficiency(graph) : 'N/A (Grafo Denso)',
+      graph.order < EFFICIENCY_NODE_LIMIT ? globalEfficiency(graph) : DENSE_GRAPH_NA,
     meanDegree: mean(nodeDegrees),
     stdDegree: stdPopulation(nodeDegrees),
     minDegree: Math.min(...nodeDegrees),

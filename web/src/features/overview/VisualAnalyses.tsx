@@ -30,8 +30,10 @@ import type { Period, SankeyData } from '@/core/viz/sankey';
 import type { ThematicMap } from '@/core/viz/thematic-map';
 import type { Dataset, SearchEntityType } from '@/lib/types';
 import { useAsyncResult } from '@/lib/use-async-result';
+import { boxplotDimensionLabel, boxplotMetricLabel } from '@/lib/i18n/labels';
 import { useLocale } from '@/state/locale.store';
 import { getAnalyticsWorker } from '@/workers/client';
+import { VISUAL_COPY } from './visual-copy';
 import { PALETTE, QUADRANT_NOTE, chartMessage } from './viz-shared';
 import { ReadingTip } from '@/components/InfoTip';
 import { openInSearch } from '@/state/navigation.store';
@@ -122,6 +124,8 @@ const CITATION_SCALE_DARK = ['#1d4a40', '#236e5e', '#3fae8f', '#8fd3c1', '#d9ffa
 
 /** Distribuição estatística comparativa. */
 function BoxplotPanel({ dataset }: { dataset: Dataset }) {
+  const locale = useLocale((state) => state.locale);
+  const c = VISUAL_COPY[locale];
   const [dimension, setDimension] = useState<BoxplotDimension>('Países');
   const [metric, setMetric] = useState<BoxplotMetric>('Citações por documento');
   const [selected, setSelected] = useState<string[] | null>(null);
@@ -163,7 +167,7 @@ function BoxplotPanel({ dataset }: { dataset: Dataset }) {
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="space-y-1.5">
-          <Label htmlFor="box-dimension">Comparar por</Label>
+          <Label htmlFor="box-dimension">{c.compareBy}</Label>
           <Select
             value={dimension}
             onValueChange={(value) => {
@@ -177,7 +181,7 @@ function BoxplotPanel({ dataset }: { dataset: Dataset }) {
             <SelectContent>
               {BOX_DIMENSIONS.map((option) => (
                 <SelectItem key={option} value={option}>
-                  {option}
+                  {boxplotDimensionLabel(option, locale)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -185,7 +189,7 @@ function BoxplotPanel({ dataset }: { dataset: Dataset }) {
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="box-metric">Métrica</Label>
+          <Label htmlFor="box-metric">{c.metric}</Label>
           <Select value={metric} onValueChange={(value) => setMetric(value as BoxplotMetric)}>
             <SelectTrigger id="box-metric">
               <SelectValue />
@@ -193,7 +197,7 @@ function BoxplotPanel({ dataset }: { dataset: Dataset }) {
             <SelectContent>
               {BOX_METRICS.map((option) => (
                 <SelectItem key={option} value={option}>
-                  {option}
+                  {boxplotMetricLabel(option, locale)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -201,7 +205,7 @@ function BoxplotPanel({ dataset }: { dataset: Dataset }) {
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="box-scale">Escala do eixo Y</Label>
+          <Label htmlFor="box-scale">{c.yScale}</Label>
           <Select
             value={logScale ? 'log' : 'linear'}
             onValueChange={(value) => setLogScale(value === 'log')}
@@ -210,8 +214,8 @@ function BoxplotPanel({ dataset }: { dataset: Dataset }) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="linear">Linear</SelectItem>
-              <SelectItem value="log">Logarítmica</SelectItem>
+              <SelectItem value="linear">{c.linear}</SelectItem>
+              <SelectItem value="log">{c.logarithmic}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -220,14 +224,16 @@ function BoxplotPanel({ dataset }: { dataset: Dataset }) {
       {(options ?? []).length === 0 ? (
         chartMessage(
           dimension === 'Temas (IA)'
-            ? 'Nenhum tema disponível. Use o mapeamento temático por IA acima para gerá-los.'
-            : `A base não traz dados de ${dimension.toLowerCase()}.`,
+            ? c.noThemes
+            : c.noDimensionData.replace('{dimension}', boxplotDimensionLabel(dimension, locale).toLowerCase()),
         )
       ) : (
         <>
           <div className="space-y-1.5">
             <Label>
-              Selecione até {MAX_BOXPLOT_ITEMS} itens ({effectiveSelection.length} selecionados)
+              {c.selectUpTo
+                .replace('{max}', String(MAX_BOXPLOT_ITEMS))
+                .replace('{count}', String(effectiveSelection.length))}
             </Label>
             <div className="flex max-h-32 flex-wrap gap-1.5 overflow-y-auto rounded-md border p-2">
               {(options ?? []).slice(0, 60).map((option) => (
@@ -246,14 +252,14 @@ function BoxplotPanel({ dataset }: { dataset: Dataset }) {
           </div>
 
           {(series ?? []).length === 0 ? (
-            chartMessage('Selecione ao menos um item para comparar.')
+            chartMessage(c.selectAtLeastOne)
           ) : (
             <BoxPlotChart
-              exportName="distribuicao-comparativa"
+              exportName={c.boxplotExport}
               onSeriesClick={(name) => openInSearch(name, BOX_SEARCH_TYPES[dimension])}
               height={440}
               log={logScale}
-              yLabel={metric}
+              yLabel={boxplotMetricLabel(metric, locale)}
               series={(series ?? []).map((entry, index) => ({
                 name: entry.entity,
                 color: PALETTE[index % PALETTE.length] as string,
@@ -277,6 +283,8 @@ function BoxplotPanel({ dataset }: { dataset: Dataset }) {
  * então não dá para arrastar para um ano sem documento algum na base.
  */
 function SankeyPanel({ dataset }: { dataset: Dataset }) {
+  const locale = useLocale((state) => state.locale);
+  const c = VISUAL_COPY[locale];
   const [topN, setTopN] = useState(10);
   const [periods, setPeriods] = useState<[Period, Period, Period] | null>(null);
 
@@ -298,9 +306,7 @@ function SankeyPanel({ dataset }: { dataset: Dataset }) {
 
   if (!suggested) {
     return chartMessage(
-      loadingPeriods
-        ? 'Calculando fluxos temáticos…'
-        : 'A base precisa de anos e palavras-chave para montar o fluxo.',
+      loadingPeriods ? c.computingFlows : c.sankeyNeedsData,
     );
   }
 
@@ -317,7 +323,7 @@ function SankeyPanel({ dataset }: { dataset: Dataset }) {
   return (
     <div className="space-y-4">
       <div className="space-y-1.5">
-        <Label htmlFor="sankey-top">Termos por período</Label>
+        <Label htmlFor="sankey-top">{c.termsPerPeriod}</Label>
         <Select value={String(topN)} onValueChange={(value) => setTopN(Number(value))}>
           <SelectTrigger id="sankey-top" className="w-40">
             <SelectValue />
@@ -336,7 +342,7 @@ function SankeyPanel({ dataset }: { dataset: Dataset }) {
         {activePeriods.map(([start, end], index) => (
           <div key={index} className="space-y-2">
             <Label>
-              Período {index + 1}: {start}–{end}
+              {c.period.replace('{n}', String(index + 1))}: {start}–{end}
             </Label>
             <Slider
               min={datasetStart}
@@ -353,20 +359,15 @@ function SankeyPanel({ dataset }: { dataset: Dataset }) {
         ))}
       </div>
 
-      <ReadingTip>
-        As linhas mais grossas são termos que sobreviveram de um período ao seguinte; as
-        finas, termos distintos que costumam aparecer nos mesmos documentos.
-      </ReadingTip>
+      <ReadingTip>{c.sankeyTip}</ReadingTip>
 
       {!sankey ? (
         chartMessage(
-          loadingSankey
-            ? 'Calculando fluxos temáticos…'
-            : 'Nenhum fluxo para os períodos selecionados — tente um recorte mais amplo.',
+          loadingSankey ? c.computingFlows : c.noFlow,
         )
       ) : (
         <SankeyChart
-          exportName="evolucao-tematica"
+          exportName={c.sankeyExport}
           onNodeClick={(term) => openInSearch(term, KEYWORD)}
           height={620}
           columnLabels={activePeriods.map(([start, end]) => `${start}–${end}`)}
@@ -379,7 +380,7 @@ function SankeyPanel({ dataset }: { dataset: Dataset }) {
             source: link.source,
             target: link.target,
             value: link.value,
-            kind: link.kind === 'continuidade' ? 'Continuidade' : 'Intersecção',
+            kind: link.kind === 'continuidade' ? c.continuity : c.intersection,
             color: link.kind === 'continuidade' ? 'rgba(63, 174, 143, 0.45)' : 'rgba(150, 160, 170, 0.28)',
           }))}
         />
@@ -391,15 +392,17 @@ function SankeyPanel({ dataset }: { dataset: Dataset }) {
 /** Ciclo de vida das palavras-chave. */
 function GeneticsPanel({ dataset }: { dataset: Dataset }) {
   const t = useLocale((state) => state.t);
+  const locale = useLocale((state) => state.locale);
+  const c = VISUAL_COPY[locale];
   const dark = usePreferences((state) => state.theme === 'dark');
   const CITATION_SCALE = dark ? CITATION_SCALE_DARK : CITATION_SCALE_LIGHT;
   const { data } = useAsyncResult<KeywordGenetics[]>('genetics', () =>
     getAnalyticsWorker().genetics(dataset),
   );
 
-  if (!data) return chartMessage('Calculando ciclo de vida dos termos…');
+  if (!data) return chartMessage(c.computingGenetics);
   if (data.length === 0) {
-    return chartMessage('A base precisa de palavras-chave e anos para esta análise.');
+    return chartMessage(c.geneticsNeedsData);
   }
 
   // Só os termos mais replicados: a cauda longa é composta de termos que aparecem uma vez
@@ -410,21 +413,16 @@ function GeneticsPanel({ dataset }: { dataset: Dataset }) {
 
   return (
     <div className="space-y-3">
-      <ReadingTip>
-        Cada ponto é uma palavra-chave. O eixo X mostra quando ela apareceu pela primeira
-        vez; o Y, por quantos anos permaneceu em uso; o tamanho, quantas vezes se replicou.
-        Termos no alto e à esquerda são o núcleo estável da área; à direita e embaixo, as
-        fronteiras recentes.
-      </ReadingTip>
+      <ReadingTip>{c.geneticsTip}</ReadingTip>
 
       <ScatterChart
-        exportName="genetica-das-ideias"
+        exportName={c.geneticsExport}
         ariaLabel={t('visual_tab_genetics')}
         height={480}
         integerX
-        xLabel="Ano de nascimento do termo"
-        yLabel="Longevidade (anos)"
-        colorScale={{ label: 'Citações', min: minCitations, max: maxCitations, colors: CITATION_SCALE }}
+        xLabel={c.termBirthYear}
+        yLabel={c.longevityYears}
+        colorScale={{ label: c.citations, min: minCitations, max: maxCitations, colors: CITATION_SCALE }}
         points={top.map((item) => ({
           id: item.keyword,
           x: item.birthYear,
@@ -439,10 +437,10 @@ function GeneticsPanel({ dataset }: { dataset: Dataset }) {
           tooltip: (
             <>
               <p className="mb-1 font-semibold break-words">{item.keyword}</p>
-              <TipRow label="Nasceu em" value={item.birthYear} />
-              <TipRow label="Longevidade" value={`${item.lifespan} anos`} />
-              <TipRow label="Replicações" value={formatNumber(item.occurrences)} />
-              <TipRow label="Citações" value={formatNumber(item.citations)} />
+              <TipRow label={c.bornIn} value={item.birthYear} />
+              <TipRow label={c.longevity} value={c.years.replace('{n}', String(item.lifespan))} />
+              <TipRow label={c.replications} value={formatNumber(item.occurrences, undefined, locale)} />
+              <TipRow label={c.citations} value={formatNumber(item.citations, undefined, locale)} />
             </>
           ),
           onClick: () => openInSearch(item.keyword, KEYWORD),
@@ -455,6 +453,8 @@ function GeneticsPanel({ dataset }: { dataset: Dataset }) {
 /** Mapa conceitual por PCA, em 2D e 3D. */
 function ConceptPanel({ dataset }: { dataset: Dataset }) {
   const t = useLocale((state) => state.t);
+  const locale = useLocale((state) => state.locale);
+  const c = VISUAL_COPY[locale];
   const [dimensions, setDimensions] = useState<'2d' | '3d'>('2d');
   const [clusters, setClusters] = useState(4);
 
@@ -462,16 +462,16 @@ function ConceptPanel({ dataset }: { dataset: Dataset }) {
     getAnalyticsWorker().conceptMap(dataset, { topTerms: 50, clusters }),
   );
 
-  if (!terms) return chartMessage('Projetando termos…');
+  if (!terms) return chartMessage(c.projectingTerms);
   if (terms.length === 0) {
-    return chartMessage('A base precisa de palavras-chave suficientes para o mapa conceitual.');
+    return chartMessage(c.conceptNeedsData);
   }
 
   const groups = [...new Set(terms.map((term) => term.cluster))].sort((a, b) => a - b);
   const colorOf = new Map(groups.map((group, index) => [group, PALETTE[index % PALETTE.length] as string]));
   const legend = groups.map((group) => ({
     key: String(group),
-    label: `Agrupamento ${group + 1}`,
+    label: c.clusterN.replace('{n}', String(group + 1)),
     color: colorOf.get(group) as string,
   }));
   const conceptPoint = (term: ConceptTerm) => ({
@@ -485,8 +485,8 @@ function ConceptPanel({ dataset }: { dataset: Dataset }) {
     tooltip: (
       <>
         <p className="mb-1 font-semibold break-words">{term.term}</p>
-        <TipRow label="Agrupamento" value={term.cluster + 1} color={colorOf.get(term.cluster)} />
-        <TipRow label="Frequência" value={formatNumber(term.frequency)} />
+        <TipRow label={c.cluster} value={term.cluster + 1} color={colorOf.get(term.cluster)} />
+        <TipRow label={c.frequency} value={formatNumber(term.frequency, undefined, locale)} />
       </>
     ),
     onClick: () => openInSearch(term.term, KEYWORD),
@@ -496,7 +496,7 @@ function ConceptPanel({ dataset }: { dataset: Dataset }) {
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label htmlFor="concept-dim">Projeção</Label>
+          <Label htmlFor="concept-dim">{c.projection}</Label>
           <Select
             value={dimensions}
             onValueChange={(value) => setDimensions(value as '2d' | '3d')}
@@ -505,14 +505,14 @@ function ConceptPanel({ dataset }: { dataset: Dataset }) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="2d">2 dimensões</SelectItem>
-              <SelectItem value="3d">3 dimensões</SelectItem>
+              <SelectItem value="2d">{c.dimensions.replace('{n}', '2')}</SelectItem>
+              <SelectItem value="3d">{c.dimensions.replace('{n}', '3')}</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="concept-clusters">Agrupamentos</Label>
+          <Label htmlFor="concept-clusters">{c.clusters}</Label>
           <Select value={String(clusters)} onValueChange={(value) => setClusters(Number(value))}>
             <SelectTrigger id="concept-clusters">
               <SelectValue />
@@ -520,7 +520,7 @@ function ConceptPanel({ dataset }: { dataset: Dataset }) {
             <SelectContent>
               {[3, 4, 5, 6, 8].map((option) => (
                 <SelectItem key={option} value={String(option)}>
-                  {option} agrupamentos
+                  {c.clustersN.replace('{n}', String(option))}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -528,27 +528,28 @@ function ConceptPanel({ dataset }: { dataset: Dataset }) {
         </div>
       </div>
 
-      <ReadingTip>
-        Termos próximos aparecem nos mesmos documentos. As ilhas são escolas de pensamento;
-        os termos entre elas são pontes conceituais.
-      </ReadingTip>
+      <ReadingTip>{c.conceptTip}</ReadingTip>
 
       {dimensions === '3d' ? (
         <Scatter3DChart
-          exportName="mapa-conceitual-3d"
+          exportName={`${c.conceptExport}-3d`}
           ariaLabel={t('visual_tab_concept')}
           height={620}
-          axisLabels={['Dimensão 1', 'Dimensão 2', 'Dimensão 3']}
+          axisLabels={[
+            c.dimensionN.replace('{n}', '1'),
+            c.dimensionN.replace('{n}', '2'),
+            c.dimensionN.replace('{n}', '3'),
+          ]}
           legend={legend}
           points={terms.map((term) => ({ ...conceptPoint(term), z: term.z }))}
         />
       ) : (
         <ScatterChart
-          exportName="mapa-conceitual-2d"
+          exportName={`${c.conceptExport}-2d`}
           ariaLabel={t('visual_tab_concept')}
           height={500}
-          xLabel="Dimensão 1"
-          yLabel="Dimensão 2"
+          xLabel={c.dimensionN.replace('{n}', '1')}
+          yLabel={c.dimensionN.replace('{n}', '2')}
           legend={legend}
           points={terms.map(conceptPoint)}
         />
@@ -560,20 +561,22 @@ function ConceptPanel({ dataset }: { dataset: Dataset }) {
 /** Mapa temático de centralidade × densidade. */
 function ThematicPanel({ dataset }: { dataset: Dataset }) {
   const t = useLocale((state) => state.t);
+  const locale = useLocale((state) => state.locale);
+  const c = VISUAL_COPY[locale];
   const [source, setSource] = useState<'abstract' | 'keywords'>('abstract');
 
   const { data: map, loading } = useAsyncResult<ThematicMap | null>(`thematic ${source}`, () =>
     getAnalyticsWorker().thematicMap(dataset, source, 150),
   );
 
-  if (loading) return chartMessage('Construindo a rede de coocorrência…');
-  if (!map) return chartMessage('Não há texto suficiente para montar o mapa temático.');
+  if (loading) return chartMessage(c.buildingNetwork);
+  if (!map) return chartMessage(c.thematicNeedsData);
 
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label htmlFor="thematic-source">Fonte do texto</Label>
+          <Label htmlFor="thematic-source">{c.textSource}</Label>
           <Select
             value={source}
             onValueChange={(value) => setSource(value as 'abstract' | 'keywords')}
@@ -582,28 +585,28 @@ function ThematicPanel({ dataset }: { dataset: Dataset }) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="abstract">Resumos</SelectItem>
-              <SelectItem value="keywords">Palavras-chave</SelectItem>
+              <SelectItem value="abstract">{c.abstracts}</SelectItem>
+              <SelectItem value="keywords">{c.keywords}</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
 
-      <ReadingTip>{QUADRANT_NOTE}</ReadingTip>
+      <ReadingTip>{QUADRANT_NOTE[locale]}</ReadingTip>
 
       <ScatterChart
-        exportName="mapa-tematico"
+        exportName={c.thematicExport}
         ariaLabel={t('visual_tab_thematic')}
         height={560}
         labelPlacement="center"
-        xLabel="Centralidade (relevância externa)"
-        yLabel="Densidade (desenvolvimento interno)"
+        xLabel={c.centralityAxis}
+        yLabel={c.densityAxis}
         reference={{ x: map.meanCentrality, y: map.meanDensity }}
         quadrants={{
-          topLeft: 'Nichos',
-          topRight: 'Motores',
-          bottomLeft: 'Emergentes / em declínio',
-          bottomRight: 'Básicos / transversais',
+          topLeft: c.niches,
+          topRight: c.motors,
+          bottomLeft: c.emerging,
+          bottomRight: c.basic,
         }}
         points={map.clusters.map((cluster, index) => ({
           id: String(cluster.id),
@@ -618,9 +621,9 @@ function ThematicPanel({ dataset }: { dataset: Dataset }) {
             <>
               <p className="mb-1 font-semibold break-words">{cluster.terms.slice(0, 3).join(' · ')}</p>
               <p className="mb-1 text-muted-foreground break-words">{cluster.terms.join(', ')}</p>
-              <TipRow label="Centralidade" value={formatNumber(cluster.centrality, 0)} />
-              <TipRow label="Densidade" value={formatNumber(cluster.density, 0)} />
-              <TipRow label="Frequência" value={formatNumber(cluster.frequency)} />
+              <TipRow label={c.centrality} value={formatNumber(cluster.centrality, 0, locale)} />
+              <TipRow label={c.density} value={formatNumber(cluster.density, 0, locale)} />
+              <TipRow label={c.frequency} value={formatNumber(cluster.frequency, undefined, locale)} />
             </>
           ),
           onClick: () => openInSearch(cluster.terms[0], ['Palavra-chave', 'Tema']),
@@ -633,28 +636,26 @@ function ThematicPanel({ dataset }: { dataset: Dataset }) {
 /** Linha do tempo de citações diretas. */
 function HistoriographPanel({ dataset }: { dataset: Dataset }) {
   const t = useLocale((state) => state.t);
+  const locale = useLocale((state) => state.locale);
+  const c = VISUAL_COPY[locale];
   const [topN, setTopN] = useState(30);
 
   const { data, loading } = useAsyncResult<HistoriographData | null>(
-    `historiograph ${topN}`,
-    () => getAnalyticsWorker().historiograph(dataset, topN),
+    `historiograph ${topN} ${locale}`,
+    () => getAnalyticsWorker().historiograph(dataset, topN, locale),
   );
 
-  if (loading) return chartMessage('Rastreando citações diretas…');
+  if (loading) return chartMessage(c.tracingCitations);
 
   if (!data) {
-    return chartMessage(
-      'Esta base não traz referências citadas, e sem elas não há como rastrear quais ' +
-        'documentos citam quais. No Web of Science, exporte com "Full Record and Cited ' +
-        'References"; no Scopus, marque "References" na exportação.',
-    );
+    return chartMessage(c.noReferences);
   }
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1.5">
-          <Label htmlFor="hist-top">Documentos</Label>
+          <Label htmlFor="hist-top">{c.documents}</Label>
           <Select value={String(topN)} onValueChange={(value) => setTopN(Number(value))}>
             <SelectTrigger id="hist-top" className="w-40">
               <SelectValue />
@@ -670,9 +671,9 @@ function HistoriographPanel({ dataset }: { dataset: Dataset }) {
         </div>
 
         <ReadingTip>
-          {data.edges.length} citações diretas entre os {data.nodes.length} documentos mais
-          citados. A detecção casa sobrenome do primeiro autor e ano dentro do texto das
-          referências, então erra em homônimos e em grafias divergentes.
+          {c.historiographTip
+            .replace('{edges}', String(data.edges.length))
+            .replace('{nodes}', String(data.nodes.length))}
         </ReadingTip>
       </div>
 
@@ -682,7 +683,7 @@ function HistoriographPanel({ dataset }: { dataset: Dataset }) {
         height={560}
         integerX
         hideYAxis
-        xLabel="Linha do tempo"
+        xLabel={c.timeline}
         edges={data.edges}
         points={data.nodes.map((node) => ({
           id: node.id,
@@ -694,8 +695,8 @@ function HistoriographPanel({ dataset }: { dataset: Dataset }) {
           tooltip: (
             <>
               <p className="mb-1 font-semibold break-words">{node.title}</p>
-              <TipRow label="Ano" value={node.year} />
-              <TipRow label="Citações" value={formatNumber(node.citations)} />
+              <TipRow label={c.year} value={node.year} />
+              <TipRow label={c.citations} value={formatNumber(node.citations, undefined, locale)} />
             </>
           ),
           onClick: () => openInSearch(node.title, ['Documento']),
@@ -708,12 +709,14 @@ function HistoriographPanel({ dataset }: { dataset: Dataset }) {
 /** Lei de Lotka: produtividade observada dos autores contra a curva teórica c/x². */
 function LotkaPanel() {
   const t = useLocale((state) => state.t);
+  const locale = useLocale((state) => state.locale);
+  const c = VISUAL_COPY[locale];
   const lotka = useDataset((state) => state.overview?.lotka);
-  if (!lotka) return chartMessage('Calculando a distribuição de produtividade…');
+  if (!lotka) return chartMessage(c.computingLotka);
   return (
     <div className="space-y-3">
       <ReadingTip>{t('lotka_description')}</ReadingTip>
-      <Suspense fallback={chartMessage('Carregando gráfico…')}>
+      <Suspense fallback={chartMessage(c.loadingChart)}>
         <LotkaChart lotka={lotka} />
       </Suspense>
     </div>

@@ -1,3 +1,4 @@
+import { useLocale } from '@/state/locale.store';
 import { toProjectMeta, type ProjectMeta, type ProjectRecord } from './project';
 
 /**
@@ -18,6 +19,11 @@ const STORE_PROJECTS = 'projects';
 const STORE_META = 'projectsMeta';
 const INDEX_UPDATED_AT = 'by-updatedAt';
 
+/** Erro no idioma da interface (só aparece quando o IndexedDB não traz o próprio). */
+function fail(pt: string, en: string): Error {
+  return new Error(useLocale.getState().locale === 'en' ? en : pt);
+}
+
 let dbPromise: Promise<IDBDatabase> | null = null;
 
 function openDb(): Promise<IDBDatabase> {
@@ -36,7 +42,7 @@ function openDb(): Promise<IDBDatabase> {
     };
 
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error('Falha ao abrir o banco de projetos.'));
+    request.onerror = () => reject(request.error ?? fail('Falha ao abrir o banco de projetos.', 'Failed to open the projects database.'));
   });
 
   return dbPromise;
@@ -45,7 +51,7 @@ function openDb(): Promise<IDBDatabase> {
 function wrapRequest<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error('Falha na operação de armazenamento local.'));
+    request.onerror = () => reject(request.error ?? fail('Falha na operação de armazenamento local.', 'Local storage operation failed.'));
   });
 }
 
@@ -58,8 +64,8 @@ export async function putProject(record: ProjectRecord): Promise<void> {
     tx.objectStore(STORE_PROJECTS).put(record);
     tx.objectStore(STORE_META).put(toProjectMeta(record));
     tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error ?? new Error('Falha ao salvar o projeto.'));
-    tx.onabort = () => reject(tx.error ?? new Error('Operação de salvamento cancelada.'));
+    tx.onerror = () => reject(tx.error ?? fail('Falha ao salvar o projeto.', 'Failed to save the project.'));
+    tx.onabort = () => reject(tx.error ?? fail('Operação de salvamento cancelada.', 'Save operation aborted.'));
   });
 }
 
@@ -86,7 +92,7 @@ export async function getAllProjectMeta(): Promise<ProjectMeta[]> {
         resolve(results);
       }
     };
-    cursorRequest.onerror = () => reject(cursorRequest.error ?? new Error('Falha ao listar projetos.'));
+    cursorRequest.onerror = () => reject(cursorRequest.error ?? fail('Falha ao listar projetos.', 'Failed to list projects.'));
   });
 }
 
@@ -97,7 +103,7 @@ export async function deleteProject(id: string): Promise<void> {
     tx.objectStore(STORE_PROJECTS).delete(id);
     tx.objectStore(STORE_META).delete(id);
     tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error ?? new Error('Falha ao excluir o projeto.'));
-    tx.onabort = () => reject(tx.error ?? new Error('Operação de exclusão cancelada.'));
+    tx.onerror = () => reject(tx.error ?? fail('Falha ao excluir o projeto.', 'Failed to delete the project.'));
+    tx.onabort = () => reject(tx.error ?? fail('Operação de exclusão cancelada.', 'Delete operation aborted.'));
   });
 }

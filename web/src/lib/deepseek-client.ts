@@ -1,5 +1,5 @@
 import type { ChatPrompt } from '@/core/hybrid/prompts';
-import { AiError } from './ai-client';
+import { AiError, localized } from './ai-client';
 
 /**
  * Cliente do modelo gerativo da classificação híbrida.
@@ -61,6 +61,10 @@ export async function chatJson(
     temperature: 0.2,
     max_tokens: 8192,
     stream: false,
+    // O raciocínio do deepseek-flash conta no teto: com a amostra de 120 documentos ele
+    // gastava os 8192 tokens pensando e devolvia `content` vazio. Só DeepSeek (e o nosso
+    // proxy, que repassa para ele) conhece o parâmetro; outros endpoints poderiam recusá-lo.
+    ...(/deepseek\.com|^\/api\//.test(config.baseUrl) ? { thinking: { type: 'disabled' } } : {}),
   });
 
   for (let attempt = 1; ; attempt += 1) {
@@ -73,7 +77,7 @@ export async function chatJson(
         usage?: { prompt_tokens?: number; completion_tokens?: number };
       };
       const text = data.choices?.[0]?.message?.content ?? '';
-      if (!text.trim()) throw new AiError('O modelo gerativo devolveu uma resposta vazia.');
+      if (!text.trim()) throw new AiError(localized('O modelo gerativo devolveu uma resposta vazia.', 'The generative model returned an empty response.'));
       return {
         text,
         model: data.model ?? config.model,
@@ -88,7 +92,7 @@ export async function chatJson(
     const transient = !quotaExhausted && (response.status === 429 || response.status >= 500);
     if (!transient || attempt >= MAX_ATTEMPTS) {
       const err = (await response.json().catch(() => ({}))) as { error?: { message?: string } };
-      throw new AiError(err.error?.message || `Modelo gerativo: erro HTTP ${response.status}`);
+      throw new AiError(err.error?.message || localized(`Modelo gerativo: erro HTTP ${response.status}`, `Generative model: HTTP error ${response.status}`));
     }
     await wait(1000 * 2 ** attempt, signal);
   }

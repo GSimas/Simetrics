@@ -710,7 +710,7 @@ export function reportThemesChart(
 ): string {
   const items = clusters.map((c) => ({
     clusterId: c.clusterId,
-    name: `Tema ${c.clusterId + 1}`,
+    name: `${locale === 'en' ? 'Theme' : 'Tema'} ${c.clusterId + 1}`,
     docCount: c.size,
     share: totalDocs > 0 ? (c.size / totalDocs) * 100 : 0,
   }));

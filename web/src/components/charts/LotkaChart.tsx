@@ -5,6 +5,7 @@ import { ExportImageButton } from '@/components/charts/ExportImageButton';
 import type { LotkaDistribution } from '@/core/scientometrics';
 import { PALETTE } from '@/features/overview/viz-shared';
 import { imageFromSvgElement } from '@/lib/export-image';
+import { numberLocale } from '@/lib/i18n/labels';
 import { cn } from '@/lib/utils';
 import { useLocale } from '@/state/locale.store';
 import { withChartBoundary } from '@/components/with-chart-boundary';
@@ -42,12 +43,14 @@ const ticks = (max: number, step: number, start = 0): number[] => {
   return values;
 };
 
-const percent = (value: number): string =>
-  `${(value * 100).toLocaleString('pt-BR', { maximumFractionDigits: value < 0.01 ? 2 : 1 })}%`;
+const percent = (value: number, locale: string): string =>
+  `${(value * 100).toLocaleString(locale, { maximumFractionDigits: value < 0.01 ? 2 : 1 })}%`;
 
 function LotkaChart(props: LotkaChartProps) {
-  const { lotka, exportName = 'lei-de-lotka', className, expanded } = props;
+  const { lotka, className, expanded } = props;
   const t = useLocale((state) => state.t);
+  const locale = useLocale((state) => state.locale);
+  const exportName = props.exportName ?? (locale === 'en' ? 'lotka-law' : 'lei-de-lotka');
   const svgRef = useRef<SVGSVGElement>(null);
   const [hovered, setHovered] = useState<number | null>(null);
 
@@ -131,11 +134,11 @@ function LotkaChart(props: LotkaChartProps) {
             </p>
             <p className="text-muted-foreground">
               {t('lotka_observed')}:{' '}
-              <span className="tabular-nums text-foreground">{observed !== undefined ? percent(observed) : '—'}</span>
+              <span className="tabular-nums text-foreground">{observed !== undefined ? percent(observed, numberLocale(locale)) : '—'}</span>
             </p>
             <p className="text-muted-foreground">
               {t('lotka_theoretical')}:{' '}
-              <span className="tabular-nums text-foreground">{theoretical !== undefined ? percent(theoretical) : '—'}</span>
+              <span className="tabular-nums text-foreground">{theoretical !== undefined ? percent(theoretical, numberLocale(locale)) : '—'}</span>
             </p>
           </div>
         )}
@@ -156,7 +159,7 @@ function LotkaChart(props: LotkaChartProps) {
               <g key={`y${value}`}>
                 <line x1={MARGIN.left} x2={WIDTH - MARGIN.right} y1={chart.sy(value)} y2={chart.sy(value)} stroke="var(--border)" strokeWidth={value === 0 ? 1 : 0.6} />
                 <text x={MARGIN.left - 10} y={chart.sy(value)} dy="0.32em" textAnchor="end">
-                  {percent(value)}
+                  {percent(value, numberLocale(locale))}
                 </text>
               </g>
             ))}

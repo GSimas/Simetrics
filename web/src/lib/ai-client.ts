@@ -25,6 +25,11 @@ export class AiError extends Error {
   }
 }
 
+/** Mensagem de erro no idioma da interface (só na thread principal). */
+export function localized(pt: string, en: string): string {
+  return useLocale.getState().locale === 'en' ? en : pt;
+}
+
 export interface ChatStatusUpdate {
   type: 'thinking' | 'tool_call' | 'tool_result';
   message: string;
@@ -191,7 +196,7 @@ export async function labelCluster(
 
   const rawText = await generateTextWithProvider(config, prompt, signal);
   const name = sanitizeThemeName(rawText);
-  if (!name) throw new AiError('O modelo devolveu uma resposta vazia.');
+  if (!name) throw new AiError(localized('O modelo devolveu uma resposta vazia.', 'The model returned an empty response.'));
   return name;
 }
 
@@ -214,7 +219,7 @@ async function labelClusterServerless(
   }
 
   const body = (await response.json()) as { name?: string };
-  if (!body.name) throw new AiError('O modelo não devolveu um nome de tema.');
+  if (!body.name) throw new AiError(localized('O modelo não devolveu um nome de tema.', 'The model did not return a theme name.'));
   return body.name;
 }
 
@@ -244,7 +249,7 @@ export async function streamChat(options: ChatStreamOptions): Promise<void> {
     await streamClaude(apiKey, model, systemPrompt, options);
   } else {
     const baseUrl = openAiCompatibleBaseUrl(config);
-    if (!baseUrl) throw new AiError(`Provedor sem endpoint configurado: ${provider}`);
+    if (!baseUrl) throw new AiError(localized(`Provedor sem endpoint configurado: ${provider}`, `Provider has no configured endpoint: ${provider}`));
     await streamOpenAiCompatible(apiKey, model, baseUrl, systemPrompt, options, {}, provider);
   }
 }
@@ -340,7 +345,7 @@ async function streamGemini(
       );
     }
 
-    if (!response.body) throw new AiError('A resposta chegou vazia.');
+    if (!response.body) throw new AiError(localized('A resposta chegou vazia.', 'The response arrived empty.'));
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
@@ -513,7 +518,7 @@ async function streamOpenAiCompatible(
       throw new AiError(errorBody.error?.message || `API error (HTTP ${response.status})`);
     }
 
-    if (!response.body) throw new AiError('A resposta chegou vazia.');
+    if (!response.body) throw new AiError(localized('A resposta chegou vazia.', 'The response arrived empty.'));
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
@@ -684,7 +689,7 @@ async function streamClaude(
       );
     }
 
-    if (!response.body) throw new AiError('A resposta chegou vazia.');
+    if (!response.body) throw new AiError(localized('A resposta chegou vazia.', 'The response arrived empty.'));
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
@@ -896,14 +901,14 @@ async function generateTextWithProvider(
 /** Testa uma configuração de IA com uma pergunta simples */
 export async function testAiConnection(config: AiConfig): Promise<string> {
   if (!config.apiKey && config.provider !== 'custom') {
-    throw new AiError('Chave de API não informada.');
+    throw new AiError(localized('Chave de API não informada.', 'API key not provided.'));
   }
   const result = await generateTextWithProvider(
     config,
     'Responda apenas "OK" para testar a conexão.',
   );
   if (!result || !result.trim()) {
-    throw new AiError('O modelo respondeu com texto vazio.');
+    throw new AiError(localized('O modelo respondeu com texto vazio.', 'The model replied with empty text.'));
   }
   return result.trim();
 }

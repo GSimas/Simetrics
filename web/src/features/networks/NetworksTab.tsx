@@ -20,8 +20,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import type { CooccurrenceKind, SizeMetric } from '@/core/graph';
-import type { GlobalMetrics } from '@/core/graph/metrics';
-import type { SearchEntityType, SnaNodeMetrics } from '@/lib/types';
+import { localizeMetricText, type GlobalMetrics } from '@/core/graph/metrics';
+import type { NodeKind, SearchEntityType, SnaNodeMetrics } from '@/lib/types';
+import { cooccurrenceLabel, entityTypeLabel, numberLocale, sizeMetricLabel } from '@/lib/i18n/labels';
+import type { Locale } from '@/lib/i18n/translations';
+import { localizeProgress } from '@/lib/i18n/progress';
 import { communityColor } from '@/features/overview/viz-shared';
 import { useStickyValue } from '@/lib/use-sticky-value';
 import { cn } from '@/lib/utils';
@@ -146,8 +149,8 @@ const METRIC_LABELS: {
   },
 ];
 
-function formatMetric(value: number | string): string {
-  if (typeof value === 'string') return value;
+function formatMetric(value: number | string, locale: Locale): string {
+  if (typeof value === 'string') return String(localizeMetricText(value, locale));
   if (!Number.isFinite(value)) return '—';
   if (value === 0) return '0';
   return Math.abs(value) < 0.001 ? value.toExponential(2) : value.toFixed(Math.abs(value) < 1 ? 4 : 2);
@@ -157,10 +160,12 @@ function NetworkMetricCard({
   label,
   value,
   hint,
+  locale,
 }: {
   label: string;
   value: number | string;
   hint: string;
+  locale: Locale;
 }) {
   return (
     <div className="border border-border bg-card p-4 transition-colors hover:border-highlight/60">
@@ -171,7 +176,7 @@ function NetworkMetricCard({
         <InfoTip label={label}>{hint}</InfoTip>
       </dt>
       <dd className="mt-2 text-xl font-medium tabular-nums tracking-tight text-foreground">
-        {formatMetric(value)}
+        {formatMetric(value, locale)}
       </dd>
     </div>
   );
@@ -196,6 +201,7 @@ function NetworkEcology({ global }: { global: GlobalMetrics }) {
       label={isEn ? labelEn : label}
       value={global[key] as number | string}
       hint={isEn ? hintEn : hint}
+      locale={locale}
     />
   ));
   const hidden = cards.length - VISIBLE_METRICS;
@@ -208,9 +214,9 @@ function NetworkEcology({ global }: { global: GlobalMetrics }) {
           info={t('network_deep_desc').replace(/:\s*$/, '.')}
         />
         <p className="eyebrow">
-          {global.nodeCount.toLocaleString('pt-BR')} {t('network_nodes')} ·{' '}
-          {global.edgeCount.toLocaleString('pt-BR')} {t('network_edges')} ·{' '}
-          {global.componentCount.toLocaleString('pt-BR')} {t('network_components')}
+          {global.nodeCount.toLocaleString(numberLocale(locale))} {t('network_nodes')} ·{' '}
+          {global.edgeCount.toLocaleString(numberLocale(locale))} {t('network_edges')} ·{' '}
+          {global.componentCount.toLocaleString(numberLocale(locale))} {t('network_components')}
         </p>
       </CardHeader>
       <CardContent>
@@ -261,8 +267,10 @@ function GraphFallback() {
  */
 function SnaProgress() {
   const t = useLocale((state) => state.t);
+  const locale = useLocale((state) => state.locale);
   const snaProgress = useDataset((state) => state.snaProgress);
-  const shownProgress = useStickyValue(snaProgress).value;
+  const sticky = useStickyValue(snaProgress).value;
+  const shownProgress = sticky && localizeProgress(sticky, locale);
   return (
     // Fechada, a barra zera a própria margem do space-y (mb-0 vence o :where do
     // Tailwind) para não deixar um vão acima dos blocos.
@@ -288,7 +296,7 @@ export default function NetworksTab() {
   const network = useDataset((state) => state.network);
   const computeSna = useDataset((state) => state.computeSna);
   const computeNetwork = useDataset((state) => state.computeNetwork);
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
 
   const [kind, setKind] = useState<CooccurrenceKind>('Coautoria');
   const [topN, setTopN] = useState<number>(50);
@@ -346,27 +354,27 @@ export default function NetworksTab() {
         },
         {
           accessorKey: 'kind',
-          header: 'Tipo / Type',
+          header: locale === 'en' ? 'Type' : 'Tipo',
           cell: ({ row }) => {
-            const val = String(row.original['kind']);
+            const val = String(row.original['kind']) as NodeKind | 'Outro';
             const variant =
               val === 'Autor'
                 ? 'purple'
                 : val === 'País'
                   ? 'indigo'
-                  : val === 'Venue'
+                  : val === 'Local de Publicação (Venue)'
                     ? 'cyan'
                     : 'blue';
-            return <Badge variant={variant}>{val}</Badge>;
+            return <Badge variant={variant}>{entityTypeLabel(val, locale)}</Badge>;
           },
         },
-        { accessorKey: 'degreeAbsolute', header: 'Grau absoluto' },
-        { accessorKey: 'degreeCentrality', header: 'Centralidade de grau' },
-        { accessorKey: 'eigenvector', header: 'Autovetor' },
+        { accessorKey: 'degreeAbsolute', header: locale === 'en' ? 'Absolute degree' : 'Grau absoluto' },
+        { accessorKey: 'degreeCentrality', header: locale === 'en' ? 'Degree centrality' : 'Centralidade de grau' },
+        { accessorKey: 'eigenvector', header: locale === 'en' ? 'Eigenvector' : 'Autovetor' },
         { accessorKey: 'betweenness', header: 'Betweenness' },
         { accessorKey: 'closeness', header: 'Closeness' },
       ] as ColumnDef<Record<string, unknown>, unknown>[],
-    [],
+    [locale],
   );
 
   if (!active) {
@@ -391,12 +399,12 @@ export default function NetworksTab() {
                 <Label htmlFor="network-kind">{t('network_kind_label')}</Label>
                 <Select value={kind} onValueChange={(value) => setKind(value as CooccurrenceKind)}>
                   <SelectTrigger id="network-kind">
-                    <SelectValue />
+                    <SelectValue>{cooccurrenceLabel(kind, locale)}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {NETWORK_KINDS.map((option) => (
                       <SelectItem key={option} value={option}>
-                        {option}
+                        {cooccurrenceLabel(option, locale)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -426,12 +434,12 @@ export default function NetworksTab() {
                   onValueChange={(value) => setSizeMetric(value as SizeMetric)}
                 >
                   <SelectTrigger id="network-size">
-                    <SelectValue />
+                    <SelectValue>{sizeMetricLabel(sizeMetric, locale)}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {SIZE_METRICS.map((option) => (
                       <SelectItem key={option} value={option}>
-                        {option}
+                        {sizeMetricLabel(option, locale)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -444,7 +452,7 @@ export default function NetworksTab() {
               <>
                 <p className="eyebrow">
                   {network.nodes.length} {t('network_nodes')} · {network.edges.length}{' '}
-                  {t('network_edges')} · {network.communityCount} comunidades
+                  {t('network_edges')} · {network.communityCount} {locale === 'en' ? 'communities' : 'comunidades'}
                 </p>
                 <Tabs
                   data-tour="net-graph"
@@ -464,7 +472,7 @@ export default function NetworksTab() {
                           nodes={network.nodes}
                           edges={network.edges}
                           onNodeClick={openNode}
-                          exportName={`rede-${kind}`}
+                          exportName={`${locale === 'en' ? 'network' : 'rede'}-${cooccurrenceLabel(kind, locale)}`}
                         />
                       </Suspense>
                     </ErrorBoundary>
@@ -478,7 +486,7 @@ export default function NetworksTab() {
                           weightLabel={t('radial_documents')}
                           legend={radialLegend}
                           onNodeClick={openNode}
-                          exportName={`rede-radial-${kind}`}
+                          exportName={`${locale === 'en' ? 'radial-network' : 'rede-radial'}-${cooccurrenceLabel(kind, locale)}`}
                         />
                       </Suspense>
                     </ErrorBoundary>
@@ -508,7 +516,7 @@ export default function NetworksTab() {
             <DataTable
               data={sna.nodes as unknown as Record<string, unknown>[]}
               columns={snaColumns}
-              exportName="metricas-sna"
+              exportName={locale === 'en' ? 'sna-metrics' : 'metricas-sna'}
               filterPlaceholder={t('table_filter_placeholder')}
             />
             </CardContent>

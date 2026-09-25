@@ -8,6 +8,7 @@ import { TutorialTriggerButton } from '@/components/TutorialTriggerButton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BuyMeCoffeeButton } from '@/components/BuyMeCoffeeButton';
 import { LandingScreen } from '@/features/landing/LandingScreen';
+import { numberLocale } from '@/lib/i18n/labels';
 import { type TranslationKey } from '@/lib/i18n/translations';
 import { lazyWithPreload, whenIdle } from '@/lib/lazy';
 import { useHashRoute } from '@/lib/use-hash-route';
@@ -71,6 +72,7 @@ const TABS = [
 export default function App() {
   const documentCount = useDataset((state) => state.active?.length ?? 0);
   const t = useLocale((state) => state.t);
+  const locale = useLocale((state) => state.locale);
   const activeTab = useNavigation((state) => state.activeTab);
   const setActiveTab = useNavigation((state) => state.setActiveTab);
   const [tutorialOpen, setTutorialOpen] = useState(false);
@@ -178,7 +180,7 @@ export default function App() {
               {documentCount > 0 && (
                 <div className="eyebrow flex h-9 items-center gap-2 px-2 text-foreground">
                   <span className="size-1.5 rounded-full bg-highlight shadow-[0_0_10px_var(--highlight)]" />
-                  <span className="tabular-nums">{documentCount.toLocaleString('pt-BR')}</span>
+                  <span className="tabular-nums">{documentCount.toLocaleString(numberLocale(locale))}</span>
                   <span className="hidden text-muted-foreground xl:inline">{t('active_docs')}</span>
                 </div>
               )}

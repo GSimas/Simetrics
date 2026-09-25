@@ -18,6 +18,7 @@ import {
   parseDiscovery,
   parseExpansion,
   slugify,
+  TaxonomyParseError,
   type ConfusionCase,
 } from '@/core/hybrid/prompts';
 import { seededRandom, stratifiedSample } from '@/core/hybrid/sampling';
@@ -118,13 +119,40 @@ let session: Session | null = null;
  * Chave própria, ou a do servidor com cota restante. Com o status ainda desconhecido, deixa
  * tentar: quem decide a cota é o servidor.
  */
+/** O Jev do servidor gasta uma classificação da cota do dispositivo, como a descoberta. */
+export function canUseFreeJev(config: HybridConfig): boolean {
+  if (config.jev.apiKey.trim()) return true;
+  const status = useFreeTier.getState().status;
+  return status === null || (status.jev.available && status.hybrid.remaining > 0);
+}
+
 export function canUseGenerative(config: HybridConfig): boolean {
   if (config.generative.apiKey.trim()) return true;
   const status = useFreeTier.getState().status;
   return status === null || (status.deepseek.available && status.hybrid.remaining > 0);
 }
 
+/**
+ * Base grande demais para as chaves do servidor: o Jev cobra por documento (10 mil
+ * documentos custaram ~30 milhões de tokens). Quem usa só chaves próprias não tem teto.
+ */
+export function freeDocsLimitError(config: HybridConfig, docCount: number, usesGenerative: boolean): string | null {
+  const max = useFreeTier.getState().status?.freeMaxDocs;
+  const usesServerKey = !config.jev.apiKey.trim() || (usesGenerative && !config.generative.apiKey.trim());
+  if (!max || !usesServerKey || docCount <= max) return null;
+  return pt()
+    ? `A classificação gratuita vale para bases de até ${max.toLocaleString('pt-BR')} documentos (esta tem ${docCount.toLocaleString('pt-BR')}). Informe suas próprias chaves do DeepSeek e do Jev nas configurações.`
+    : `Free classification is limited to datasets of up to ${max.toLocaleString('en')} documents (this one has ${docCount.toLocaleString('en')}). Set your own DeepSeek and Jev keys in the settings.`;
+}
+
+function freeRunsExhaustedMessage(): string {
+  return pt()
+    ? 'As classificações gratuitas deste dispositivo acabaram. Informe suas próprias chaves do DeepSeek e do Jev nas configurações.'
+    : 'The free classifications on this device are used up. Set your own DeepSeek and Jev keys in the settings.';
+}
+
 function describeError(cause: unknown): string {
+  if (cause instanceof TaxonomyParseError && !pt()) return cause.en;
   return cause instanceof Error ? cause.message : String(cause);
 }
 
@@ -158,11 +186,14 @@ function sanitizeDraft(categories: readonly HybridCategory[], otherName: string)
     const name = category.name.replace(/\s+/g, ' ').trim().slice(0, 60);
     if (!name) continue;
     const key = name.toLowerCase();
-    if (key === otherName.toLowerCase() || key === 'other' || key === 'outro' || key === 'outros') {
+    if (
+      key === otherName.toLowerCase() ||
+      ['other', 'others', 'outro', 'outros', 'unclassified', 'não classificado', 'nao classificado'].includes(key)
+    ) {
       throw new Error(
         pt()
-          ? `"${name}" é reservado para a categoria "outros", que já é incluída automaticamente.`
-          : `"${name}" is reserved for the "other" category, which is added automatically.`,
+          ? `"${name}" não pode ser uma categoria: documentos que não se encaixam em nenhuma ficam como "Não classificado".`
+          : `"${name}" cannot be a category: documents that fit none of them are left as "Unclassified".`,
       );
     }
     if (taken.has(key)) {
@@ -208,7 +239,12 @@ export const useHybrid = create<HybridState>((set, get) => {
       docs,
       concurrency,
       async (doc) => {
-        const response = await jevEvaluate(buildJevRequest(doc, question, jev.model), jev.apiKey, target.controller.signal);
+        const response = await jevEvaluate(
+          buildJevRequest(doc, question, jev.model),
+          jev.apiKey,
+          target.controller.signal,
+          jev.apiKey.trim() ? {} : freeTierHeaders(target.unit, target.locale),
+        );
         target.usage.classifierInputTokens += response.usage?.input_tokens ?? 0;
         target.usage.classifierRequests += 1;
         if (response.model) target.classifierModel = response.model;
@@ -237,10 +273,30 @@ export const useHybrid = create<HybridState>((set, get) => {
     return result.text;
   }
 
+  /**
+   * Sem chave própria do Jev, a execução precisa ser aberta no servidor: ele confere o
+   * tamanho da base, desconta da cota de classificações (a mesma unidade da descoberta
+   * gratuita, então não conta duas vezes) e dá ao Jev um orçamento de chamadas.
+   */
+  async function openFreeRun(target: Session): Promise<void> {
+    if (target.config.jev.apiKey.trim()) return;
+    const response = await fetch('/api/hybrid/runs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...freeTierHeaders(target.unit, target.locale) },
+      body: JSON.stringify({ docCount: target.docs.length }),
+      signal: target.controller.signal,
+    });
+    if (!response.ok) {
+      const body = (await response.json().catch(() => ({}))) as { error?: { message?: string } };
+      throw new Error(body.error?.message ?? `HTTP ${response.status}`);
+    }
+  }
+
   /** Etapas 4 a 7: validação, classificação da base, expansão e aplicação. */
   async function classifyAndApply(target: Session): Promise<void> {
     const { config, otherName } = target;
     const isEn = !pt();
+    await openFreeRun(target);
     let categories = currentCategories(target);
     const validation: ValidationRound[] = [];
 
@@ -436,6 +492,9 @@ export const useHybrid = create<HybridState>((set, get) => {
       await runGuarded(target, async () => {
         const isEn = !pt();
         const { config } = target;
+        const tooLarge = freeDocsLimitError(config, target.docs.length, true);
+        if (tooLarge) throw new Error(tooLarge);
+        if (!canUseFreeJev(config)) throw new Error(freeRunsExhaustedMessage());
         if (!canUseGenerative(config)) {
           throw new Error(
             isEn
@@ -508,6 +567,14 @@ export const useHybrid = create<HybridState>((set, get) => {
     startManual() {
       const dataset = useDataset.getState().active;
       if (!dataset || dataset.length === 0) return;
+      const manualConfig = useHybridConfig.getState().config;
+      const tooLarge =
+        freeDocsLimitError(manualConfig, dataset.length, false) ??
+        (canUseFreeJev(manualConfig) ? null : freeRunsExhaustedMessage());
+      if (tooLarge) {
+        set({ stage: 'error', error: tooLarge, draft: null, progress: null });
+        return;
+      }
       const target = newSession(dataset);
       session = target;
       const blank = (): HybridCategory => ({ id: '', name: '', what: '', notFor: '', examples: [] });

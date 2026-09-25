@@ -11,7 +11,8 @@ import { applyThemes, fallbackThemeName } from '@/core/theme-assignment';
 import { buildSearchOptions, type SearchOptions } from '@/core/search';
 import { labelCluster } from '@/lib/ai-client';
 import { DEMO_FILES } from '@/lib/demo';
-import type { DatabaseName } from '@/lib/schema';
+import { useLocale } from './locale.store';
+import { MAX_DOCUMENTS, type DatabaseName } from '@/lib/schema';
 import type { Dataset, DuplicateRecord, WorkerProgress } from '@/lib/types';
 import {
   getAiWorker,
@@ -71,7 +72,9 @@ interface DatasetState {
   snaProgress: WorkerProgress | null;
   error: string | null;
 
-  loadFiles: (files: UploadedFile[]) => Promise<void>;
+  /** `append` soma os arquivos à base atual (e refaz a deduplicação que estava valendo);
+   * `replace` descarta a base atual. */
+  loadFiles: (files: UploadedFile[], mode?: 'replace' | 'append') => Promise<void>;
   loadDemo: () => Promise<void>;
   applyDedup: (strategy: DedupStrategy, threshold?: number) => Promise<void>;
   computeOverview: () => Promise<void>;
@@ -103,6 +106,11 @@ function describeError(cause: unknown): string {
   return cause instanceof Error ? cause.message : String(cause);
 }
 
+/** Mensagem no idioma da interface. As fases de progresso ficam em português: a tela traduz. */
+function tr(pt: string, en: string): string {
+  return useLocale.getState().locale === 'en' ? en : pt;
+}
+
 export const useDataset = create<DatasetState>()(subscribeWithSelector((set, get) => ({
   original: null,
   active: null,
@@ -118,15 +126,26 @@ export const useDataset = create<DatasetState>()(subscribeWithSelector((set, get
   snaProgress: null,
   error: null,
 
-  async loadFiles(files) {
+  async loadFiles(files, mode = 'replace') {
     set({ isIngesting: true, progress: { phase: 'Lendo arquivos', ratio: 0 }, error: null });
+    const previous = get();
+    const append = mode === 'append' && previous.original !== null;
+    let redo: { strategy: DedupStrategy; threshold: number | null } | null = null;
 
     try {
       const worker = getIngestWorker();
-      const dataset = await worker.ingest(
+      const incoming = await worker.ingest(
         files,
         proxyProgress((update: WorkerProgress) => set({ progress: update })),
       );
+      // Somar à base é o mesmo que ter enviado todos os arquivos juntos: a ingestão só
+      // concatena os documentos de cada arquivo. O teto de documentos continua valendo.
+      const dataset = append
+        ? [...(previous.original ?? []), ...incoming].slice(0, MAX_DOCUMENTS)
+        : incoming;
+      if (append && previous.dedupStrategy !== 'none') {
+        redo = { strategy: previous.dedupStrategy, threshold: previous.dedupThreshold };
+      }
 
       set({
         original: dataset,
@@ -134,7 +153,10 @@ export const useDataset = create<DatasetState>()(subscribeWithSelector((set, get
         duplicates: [],
         dedupStrategy: 'none',
         dedupThreshold: null,
-        sourceFiles: files.map(({ name, database }) => ({ name, database })),
+        sourceFiles: [
+          ...(append ? previous.sourceFiles : []),
+          ...files.map(({ name, database }) => ({ name, database })),
+        ],
         ...DERIVED_RESET,
         searchOptions: buildSearchOptions(dataset),
       });
@@ -143,6 +165,9 @@ export const useDataset = create<DatasetState>()(subscribeWithSelector((set, get
     } finally {
       set({ isIngesting: false, progress: null });
     }
+
+    // A deduplicação escolhida para a base antiga vale também para os documentos novos.
+    if (redo) await get().applyDedup(redo.strategy, redo.threshold ?? undefined);
   },
 
   async loadDemo() {
@@ -156,7 +181,9 @@ export const useDataset = create<DatasetState>()(subscribeWithSelector((set, get
       const sources: RisSource[] = await Promise.all(
         DEMO_FILES.map(async ({ name, database }) => {
           const response = await fetch(`${import.meta.env.BASE_URL}demo/${name}`);
-          if (!response.ok) throw new Error(`Falha ao carregar ${name}: HTTP ${response.status}`);
+          if (!response.ok) {
+            throw new Error(tr(`Falha ao carregar ${name}: HTTP ${response.status}`, `Failed to load ${name}: HTTP ${response.status}`));
+          }
           const text = await response.text();
           downloaded += 1;
           set({
@@ -330,7 +357,12 @@ export const useDataset = create<DatasetState>()(subscribeWithSelector((set, get
       );
 
       if (!result) {
-        set({ error: 'A base é pequena demais para identificar agrupamentos temáticos.' });
+        set({
+          error: tr(
+            'A base é pequena demais para identificar agrupamentos temáticos.',
+            'The dataset is too small to identify thematic clusters.',
+          ),
+        });
         return;
       }
 
@@ -352,12 +384,12 @@ export const useDataset = create<DatasetState>()(subscribeWithSelector((set, get
             topTerms: cluster.topTerms,
           }));
         } catch {
-          names.set(cluster.clusterId, fallbackThemeName(cluster));
+          names.set(cluster.clusterId, fallbackThemeName(cluster, useLocale.getState().locale));
           failures += 1;
         }
       }
 
-      const themed = applyThemes(active, result.assignments, names);
+      const themed = applyThemes(active, result.assignments, names, useLocale.getState().locale);
 
       set({
         active: themed,
@@ -366,7 +398,10 @@ export const useDataset = create<DatasetState>()(subscribeWithSelector((set, get
         searchOptions: buildSearchOptions(themed),
         error:
           failures > 0
-            ? `${failures} de ${result.clusters.length} temas ficaram sem nome da IA e receberam rótulo automático a partir dos termos característicos.`
+            ? tr(
+                `${failures} de ${result.clusters.length} temas ficaram sem nome da IA e receberam rótulo automático a partir dos termos característicos.`,
+                `${failures} of ${result.clusters.length} themes got no AI name and were labeled automatically from their characteristic terms.`,
+              )
             : null,
       });
     } catch (cause) {

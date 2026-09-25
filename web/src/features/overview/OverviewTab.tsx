@@ -39,6 +39,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import type { ProductionCategory, ProductionSeries } from '@/core/viz/production-timeline';
+import { numberLocale } from '@/lib/i18n/labels';
 import type { Dataset, MetadataCompleteness, SearchEntityType } from '@/lib/types';
 import { identityKey, useAsyncResult } from '@/lib/use-async-result';
 import { useStickyValue } from '@/lib/use-sticky-value';
@@ -76,6 +77,14 @@ const STATUS_VARIANT: Record<MetadataCompleteness['status'], 'success' | 'defaul
   Ruim: 'destructive',
 };
 
+/** O status é calculado em português (core/summary.ts); a tela mostra no idioma escolhido. */
+const STATUS_LABEL = {
+  Excelente: 'meta_status_excellent',
+  Bom: 'meta_status_good',
+  Aceitável: 'meta_status_acceptable',
+  Ruim: 'meta_status_poor',
+} as const satisfies Record<MetadataCompleteness['status'], string>;
+
 export default function OverviewTab() {
   const active = useDataset((state) => state.active);
   // Após deduplicar ou mapear temas, as análises voltam a `null` até o worker
@@ -95,6 +104,9 @@ export default function OverviewTab() {
   const isIngesting = useDataset((state) => state.isIngesting);
   const busy = isDeduplicating || isIngesting;
   const t = useLocale((state) => state.t);
+  const locale = useLocale((state) => state.locale);
+  const isEn = locale === 'en';
+  const nf = numberLocale(locale);
 
   const [selectedStrategy, setSelectedStrategy] = useState<DedupStrategy>(dedupStrategy);
 
@@ -152,7 +164,12 @@ export default function OverviewTab() {
           <div className="w-72 sm:w-80">
             <Select
               value={selectedStrategy}
-              onValueChange={(val) => setSelectedStrategy(val as DedupStrategy)}
+              onValueChange={(val) => {
+                const strategy = val as DedupStrategy;
+                setSelectedStrategy(strategy);
+                // "Base completa" não tem o que executar: escolhê-la já desfaz a deduplicação.
+                if (strategy === 'none' && dedupStrategy !== 'none') void applyDedup('none');
+              }}
               disabled={busy}
             >
               <SelectTrigger className="h-9" aria-label={t('dedup_strategy_aria')}>
@@ -167,20 +184,22 @@ export default function OverviewTab() {
             </Select>
           </div>
 
-          <Button
-            size="sm"
-            disabled={busy}
-            onClick={() => void applyDedup(selectedStrategy)}
-            className="cursor-pointer"
-          >
-            {t('dedup_execute_btn')}
-          </Button>
+          {selectedStrategy !== 'none' && (
+            <Button
+              size="sm"
+              disabled={busy}
+              onClick={() => void applyDedup(selectedStrategy)}
+              className="cursor-pointer"
+            >
+              {t('dedup_execute_btn')}
+            </Button>
+          )}
 
           {dedupStrategy !== 'none' && <Badge variant="blue">{dedupLabels[dedupStrategy]}</Badge>}
 
           {duplicates.length > 0 && (
             <Badge variant="warning">
-              {duplicates.length.toLocaleString('pt-BR')} {t('dedup_removed')}
+              {duplicates.length.toLocaleString(nf)} {t('dedup_removed')}
             </Badge>
           )}
         </div>
@@ -189,15 +208,19 @@ export default function OverviewTab() {
         <Collapse open={duplicates.length > 0} delayOpen={false}>
             <div className="space-y-3 pt-2">
               <SectionTitle
-                title="Relatório de documentos excluídos"
-                info="Cada linha indica o documento removido e qual foi mantido em seu lugar."
+                title={isEn ? 'Removed documents report' : 'Relatório de documentos excluídos'}
+                info={
+                  isEn
+                    ? 'Each row shows the removed document and the one kept in its place.'
+                    : 'Cada linha indica o documento removido e qual foi mantido em seu lugar.'
+                }
               />
               <div className="max-h-96 overflow-auto border">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Documento removido</TableHead>
-                      <TableHead>Mantido no lugar</TableHead>
+                      <TableHead>{isEn ? 'Removed document' : 'Documento removido'}</TableHead>
+                      <TableHead>{isEn ? 'Kept in its place' : 'Mantido no lugar'}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -219,7 +242,8 @@ export default function OverviewTab() {
               </div>
               {shownDuplicates.length > 200 && (
                 <p className="eyebrow">
-                  Exibindo as 200 primeiras de {shownDuplicates.length.toLocaleString('pt-BR')}.
+                  {isEn ? 'Showing the first 200 of' : 'Exibindo as 200 primeiras de'}{' '}
+                  {shownDuplicates.length.toLocaleString(nf)}.
                 </p>
               )}
             </div>
@@ -274,7 +298,7 @@ export default function OverviewTab() {
           />
           <KpiCard
             title={t('kpi_growth')}
-            value={`${metrics.growthRate.toLocaleString('pt-BR')}%`}
+            value={`${metrics.growthRate.toLocaleString(nf)}%`}
             subtitle={t('kpi_growth_sub')}
             Icon={TrendingUp}
             tone="emerald"
@@ -289,14 +313,14 @@ export default function OverviewTab() {
           <KpiCard
             title={t('kpi_collab')}
             value={metrics.mcp}
-            subtitle={`${metrics.scp.toLocaleString('pt-BR')} ${t('kpi_collab_sub')}`}
+            subtitle={`${metrics.scp.toLocaleString(nf)} ${t('kpi_collab_sub')}`}
             Icon={Globe2}
             tone="indigo"
           />
           <KpiCard
             title={t('kpi_authors_doc')}
             value={metrics.coauthIndex}
-            subtitle={`${metrics.singleAuthorDocs.toLocaleString('pt-BR')} ${t('kpi_authors_doc_sub')}`}
+            subtitle={`${metrics.singleAuthorDocs.toLocaleString(nf)} ${t('kpi_authors_doc_sub')}`}
             Icon={CalendarRange}
             tone="purple"
           />
@@ -336,10 +360,10 @@ export default function OverviewTab() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Metadado</TableHead>
-                    <TableHead>Faltantes</TableHead>
+                    <TableHead>{t('meta_col_field')}</TableHead>
+                    <TableHead>{t('meta_col_missing')}</TableHead>
                     <TableHead>%</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>{t('meta_col_status')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -347,17 +371,17 @@ export default function OverviewTab() {
                     <TableRow key={row.field}>
                       <TableCell className="font-medium">{row.field}</TableCell>
                       <TableCell className="tabular-nums">
-                        {row.missing.toLocaleString('pt-BR')}
+                        {row.missing.toLocaleString(nf)}
                       </TableCell>
                       <TableCell className="tabular-nums">
-                        {row.missingPct.toLocaleString('pt-BR', {
+                        {row.missingPct.toLocaleString(nf, {
                           minimumFractionDigits: 1,
                           maximumFractionDigits: 1,
                         })}
                         %
                       </TableCell>
                       <TableCell>
-                        <Badge variant={STATUS_VARIANT[row.status]}>{row.status}</Badge>
+                        <Badge variant={STATUS_VARIANT[row.status]}>{t(STATUS_LABEL[row.status])}</Badge>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -394,6 +418,7 @@ export default function OverviewTab() {
  */
 function ProductionTimeline({ dataset }: { dataset: Dataset }) {
   const t = useLocale((state) => state.t);
+  const locale = useLocale((state) => state.locale);
   const hasThemes = useDataset((state) => state.clustering !== null || state.hybridRun !== null);
   const [category, setCategory] = useState<ProductionCategory>('Total');
   const [mode, setMode] = useState<ProductionChartMode>('bars-grouped');
@@ -460,7 +485,7 @@ function ProductionTimeline({ dataset }: { dataset: Dataset }) {
           )
         ) : (
           <TimeSeriesChart
-            exportName="producao-por-ano"
+            exportName={locale === 'en' ? 'production-per-year' : 'producao-por-ano'}
             mode={mode}
             xLabel={t('prod_axis_year')}
             yLabel={t('prod_axis_docs')}

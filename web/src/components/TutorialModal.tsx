@@ -729,8 +729,8 @@ function TutorialStepPreview({
   if (type === 'kpis') {
     const kpis = [
       { Icon: BookOpen, label: 'Docs', value: '973' },
-      { Icon: Users, label: isEn ? 'Authors' : 'Autores', value: '1.630' },
-      { Icon: TrendingUp, label: isEn ? 'Growth' : 'Crescimento', value: '6,82%' },
+      { Icon: Users, label: isEn ? 'Authors' : 'Autores', value: isEn ? '1,630' : '1.630' },
+      { Icon: TrendingUp, label: isEn ? 'Growth' : 'Crescimento', value: isEn ? '6.82%' : '6,82%' },
       { Icon: Award, label: isEn ? 'h-index' : 'Índice h', value: '38' },
     ];
     return (

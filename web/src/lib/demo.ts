@@ -1,5 +1,6 @@
 import type { RisSource } from '@/core/parsers';
 import type { Dataset } from '@/lib/types';
+import { useLocale } from '@/state/locale.store';
 import { getIngestWorker } from '@/workers/client';
 
 /**
@@ -21,7 +22,11 @@ export async function loadDemoDataset(): Promise<Dataset> {
     DEMO_FILES.map(async ({ name, database }) => {
       const response = await fetch(`${import.meta.env.BASE_URL}demo/${name}`);
       if (!response.ok) {
-        throw new Error(`Falha ao carregar ${name}: HTTP ${response.status}`);
+        throw new Error(
+          useLocale.getState().locale === 'en'
+            ? `Failed to load ${name}: HTTP ${response.status}`
+            : `Falha ao carregar ${name}: HTTP ${response.status}`,
+        );
       }
       return { name, database, text: await response.text() };
     }),

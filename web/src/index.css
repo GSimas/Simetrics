@@ -309,6 +309,13 @@
   body {
     overflow-x: clip;
   }
+  /* Selects e diálogos do Radix travam a rolagem com `overflow: hidden` no body, o que o
+     torna contêiner de rolagem: o cabeçalho `sticky` passa a grudar no topo do body (já
+     rolado para cima) e some. `clip` não cria contêiner; a rolagem continua travada pelos
+     ouvintes de roda e toque do próprio Radix. */
+  html body[data-scroll-locked] {
+    overflow: clip !important;
+  }
   html.dark {
     color-scheme: dark;
   }

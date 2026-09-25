@@ -107,6 +107,7 @@ function ScatterChart(props: ScatterChartProps) {
     className,
   } = props;
   const t = useLocale((state) => state.t);
+  const locale = useLocale((state) => state.locale);
   const clipId = useId().replace(/:/g, '');
   const svgRef = useRef<SVGSVGElement>(null);
   const [containerRef, width] = useElementWidth<HTMLDivElement>();
@@ -136,7 +137,7 @@ function ScatterChart(props: ScatterChartProps) {
   );
 
   const yTicks = hideYAxis ? [] : linearTicks(domain.y[0], domain.y[1], 6);
-  const tickWidth = hideYAxis ? 0 : Math.max(...yTicks.map((value) => measureText(formatTick(value), 11, FONT_MONO)), 10);
+  const tickWidth = hideYAxis ? 0 : Math.max(...yTicks.map((value) => measureText(formatTick(value, locale), 11, FONT_MONO)), 10);
   const colorBarSpace = colorScale ? 78 : 0;
 
   const area: PlotArea = {
@@ -274,7 +275,7 @@ function ScatterChart(props: ScatterChartProps) {
             <g key={`y${value}`}>
               <line x1={area.left} x2={area.left + area.width} y1={sy(value)} y2={sy(value)} stroke="var(--border)" strokeWidth={0.6} />
               <text x={area.left - 8} y={sy(value)} dy="0.32em" textAnchor="end">
-                {formatTick(value)}
+                {formatTick(value, locale)}
               </text>
             </g>
           ))}
@@ -282,7 +283,7 @@ function ScatterChart(props: ScatterChartProps) {
             <g key={`x${value}`}>
               <line x1={sx(value)} x2={sx(value)} y1={area.top} y2={area.top + area.height} stroke="var(--border)" strokeWidth={0.6} />
               <text x={sx(value)} y={area.top + area.height + 18} textAnchor="middle">
-                {integerX ? String(value) : formatTick(value)}
+                {integerX ? String(value) : formatTick(value, locale)}
               </text>
             </g>
           ))}
@@ -435,10 +436,10 @@ function ScatterChart(props: ScatterChartProps) {
           <g transform={`translate(${area.left + area.width + 20} ${area.top})`} fontFamily={FONT_MONO} fontSize={10}>
             <rect width={12} height={area.height * 0.6} fill={`url(#${gradientId})`} rx={2} />
             <text x={18} y={8} fill="var(--muted-foreground)">
-              {formatNumber(colorScale.max, 0)}
+              {formatNumber(colorScale.max, 0, locale)}
             </text>
             <text x={18} y={area.height * 0.6} fill="var(--muted-foreground)">
-              {formatNumber(colorScale.min, 0)}
+              {formatNumber(colorScale.min, 0, locale)}
             </text>
             <text
               transform={`translate(-6 ${area.height * 0.3}) rotate(-90)`}

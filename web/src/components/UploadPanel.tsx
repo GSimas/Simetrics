@@ -5,6 +5,14 @@ import { Collapse } from '@/components/Collapse';
 import { SectionTitle } from '@/components/InfoTip';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
 import {
   Select,
@@ -14,6 +22,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { suggestDatabase, type UploadedFile } from '@/core/parsers';
+import { numberLocale } from '@/lib/i18n/labels';
+import { localizeProgress } from '@/lib/i18n/progress';
 import { DATABASES, MAX_DOCUMENTS, type DatabaseName } from '@/lib/schema';
 import { useStickyValue } from '@/lib/use-sticky-value';
 import { useDataset } from '@/state/dataset.store';
@@ -29,6 +39,7 @@ interface PendingFile {
 export function UploadPanel() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState<PendingFile[]>([]);
+  const [askMerge, setAskMerge] = useState(false);
 
   const loadFiles = useDataset((state) => state.loadFiles);
   const loadDemo = useDataset((state) => state.loadDemo);
@@ -39,9 +50,11 @@ export function UploadPanel() {
   const error = useDataset((state) => state.error);
   const active = useDataset((state) => state.active);
   const t = useLocale((state) => state.t);
+  const locale = useLocale((state) => state.locale);
 
   const busy = isIngesting || isDeduplicating;
-  const shownProgress = useStickyValue(progress).value;
+  const stickyProgress = useStickyValue(progress).value;
+  const shownProgress = stickyProgress && localizeProgress(stickyProgress, locale);
   const shownError = useStickyValue(error).value;
   const shownPending = useStickyValue(pending.length > 0 ? pending : null).value ?? [];
 
@@ -52,7 +65,8 @@ export function UploadPanel() {
     );
   };
 
-  const handleProcess = async (): Promise<void> => {
+  const handleProcess = async (mode: 'replace' | 'append'): Promise<void> => {
+    setAskMerge(false);
     const uploads: UploadedFile[] = await Promise.all(
       pending.map(async ({ file, database }) => ({
         name: file.name,
@@ -61,7 +75,7 @@ export function UploadPanel() {
       })),
     );
 
-    await loadFiles(uploads);
+    await loadFiles(uploads, mode);
     setPending([]);
     if (inputRef.current) inputRef.current.value = '';
   };
@@ -71,7 +85,7 @@ export function UploadPanel() {
       <CardHeader className="pb-3">
         <SectionTitle
           title={t('upload_title')}
-          info={t('upload_description').replace('10.000', MAX_DOCUMENTS.toLocaleString('pt-BR'))}
+          info={t('upload_description').replace(/10[.,]000/, MAX_DOCUMENTS.toLocaleString(numberLocale(locale)))}
         />
       </CardHeader>
 
@@ -103,7 +117,7 @@ export function UploadPanel() {
             <>
               <span className="eyebrow inline-flex items-center gap-2 px-1 text-foreground">
                 <span className="size-1.5 rounded-full bg-highlight shadow-[0_0_10px_var(--highlight)]" />
-                {active.length.toLocaleString('pt-BR')} {t('upload_loaded_count')}
+                {active.length.toLocaleString(numberLocale(locale))} {t('upload_loaded_count')}
               </span>
               <Button
                 variant="ghost"
@@ -163,7 +177,7 @@ export function UploadPanel() {
 
               <Button
                 variant="gradient"
-                onClick={() => void handleProcess()}
+                onClick={() => (active ? setAskMerge(true) : void handleProcess('replace'))}
                 disabled={busy}
                 className="w-full font-semibold shadow-xs"
               >
@@ -201,6 +215,28 @@ export function UploadPanel() {
           </Collapse>
         </div>
       </CardContent>
+
+      <Dialog open={askMerge} onOpenChange={setAskMerge}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t('upload_merge_title')}</DialogTitle>
+            <DialogDescription>
+              {t('upload_merge_desc').replace('{count}', (active?.length ?? 0).toLocaleString(numberLocale(locale)))}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="ghost" onClick={() => setAskMerge(false)} className="cursor-pointer">
+              {t('upload_merge_cancel')}
+            </Button>
+            <Button variant="outline" onClick={() => void handleProcess('replace')} className="cursor-pointer">
+              {t('upload_merge_replace')}
+            </Button>
+            <Button variant="gradient" onClick={() => void handleProcess('append')} className="cursor-pointer">
+              {t('upload_merge_append')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

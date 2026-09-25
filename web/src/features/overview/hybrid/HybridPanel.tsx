@@ -9,10 +9,11 @@ import { Progress } from '@/components/ui/progress';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { hybridMethodsText } from '@/core/hybrid/report';
 import type { HybridRun } from '@/core/hybrid/types';
+import { localizeProgress } from '@/lib/i18n/progress';
 import { useDataset } from '@/state/dataset.store';
 import { useFreeTier } from '@/state/free-tier.store';
 import { useHybridConfig } from '@/state/hybrid-config.store';
-import { useHybrid } from '@/state/hybrid.store';
+import { freeDocsLimitError, useHybrid } from '@/state/hybrid.store';
 import { useLocale } from '@/state/locale.store';
 import { HYBRID_COPY, type HybridCopy } from './copy';
 import { HybridSettingsModal } from './HybridSettingsModal';
@@ -164,18 +165,28 @@ export function HybridPanel() {
   const config = useHybridConfig((state) => state.config);
   const hybridRun = useDataset((state) => state.hybridRun);
   const kmeansBusy = useDataset((state) => state.isCategorizingThemes);
-  const { stage, progress, draft, draftSupport, isManual, error, start, startManual, updateDraft, confirm, cancel, dismiss } =
+  const { stage, progress: rawProgress, draft, draftSupport, isManual, error, start, startManual, updateDraft, confirm, cancel, dismiss } =
     useHybrid();
+  // As fases do k-means chegam do worker em português; as do fluxo híbrido já vêm no idioma.
+  const progress = rawProgress && localizeProgress(rawProgress, locale);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [focus, setFocus] = useState('');
 
   const freeStatus = useFreeTier((state) => state.status);
   const ownGenerative = Boolean(config.generative.apiKey.trim());
   const ownJev = Boolean(config.jev.apiKey.trim());
-  const freeDiscovery = freeStatus?.deepseek.available && freeStatus.hybrid.limit > 0 ? freeStatus.hybrid : null;
+  // Uma só cota de classificações para o DeepSeek e o Jev do servidor.
+  const freeQuota = freeStatus && freeStatus.hybrid.limit > 0 ? freeStatus.hybrid : null;
+  const missingGenerative = !ownGenerative && freeStatus !== null && !freeStatus.deepseek.available;
   // Status ainda desconhecido: deixa tentar, o servidor decide.
-  const canDiscover = ownGenerative || freeStatus === null || (freeDiscovery !== null && freeDiscovery.remaining > 0);
-  const jevAvailable = ownJev || freeStatus?.jev.available !== false;
+  const canDiscover =
+    ownGenerative || freeStatus === null || (!missingGenerative && freeQuota !== null && freeQuota.remaining > 0);
+  // O Jev do servidor também gasta uma classificação da cota do dispositivo.
+  const jevAvailable = ownJev || freeStatus === null || (freeStatus.jev.available && freeStatus.hybrid.remaining > 0);
+  const docCount = useDataset((state) => state.active?.length ?? 0);
+  const maxDocs = (freeStatus?.freeMaxDocs ?? 0).toLocaleString(locale === 'pt' ? 'pt-BR' : 'en');
+  const discoverTooLarge = freeDocsLimitError(config, docCount, true);
+  const manualTooLarge = freeDocsLimitError(config, docCount, false);
   const fill = (text: string, quota: { remaining: number; limit: number }) =>
     text.replace('{remaining}', String(quota.remaining)).replace('{limit}', String(quota.limit));
   const running = stage === 'running';
@@ -216,19 +227,24 @@ export function HybridPanel() {
 
       {(stage === 'idle' || stage === 'done' || stage === 'error') && (
         <div className="space-y-3">
-          {!ownGenerative && freeStatus && (
-            <p className={freeDiscovery?.remaining ? 'text-xs text-muted-foreground' : 'text-xs text-amber-800 dark:text-amber-300'}>
-              {!freeDiscovery
+          {(!ownGenerative || !ownJev) && freeStatus && (
+            <p className={freeQuota?.remaining && !missingGenerative ? 'text-xs text-muted-foreground' : 'text-xs text-amber-800 dark:text-amber-300'}>
+              {missingGenerative
                 ? copy.missingGenerative
-                : freeDiscovery.remaining > 0
-                  ? fill(copy.freeDiscovery, freeDiscovery)
-                  : fill(copy.freeDiscoveryExhausted, freeDiscovery)}
+                : !freeQuota
+                  ? copy.missingJev
+                  : freeQuota.remaining > 0
+                    ? fill(copy.freeDiscovery, freeQuota)
+                    : fill(copy.freeDiscoveryExhausted, freeQuota)}
             </p>
           )}
           {!ownJev && freeStatus && (
             <p className={freeStatus.jev.available ? 'text-xs text-muted-foreground' : 'text-xs text-amber-800 dark:text-amber-300'}>
-              {freeStatus.jev.available ? copy.jevFree : copy.missingJev}
+              {freeStatus.jev.available ? copy.jevFree.replace('{max}', maxDocs) : copy.missingJev}
             </p>
+          )}
+          {discoverTooLarge && stage !== 'error' && (
+            <p className="text-xs text-amber-800 dark:text-amber-300">{discoverTooLarge}</p>
           )}
           <div className="space-y-1">
             <Label htmlFor="hybrid-focus" className="text-xs">{copy.focusLabel}</Label>
@@ -242,11 +258,11 @@ export function HybridPanel() {
             />
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button type="button" onClick={() => void start(focus)} disabled={!canDiscover || !jevAvailable || kmeansBusy}>
+            <Button type="button" onClick={() => void start(focus)} disabled={!canDiscover || !jevAvailable || kmeansBusy || Boolean(discoverTooLarge)}>
               <Layers aria-hidden />
               {copy.discover}
             </Button>
-            <Button type="button" variant="outline" onClick={startManual} disabled={!jevAvailable || kmeansBusy}>
+            <Button type="button" variant="outline" onClick={startManual} disabled={!jevAvailable || kmeansBusy || Boolean(manualTooLarge)}>
               <ListChecks aria-hidden />
               {copy.manual}
             </Button>

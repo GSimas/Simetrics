@@ -152,8 +152,12 @@ ${docs.map(describeDoc).join('\n\n')}`,
 // ---------------------------------------------------------------------------------------
 // Leitura das respostas
 
+/** Resposta de modelo ilegível. Módulo puro: leva as duas línguas e a tela escolhe (`en`). */
 export class TaxonomyParseError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    readonly en: string = message,
+  ) {
     super(message);
     this.name = 'TaxonomyParseError';
   }
@@ -163,16 +167,16 @@ export class TaxonomyParseError extends Error {
 export function extractJson(raw: string): Record<string, unknown> {
   const start = raw.indexOf('{');
   const end = raw.lastIndexOf('}');
-  if (start < 0 || end <= start) throw new TaxonomyParseError('O modelo não devolveu um objeto JSON.');
+  if (start < 0 || end <= start) throw new TaxonomyParseError('O modelo não devolveu um objeto JSON.', 'The model did not return a JSON object.');
   try {
     const parsed: unknown = JSON.parse(raw.slice(start, end + 1));
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-      throw new TaxonomyParseError('O JSON devolvido não é um objeto.');
+      throw new TaxonomyParseError('O JSON devolvido não é um objeto.', 'The returned JSON is not an object.');
     }
     return parsed as Record<string, unknown>;
   } catch (cause) {
     if (cause instanceof TaxonomyParseError) throw cause;
-    throw new TaxonomyParseError('O JSON devolvido pelo modelo está malformado.');
+    throw new TaxonomyParseError('O JSON devolvido pelo modelo está malformado.', 'The JSON returned by the model is malformed.');
   }
 }
 
@@ -310,7 +314,10 @@ export function parseDiscovery(
     options.maxCategories,
   );
   if (categories.length < 2) {
-    throw new TaxonomyParseError('O modelo propôs menos de duas categorias válidas.');
+    throw new TaxonomyParseError(
+      'O modelo propôs menos de duas categorias válidas.',
+      'The model proposed fewer than two valid categories.',
+    );
   }
   return { categories, labels: parseAssignments(json['assignments'], docs, categories, options.otherName) };
 }

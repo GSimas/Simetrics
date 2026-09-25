@@ -1,10 +1,13 @@
 import { useMemo, useRef, useState } from 'react';
 
+import { ChartSearch } from '@/components/charts/ChartSearch';
+import { matchKeys } from '@/components/charts/chart-search';
 import { ExpandChartButton } from '@/components/charts/ExpandChartButton';
 import { ExportImageButton } from '@/components/charts/ExportImageButton';
 import { useSvgZoom, ZoomControls } from '@/components/charts/svg-zoom';
 import { chordLayout } from '@/core/graph/chord';
 import { imageFromSvgElement } from '@/lib/export-image';
+import { numberLocale } from '@/lib/i18n/labels';
 import { cn } from '@/lib/utils';
 import { useLocale } from '@/state/locale.store';
 import { withChartBoundary } from '@/components/with-chart-boundary';
@@ -16,7 +19,7 @@ import { withChartBoundary } from '@/components/with-chart-boundary';
  * SVG próprio porque o Sigma não gira rótulos ao longo do raio nem desenha cordas curvas. Passar o mouse sobre um nó mostra suas ligações; o primeiro clique fixa
  * o destaque, o segundo no mesmo nó chama `onNodeClick` (abrir o perfil no Motor de
  * Busca). Clicar no fundo desfaz o destaque. Roda do mouse ou botões aproximam; arrastar
- * move o diagrama.
+ * move o diagrama. A busca destaca os nós cujo rótulo contém o texto digitado.
  */
 export interface RadialNode {
   key: string;
@@ -59,12 +62,16 @@ function truncate(text: string): string {
 }
 
 function RadialGraph(props: RadialGraphProps) {
-  const { nodes, edges, weightLabel, legend, onNodeClick, exportName = 'grafo-radial', className, expanded } = props;
+  const { nodes, edges, weightLabel, legend, onNodeClick, className, expanded } = props;
   const t = useLocale((state) => state.t);
+  const locale = useLocale((state) => state.locale);
+  const exportName = props.exportName ?? (locale === 'en' ? 'radial-graph' : 'grafo-radial');
   const svgRef = useRef<SVGSVGElement>(null);
   const zoom = useSvgZoom(svgRef, SIZE, SIZE);
   const [hovered, setHovered] = useState<string | null>(null);
   const [chosen, setSelected] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const matches = useMemo(() => matchKeys(nodes, query, (node) => node.key, (node) => node.label), [nodes, query]);
   // Com outros dados (outro tipo de rede), um nó escolhido antes pode não existir mais.
   const selected = chosen !== null && nodes.some((node) => node.key === chosen) ? chosen : null;
   // O destaque fixo (clique) tem prioridade sobre o de passagem (hover).
@@ -122,14 +129,15 @@ function RadialGraph(props: RadialGraphProps) {
   }, [nodes, edges]);
 
   const neighbours = useMemo(() => {
-    if (!focus) return null;
+    // Sem nó em foco, a busca decide o destaque.
+    if (!focus) return matches && matches.size > 0 ? matches : null;
     const keys = new Set([focus]);
     for (const edge of edges) {
       if (edge.source === focus) keys.add(edge.target);
       if (edge.target === focus) keys.add(edge.source);
     }
     return keys;
-  }, [focus, edges]);
+  }, [focus, edges, matches]);
 
   const hoveredNode = focus ? layout.placed.find((item) => item.key === focus) : undefined;
   const hoveredDegree = neighbours ? neighbours.size - 1 : 0;
@@ -137,6 +145,7 @@ function RadialGraph(props: RadialGraphProps) {
 
   return (
     <div className={cn('space-y-3', className)}>
+      <ChartSearch value={query} onChange={setQuery} found={matches?.size ?? null} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         {legend && legend.length > 0 ? (
           <div className="flex flex-wrap gap-x-4 gap-y-1.5">
@@ -168,7 +177,7 @@ function RadialGraph(props: RadialGraphProps) {
           <div className="pointer-events-none absolute left-3 top-3 z-10 max-w-xs border border-border bg-popover/95 p-3 text-xs shadow-lg animate-in fade-in-0">
             <p className="mb-1 font-semibold break-words">{hoveredNode.node.label}</p>
             <p className="text-muted-foreground">
-              <span className="tabular-nums text-foreground">{hoveredNode.node.weight.toLocaleString('pt-BR')}</span>{' '}
+              <span className="tabular-nums text-foreground">{hoveredNode.node.weight.toLocaleString(numberLocale(locale))}</span>{' '}
               {weightLabel} ·{' '}
               <span className="tabular-nums text-foreground">{hoveredDegree}</span> {t('radial_links')}
             </p>
@@ -197,14 +206,16 @@ function RadialGraph(props: RadialGraphProps) {
           <g style={zoom.style}>
           <g fill="none">
             {layout.chords.map((chord) => {
-              const active = !focus || chord.source === focus || chord.target === focus;
+              const active = focus
+                ? chord.source === focus || chord.target === focus
+                : !neighbours || neighbours.has(chord.source) || neighbours.has(chord.target);
               return (
                 <path
                   key={`${chord.source}→${chord.target}`}
                   d={chord.d}
                   stroke={chord.color}
                   strokeWidth={chord.width / zoom.k}
-                  strokeOpacity={focus ? (active ? 0.85 : 0.04) : 0.28}
+                  strokeOpacity={neighbours ? (active ? 0.85 : 0.04) : 0.28}
                   className="transition-[stroke-opacity] duration-200"
                 />
               );
@@ -236,7 +247,7 @@ function RadialGraph(props: RadialGraphProps) {
                   cy={item.py}
                   r={r}
                   fill={item.node.color}
-                  stroke={selected === item.key ? 'var(--foreground)' : 'none'}
+                  stroke={selected === item.key || matches?.has(item.key) ? 'var(--foreground)' : 'none'}
                   strokeWidth={2 / zoom.k}
                 />
                 <text
@@ -246,7 +257,7 @@ function RadialGraph(props: RadialGraphProps) {
                   textAnchor={flip ? 'end' : 'start'}
                   fontSize={layout.fontSize}
                   fill="var(--foreground)"
-                  fontWeight={focus === item.key ? 700 : 500}
+                  fontWeight={focus === item.key || matches?.has(item.key) ? 700 : 500}
                 >
                   {truncate(item.node.label)}
                 </text>

@@ -1,14 +1,17 @@
 import { useMemo, useRef, useState } from 'react';
-import { geoGraticule10, geoNaturalEarth1, geoPath, type GeoPermissibleObjects } from 'd3-geo';
+import { geoCentroid, geoGraticule10, geoNaturalEarth1, geoPath, type GeoPermissibleObjects } from 'd3-geo';
 import { feature } from 'topojson-client';
 import type { Feature, FeatureCollection, Geometry } from 'geojson';
 import type { GeometryCollection, Topology } from 'topojson-specification';
 import world from 'world-atlas/countries-110m.json';
 
+import { ChartSearch } from '@/components/charts/ChartSearch';
+import { matchKeys } from '@/components/charts/chart-search';
 import { ExpandChartButton } from '@/components/charts/ExpandChartButton';
 import { ExportImageButton } from '@/components/charts/ExportImageButton';
 import { useSvgZoom, ZoomControls } from '@/components/charts/svg-zoom';
 import { imageFromSvgElement } from '@/lib/export-image';
+import { numberLocale } from '@/lib/i18n/labels';
 import { cn } from '@/lib/utils';
 import { useLocale } from '@/state/locale.store';
 import { withChartBoundary } from '@/components/with-chart-boundary';
@@ -19,7 +22,8 @@ import { withChartBoundary } from '@/components/with-chart-boundary';
  * Países preenchidos pela produção, colaborações como arcos curvos entre os países e um
  * marcador por país. Primeiro clique num país fixa o destaque — ele, os parceiros e as
  * linhas entre eles —; segundo clique no mesmo país chama `onOpenProfile`. Clicar no
- * oceano desfaz o destaque. Roda do mouse ou botões aproximam; arrastar move o mapa.
+ * oceano desfaz o destaque. Roda do mouse ou botões aproximam; arrastar move o mapa. A
+ * busca destaca os países cujo nome contém o texto digitado.
  */
 export interface WorldMapNode {
   key: string;
@@ -74,6 +78,16 @@ const COUNTRY_PATHS = COUNTRIES.map((country) => ({
   name: country.properties.name,
   d: path(country as GeoPermissibleObjects) ?? '',
 }));
+/**
+ * Centro de cada país no mapa, para quem não está na tabela de coordenadas da rede
+ * (core/viz/collaboration.ts): sem ponto, a ligação com o parceiro não era desenhada.
+ */
+const COUNTRY_CENTROIDS = new Map(
+  COUNTRIES.map((country) => [
+    country.properties.name.toLowerCase(),
+    projection(geoCentroid(country as GeoPermissibleObjects)) ?? null,
+  ]),
+);
 
 /**
  * Nome como vem das bases → nome no world-atlas. Só as divergências; o resto casa
@@ -116,12 +130,16 @@ const normalize = (name: string): string => {
 };
 
 function WorldMap(props: WorldMapProps) {
-  const { nodes, edges, focus, onOpenProfile, exportName = 'mapa-mundi', className, expanded } = props;
+  const { nodes, edges, focus, onOpenProfile, className, expanded } = props;
   const t = useLocale((state) => state.t);
+  const locale = useLocale((state) => state.locale);
+  const exportName = props.exportName ?? (locale === 'en' ? 'world-map' : 'mapa-mundi');
   const svgRef = useRef<SVGSVGElement>(null);
   const zoom = useSvgZoom(svgRef, WIDTH, HEIGHT);
   const [hovered, setHovered] = useState<string | null>(null);
   const [chosen, setChosen] = useState<string | null>(focus ?? null);
+  const [query, setQuery] = useState('');
+  const matches = useMemo(() => matchKeys(nodes, query, (node) => node.key, (node) => node.label), [nodes, query]);
 
   const data = useMemo(() => {
     const byName = new Map<string, WorldMapNode>();
@@ -133,12 +151,15 @@ function WorldMap(props: WorldMapProps) {
     const maxEdge = Math.max(...edges.map((edge) => edge.documents), 1);
 
     const points = new Map(
-      nodes
-        .filter((node) => node.latitude !== null && node.longitude !== null)
-        .map((node) => {
-          const [x, y] = projection([node.longitude!, node.latitude!]) ?? [0, 0];
-          return [node.key, { node, x, y, r: 2.5 + Math.sqrt(node.documents / maxDocuments) * 9 }];
-        }),
+      nodes.flatMap((node) => {
+        const point =
+          node.latitude !== null && node.longitude !== null
+            ? projection([node.longitude, node.latitude])
+            : (COUNTRY_CENTROIDS.get(normalize(node.label)) ?? COUNTRY_CENTROIDS.get(normalize(node.key)));
+        if (!point) return [];
+        const [x, y] = point;
+        return [[node.key, { node, x, y, r: 2.5 + Math.sqrt(node.documents / maxDocuments) * 9 }] as const];
+      }),
     );
 
     const arcs = edges.flatMap((edge) => {
@@ -171,14 +192,15 @@ function WorldMap(props: WorldMapProps) {
   const active = selected ?? hovered;
 
   const partners = useMemo(() => {
-    if (!active) return null;
+    // Sem país em foco, a busca decide o destaque.
+    if (!active) return matches && matches.size > 0 ? matches : null;
     const keys = new Set([active]);
     for (const edge of edges) {
       if (edge.source === active) keys.add(edge.target);
       if (edge.target === active) keys.add(edge.source);
     }
     return keys;
-  }, [active, edges]);
+  }, [active, edges, matches]);
 
   const handleClick = (key: string): void => {
     if (selected === key) onOpenProfile?.(key);
@@ -189,7 +211,9 @@ function WorldMap(props: WorldMapProps) {
 
   return (
     <div className={cn('space-y-3', className)}>
-      <div className="flex justify-end gap-1.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <ChartSearch value={query} onChange={setQuery} found={matches?.size ?? null} />
+        <div className="flex gap-1.5">
         {!expanded && (
           <ExpandChartButton>
             <WorldMap {...props} focus={selected ?? focus} expanded />
@@ -199,6 +223,7 @@ function WorldMap(props: WorldMapProps) {
           filename={exportName}
           getImage={() => (svgRef.current ? imageFromSvgElement(svgRef.current) : null)}
         />
+        </div>
       </div>
 
       <div className="relative overflow-hidden border border-border">
@@ -206,7 +231,7 @@ function WorldMap(props: WorldMapProps) {
           <div className="pointer-events-none absolute left-3 top-3 z-10 max-w-xs border border-border bg-popover/95 p-3 text-xs shadow-lg animate-in fade-in-0">
             <p className="mb-1 font-semibold">{activeNode.label}</p>
             <p className="text-muted-foreground">
-              <span className="tabular-nums text-foreground">{activeNode.documents.toLocaleString('pt-BR')}</span>{' '}
+              <span className="tabular-nums text-foreground">{activeNode.documents.toLocaleString(numberLocale(locale))}</span>{' '}
               {t('radial_documents')} ·{' '}
               <span className="tabular-nums text-foreground">{(partners?.size ?? 1) - 1}</span> {t('map_partners')}
             </p>
@@ -256,7 +281,9 @@ function WorldMap(props: WorldMapProps) {
 
           <g fill="none" pointerEvents="none">
             {data.arcs.map((arc) => {
-              const on = !active || arc.source === active || arc.target === active;
+              const on = active
+                ? arc.source === active || arc.target === active
+                : !partners || partners.has(arc.source) || partners.has(arc.target);
               return (
                 <path
                   key={`${arc.source}→${arc.target}`}
@@ -264,7 +291,7 @@ function WorldMap(props: WorldMapProps) {
                   stroke="var(--cyan)"
                   strokeWidth={arc.width / zoom.k}
                   strokeLinecap="round"
-                  strokeOpacity={active ? (on ? 0.9 : 0.04) : 0.35}
+                  strokeOpacity={partners ? (on ? 0.9 : 0.04) : 0.35}
                   className="transition-[stroke-opacity] duration-300"
                 />
               );
@@ -284,8 +311,8 @@ function WorldMap(props: WorldMapProps) {
                   r={r / Math.sqrt(zoom.k)}
                   fill="var(--highlight)"
                   fillOpacity={related ? 0.9 : 0.15}
-                  stroke={selected === node.key ? 'var(--foreground)' : 'var(--background)'}
-                  strokeWidth={(selected === node.key ? 2 : 1) / zoom.k}
+                  stroke={selected === node.key || matches?.has(node.key) ? 'var(--foreground)' : 'var(--background)'}
+                  strokeWidth={(selected === node.key || matches?.has(node.key) ? 2 : 1) / zoom.k}
                   className={cn('transition-[fill-opacity] duration-300', onOpenProfile && 'cursor-pointer')}
                   onMouseEnter={() => setHovered(node.key)}
                   onMouseLeave={() => setHovered(null)}

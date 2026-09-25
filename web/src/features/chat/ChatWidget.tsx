@@ -244,7 +244,7 @@ export function ChatWidget() {
                   onClick={clearChat}
                   className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
                   title={isEn ? 'Clear history' : 'Limpar conversa'}
-                  aria-label="Limpar conversa"
+                  aria-label={isEn ? 'Clear history' : 'Limpar conversa'}
                 >
                   <Trash2 className="size-4" />
                 </button>
@@ -255,7 +255,7 @@ export function ChatWidget() {
                 onClick={() => setIsOpen(false)}
                 className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 title={isEn ? 'Minimize' : 'Minimizar'}
-                aria-label="Fechar"
+                aria-label={isEn ? 'Close' : 'Fechar'}
               >
                 <X className="size-4" />
               </button>
@@ -389,7 +389,7 @@ export function ChatWidget() {
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
                 placeholder={t('chat_placeholder')}
-                aria-label="Pergunta para a Simi"
+                aria-label={isEn ? 'Question for Simi' : 'Pergunta para a Simi'}
                 disabled={streaming || !active}
                 className="h-9 rounded-lg text-xs"
               />

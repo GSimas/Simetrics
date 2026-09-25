@@ -1,5 +1,5 @@
 import type { JevRequestBody, JevResponseBody } from '@/core/hybrid/jev-request';
-import { AiError } from './ai-client';
+import { AiError, localized } from './ai-client';
 
 /**
  * Cliente do Jev (TypeSafe).
@@ -41,13 +41,14 @@ function backoff(attempt: number, response?: Response): number {
 
 async function readError(response: Response): Promise<string> {
   const body = (await response.json().catch(() => ({}))) as {
-    error?: string;
+    error?: string | { message?: string };
     detail?: { message?: string } | string | { msg?: string }[];
   };
   if (typeof body.error === 'string') return body.error;
+  if (typeof body.error?.message === 'string') return body.error.message;
   if (typeof body.detail === 'string') return body.detail;
   if (Array.isArray(body.detail)) return body.detail.map((item) => item.msg).filter(Boolean).join('; ');
-  return body.detail?.message ?? `Jev: erro HTTP ${response.status}`;
+  return body.detail?.message ?? localized(`Jev: erro HTTP ${response.status}`, `Jev: HTTP error ${response.status}`);
 }
 
 /**
@@ -58,8 +59,9 @@ export async function jevEvaluate(
   body: JevRequestBody | Record<string, unknown>,
   apiKey: string,
   signal?: AbortSignal,
+  extraHeaders: Record<string, string> = {},
 ): Promise<JevResponseBody> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...extraHeaders };
   if (apiKey.trim()) headers['Authorization'] = `Bearer ${apiKey.trim()}`;
   const payload = JSON.stringify(body);
 
@@ -75,12 +77,15 @@ export async function jevEvaluate(
 
     if (response.ok) return (await response.json()) as JevResponseBody;
 
-    const transient = response.status === 429 || response.status === 529 || response.status >= 500;
+    // Orçamento gratuito esgotado também chega como 429, mas não adianta tentar de novo.
+    const quotaExhausted = response.headers.has('x-free-limit');
+    const transient = !quotaExhausted && (response.status === 429 || response.status === 529 || response.status >= 500);
     if (!transient || attempt >= MAX_ATTEMPTS) {
       const message = await readError(response);
-      // O Jev responde 403 (não 401) para chave ausente; o proxy responde 401.
-      const keyProblem = response.status === 401 || response.status === 403;
-      throw new AiError(keyProblem ? `Chave do Jev inválida ou ausente (${message}).` : message);
+      // O Jev responde 403 (não 401) para chave ausente; o proxy responde 401. Sem chave
+      // própria, o 403 é do proxy (execução não aberta) e a mensagem já diz isso.
+      const keyProblem = apiKey.trim() !== '' && (response.status === 401 || response.status === 403);
+      throw new AiError(keyProblem ? localized(`Chave do Jev inválida ou ausente (${message}).`, `Invalid or missing Jev key (${message}).`) : message);
     }
     await wait(backoff(attempt, response), signal);
   }

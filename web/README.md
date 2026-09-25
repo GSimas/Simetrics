@@ -41,9 +41,10 @@ variáveis com esse prefixo são embutidas no bundle do cliente e a chave vazari
 | Variável | Para quê |
 |---|---|
 | `DEEPSEEK_API_KEY` | Simi gratuita, descoberta de categorias gratuita e nome dos temas sem chave própria |
-| `TYPESAFE_API_KEY` | Jev, livre para todos na classificação híbrida |
+| `TYPESAFE_API_KEY` | Jev, grátis na classificação híbrida para bases de até `HYBRID_FREE_MAX_DOCS` |
 | `SIMI_FREE_QUESTIONS` | Perguntas gratuitas do Simi por dispositivo (padrão 10) |
 | `HYBRID_FREE_RUNS` | Classificações híbridas gratuitas por dispositivo (padrão 3) |
+| `HYBRID_FREE_MAX_DOCS` | Maior base (documentos) que usa o DeepSeek e o Jev do servidor; acima, só com chaves próprias (padrão 1000) |
 | `*_IP_DAILY_LIMIT`, `QUOTA_SALT` | Tetos diários por IP e sal dos hashes — ver `.env.example` |
 
 **Sobre o "por dispositivo".** O dispositivo é um identificador aleatório guardado no

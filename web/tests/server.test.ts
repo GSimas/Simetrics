@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { readServerEnv } from '../server/env';
-import { handleApi, type ApiContext } from '../server/handlers';
+import { handleApi, jevCallBudget, type ApiContext } from '../server/handlers';
 import { consume, MemoryQuotaStore, refund, type QuotaPolicy } from '../server/quota';
 
 const DEVICE = '11111111-2222-3333-4444-555555555555';
@@ -20,6 +20,14 @@ function chat(unit: string, device = DEVICE): Request {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Simetrics-Device': device, 'X-Simetrics-Unit': unit },
     body: JSON.stringify({ model: 'anything', messages: [{ role: 'user', content: 'oi' }], max_tokens: 999999, stream: true }),
+  });
+}
+
+function openRun(unit: string, docCount: number): Request {
+  return new Request('http://localhost/api/hybrid/runs', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Simetrics-Device': DEVICE, 'X-Simetrics-Unit': unit },
+    body: JSON.stringify({ docCount }),
   });
 }
 
@@ -77,6 +85,7 @@ describe('api handlers', () => {
       jev: { available: true },
       simi: { limit: 10, used: 0, remaining: 10 },
       hybrid: { limit: 3, used: 0, remaining: 3 },
+      freeMaxDocs: 1000,
     });
   });
 
@@ -98,6 +107,28 @@ describe('api handlers', () => {
     const body = JSON.parse(String(init.body));
     expect(body.model).toBe('deepseek-flash');
     expect(body.max_tokens).toBe(8192);
+    expect(body.thinking).toBeUndefined();
+  });
+
+  it('forwards only a valid thinking switch', async () => {
+    const fetchMock = vi.fn(async () => new Response('{}', { headers: { 'content-type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+    const ctx = context();
+    const send = (thinking: unknown, unit: string) =>
+      handleApi(
+        new Request('http://localhost/api/hybrid/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Simetrics-Device': DEVICE, 'X-Simetrics-Unit': unit },
+          body: JSON.stringify({ messages: [{ role: 'user', content: 'oi' }], thinking }),
+        }),
+        ctx,
+      );
+    const sent = (call: number) => JSON.parse(String((fetchMock.mock.calls[call] as unknown as [string, RequestInit])[1].body));
+
+    await send({ type: 'disabled', budget: 1e9 }, 'unit-aaaa');
+    expect(sent(0).thinking).toEqual({ type: 'disabled' });
+    await send({ type: 'max' }, 'unit-bbbb');
+    expect(sent(1).thinking).toBeUndefined();
   });
 
   it('stops after the free questions with a 429 in the OpenAI error format', async () => {
@@ -117,21 +148,83 @@ describe('api handlers', () => {
     expect(response!.status).toBe(503);
   });
 
-  it('forwards Jev calls with the server key and without Origin', async () => {
+  it('forwards Jev calls with the server key and without Origin, only inside an open run', async () => {
     const fetchMock = vi.fn(async () => new Response('{"answers":{}}', { headers: { 'content-type': 'application/json' } }));
     vi.stubGlobal('fetch', fetchMock);
-    const response = await handleApi(
-      new Request('http://localhost/api/jev/systemone', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Origin: 'http://localhost:5173' },
-        body: JSON.stringify({ state: 'x', model: 'jev-latest', questions: { q: { type: 'noul', instructions: 'x?' } } }),
-      }),
-      context(),
-    );
-    expect(response!.status).toBe(200);
+    const ctx = context();
+    const jev = (unit: string) =>
+      handleApi(
+        new Request('http://localhost/api/jev/systemone', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Origin: 'http://localhost:5173',
+            'X-Simetrics-Device': DEVICE,
+            'X-Simetrics-Unit': unit,
+          },
+          body: JSON.stringify({ state: 'x', model: 'jev-latest', questions: { q: { type: 'noul', instructions: 'x?' } } }),
+        }),
+        ctx,
+      );
+
+    expect((await jev('unit-aaaa'))!.status).toBe(403);
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    expect((await handleApi(openRun('unit-aaaa', 10), ctx))!.status).toBe(200);
+    expect((await jev('unit-aaaa'))!.status).toBe(200);
     const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     const headers = init.headers as Record<string, string>;
     expect(headers['Authorization']).toBe('Bearer ts-test');
     expect(headers['Origin']).toBeUndefined();
+  });
+
+  it('refuses free runs above the document cap and stops Jev at the run budget', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { headers: { 'content-type': 'application/json' } })));
+    const ctx = context({ HYBRID_FREE_MAX_DOCS: '1000' });
+    expect((await handleApi(openRun('unit-bbbb', 1001), ctx))!.status).toBe(413);
+    expect((await handleApi(openRun('unit-bbbb', 1), ctx))!.status).toBe(200);
+
+    const budget = jevCallBudget(1);
+    const call = () =>
+      handleApi(
+        new Request('http://localhost/api/jev/systemone', {
+          method: 'POST',
+          headers: { 'X-Simetrics-Device': DEVICE, 'X-Simetrics-Unit': 'unit-bbbb' },
+          body: JSON.stringify({ questions: { q: {} } }),
+        }),
+        ctx,
+      );
+    for (let i = 0; i < budget; i += 1) expect((await call())!.status).toBe(200);
+    const over = await call();
+    expect(over!.status).toBe(429);
+    expect(over!.headers.get('X-Free-Limit')).toBe(String(budget));
+
+    // Reabrir a mesma execução conta como a mesma classificação e não zera o orçamento.
+    expect((await handleApi(openRun('unit-bbbb', 1), ctx))!.status).toBe(200);
+    expect((await call())!.status).toBe(429);
+  });
+
+  it('answers fixed error messages in English when the client asks for it', async () => {
+    const bad = (locale: string) =>
+      handleApi(
+        new Request('http://localhost/api/hybrid/runs', {
+          method: 'POST',
+          headers: { 'X-Simetrics-Locale': locale },
+          body: 'not json',
+        }),
+        context(),
+      );
+    expect(((await (await bad('en'))!.json()) as { error: { message: string } }).error.message).toBe(
+      'The request body is not valid JSON.',
+    );
+    expect(((await (await bad('pt'))!.json()) as { error: { message: string } }).error.message).toBe(
+      'Corpo da requisição não é um JSON válido.',
+    );
+  });
+
+  it('counts free runs against the per-device classification quota', async () => {
+    const ctx = context({ HYBRID_FREE_RUNS: '1' });
+    expect((await handleApi(openRun('unit-cccc', 5), ctx))!.status).toBe(200);
+    expect((await handleApi(openRun('unit-dddd', 5), ctx))!.status).toBe(429);
   });
 });

@@ -33,6 +33,7 @@ import {
   DEFAULT_MODELS,
   PROVIDER_MODELS,
   PROVIDER_OPTIONS,
+  modelBadgeLabel,
   useAiConfig,
   type AiConfig,
   type AiProvider,
@@ -147,7 +148,7 @@ export function AiSettingsModal({ open, onOpenChange }: AiSettingsModalProps) {
                 <SelectContent>
                   {PROVIDER_OPTIONS.map((opt) => (
                     <SelectItem key={opt.id} value={opt.id}>
-                      {opt.label}
+                      {(isEn && opt.labelEn) || opt.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -176,7 +177,7 @@ export function AiSettingsModal({ open, onOpenChange }: AiSettingsModalProps) {
                   type={showKey ? 'text' : 'password'}
                   value={form.apiKey}
                   onChange={(e) => setForm((prev) => ({ ...prev, apiKey: e.target.value }))}
-                  placeholder={selectedProviderOption.placeholder}
+                  placeholder={(isEn && selectedProviderOption.placeholderEn) || selectedProviderOption.placeholder}
                   className="pr-10 h-10 font-mono text-xs rounded-xl"
                 />
                 <button
@@ -212,7 +213,7 @@ export function AiSettingsModal({ open, onOpenChange }: AiSettingsModalProps) {
                           <span>{opt.name}</span>
                           {opt.badge && (
                             <span className="rounded bg-primary/10 px-1.5 py-0.2 text-[10px] font-semibold text-primary">
-                              {opt.badge}
+                              {modelBadgeLabel(opt.badge, locale)}
                             </span>
                           )}
                         </div>
@@ -237,7 +238,7 @@ export function AiSettingsModal({ open, onOpenChange }: AiSettingsModalProps) {
                     id="ai-custom-model"
                     value={form.model}
                     onChange={(e) => setForm((prev) => ({ ...prev, model: e.target.value }))}
-                    placeholder="ex: gemini-1.5-pro-exp-0827 / gpt-4.5-preview / deepseek-r1"
+                    placeholder={`${isEn ? 'e.g.' : 'ex:'} gemini-1.5-pro-exp-0827 / gpt-4.5-preview / deepseek-r1`}
                     className="h-9 font-mono text-xs rounded-xl"
                   />
                 </div>

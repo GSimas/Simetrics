@@ -27,6 +27,7 @@ const CONTEXT_SIZE = 40;
 export default function ChatTab() {
   const active = useDataset((state) => state.active);
   const t = useLocale((state) => state.t);
+  const locale = useLocale((state) => state.locale);
   const isAiConfigured = useAiConfig((state) => state.isConfigured());
 
   const [aiModalOpen, setAiModalOpen] = useState(false);
@@ -273,7 +274,7 @@ export default function ChatTab() {
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               placeholder={t('chat_placeholder')}
-              aria-label="Pergunta para a Simi"
+              aria-label={locale === 'en' ? 'Question for Simi' : 'Pergunta para a Simi'}
               disabled={streaming}
               className="rounded-lg shadow-2xs"
             />

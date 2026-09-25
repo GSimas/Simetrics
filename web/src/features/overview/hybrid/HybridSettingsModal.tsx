@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { chatJson } from '@/lib/deepseek-client';
 import { jevEvaluate } from '@/lib/jev-client';
+import { useFreeTier } from '@/state/free-tier.store';
 import { normalizeHybridConfig, useHybridConfig, type HybridConfig } from '@/state/hybrid-config.store';
 import { useLocale } from '@/state/locale.store';
 import { HYBRID_COPY } from './copy';
@@ -109,6 +110,7 @@ export function HybridSettingsModal({ open, onOpenChange }: HybridSettingsModalP
 function SettingsBody({ onClose }: { onClose: () => void }) {
   const locale = useLocale((state) => state.locale);
   const copy = HYBRID_COPY[locale];
+  const freeMaxDocs = useFreeTier((state) => state.status?.freeMaxDocs ?? 1000);
   const saved = useHybridConfig((state) => state.config);
   const setConfig = useHybridConfig((state) => state.setConfig);
   const clearKeys = useHybridConfig((state) => state.clearKeys);
@@ -222,7 +224,7 @@ function SettingsBody({ onClose }: { onClose: () => void }) {
                 placeholder="ts-..."
                 label={copy.showKey}
               />
-              <p className="text-[11px] text-muted-foreground">{copy.jevKeyHint}</p>
+              <p className="text-[11px] text-muted-foreground">{copy.jevKeyHint.replace('{max}', freeMaxDocs.toLocaleString(locale === 'pt' ? 'pt-BR' : 'en'))}</p>
             </div>
             <div className="space-y-1">
               <Label htmlFor="hybrid-jev-model" className="text-xs">{copy.model}</Label>
@@ -239,7 +241,7 @@ function SettingsBody({ onClose }: { onClose: () => void }) {
               type="button"
               variant="outline"
               size="sm"
-              disabled={jevTest.status === 'testing'}
+              disabled={jevTest.status === 'testing' || !form.jev.apiKey.trim()}
               onClick={() => void testJev()}
             >
               {jevTest.status === 'testing' ? <Loader2 className="animate-spin" aria-hidden /> : null}

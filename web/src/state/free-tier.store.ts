@@ -18,6 +18,8 @@ export interface ServerStatus {
   jev: { available: boolean };
   simi: FreeQuota;
   hybrid: FreeQuota;
+  /** Maior base (documentos) que pode usar o DeepSeek e o Jev do servidor. */
+  freeMaxDocs: number;
 }
 
 interface FreeTierState {

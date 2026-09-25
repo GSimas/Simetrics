@@ -28,6 +28,7 @@ import { hybridReportRows, hybridReportTitle } from '@/core/hybrid/report-rows';
 import type { Dataset } from '@/lib/types';
 import { FIELD, FIELD_CANDIDATES } from '@/lib/schema';
 import { collectColumns, pickColumn, toNumeric } from '@/core/text';
+import { localizeMetricText } from '@/core/graph/metrics';
 import type { ReportSectionsSelection } from './pdf-generator';
 import {
   BRAND,
@@ -468,7 +469,7 @@ export async function generateDocxReport({
         const share = dataset.length > 0 ? (c.size / dataset.length) * 100 : 0;
         return [
           String(c.clusterId + 1),
-          `Tema ${c.clusterId + 1}`,
+          `${isEn ? 'Theme' : 'Tema'} ${c.clusterId + 1}`,
           c.size.toLocaleString(isEn ? 'en-US' : 'pt-BR'),
           `${share.toFixed(1)}%`,
           c.topTerms.slice(0, 6).join(', '),
@@ -558,7 +559,7 @@ export async function generateDocxReport({
         [
           [isEn ? 'Topology Metric' : 'Métrica Topológica', isEn ? 'Value' : 'Valor', isEn ? 'Topology Metric' : 'Métrica Topológica', isEn ? 'Value' : 'Valor'],
           [isEn ? 'Density' : 'Densidade', formatVal(g.density, 4), isEn ? 'Avg Clustering' : 'Clustering Médio', formatVal(g.clustering, 4)],
-          [isEn ? 'Shannon Entropy' : 'Entropia de Shannon', formatVal(g.entropy, 3), isEn ? 'Global Efficiency' : 'Eficiência Global', formatVal(g.efficiency, 4)],
+          [isEn ? 'Shannon Entropy' : 'Entropia de Shannon', formatVal(g.entropy, 3), isEn ? 'Global Efficiency' : 'Eficiência Global', formatVal(localizeMetricText(g.efficiency, locale), 4)],
           [isEn ? 'Mean Degree' : 'Grau Médio', formatVal(g.meanDegree, 2), isEn ? 'Degree Std Dev' : 'Desvio do Grau', formatVal(g.stdDegree, 2)],
           [isEn ? 'Mean PageRank' : 'PageRank Médio', formatVal(g.meanPageRank, 4), isEn ? 'Assortativity' : 'Assortatividade', formatVal(g.assortativity, 3)],
           [isEn ? 'Power Law Exponent' : 'Lei de Potência', formatVal(g.powerLawExponent, 2), isEn ? 'Degree×Betweenness' : 'Spearman Grau×Ponte', formatVal(g.spearmanDegreeBetweenness, 3)],
