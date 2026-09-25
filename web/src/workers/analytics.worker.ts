@@ -109,8 +109,8 @@ const api = {
   },
 
   /** Linha do tempo de citações diretas entre os documentos mais citados. */
-  historiograph(dataset: Dataset, topN: number): HistoriographData | null {
-    return historiograph(dataset, topN);
+  historiograph(dataset: Dataset, topN: number, locale: 'pt' | 'en' = 'pt'): HistoriographData | null {
+    return historiograph(dataset, topN, locale);
   },
 
   /** Mapa conceitual: termos projetados por PCA sobre sua coocorrência em documentos. */

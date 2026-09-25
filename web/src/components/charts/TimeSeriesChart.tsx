@@ -62,6 +62,7 @@ function TimeSeriesChart(props: TimeSeriesChartProps) {
     className,
   } = props;
   const t = useLocale((state) => state.t);
+  const locale = useLocale((state) => state.locale);
   const svgRef = useRef<SVGSVGElement>(null);
   const [containerRef, width] = useElementWidth<HTMLDivElement>();
   const { tooltip, show, hide } = useTooltip(containerRef);
@@ -115,7 +116,7 @@ function TimeSeriesChart(props: TimeSeriesChartProps) {
   );
   const [, yMax] = niceDomain(0, yMaxRaw, 5);
   const yTicks = linearTicks(0, yMax, 5);
-  const tickWidth = Math.max(...yTicks.map((value) => measureText(formatTick(value), 11, FONT_MONO)));
+  const tickWidth = Math.max(...yTicks.map((value) => measureText(formatTick(value, locale), 11, FONT_MONO)));
 
   const area: PlotArea = {
     left: Math.round(tickWidth + 40),
@@ -161,12 +162,12 @@ function TimeSeriesChart(props: TimeSeriesChartProps) {
       <>
         <p className="mb-1 font-semibold tabular-nums">{year}</p>
         {rows.slice(0, MAX_TIP_ROWS).map(({ entry, value }) => (
-          <TipRow key={entry.name} label={entry.name} value={formatNumber(value)} color={entry.color} />
+          <TipRow key={entry.name} label={entry.name} value={formatNumber(value, undefined, locale)} color={entry.color} />
         ))}
         {rows.length > MAX_TIP_ROWS && <p className="text-muted-foreground">+{rows.length - MAX_TIP_ROWS}</p>}
         {rows.length > 1 && (
           <p className="mt-1 border-t border-border pt-1 text-muted-foreground">
-            Total: <span className="tabular-nums text-foreground">{formatNumber(total)}</span> {unit}
+            Total: <span className="tabular-nums text-foreground">{formatNumber(total, undefined, locale)}</span> {unit}
           </p>
         )}
         {rows.length === 1 && unit && <p className="text-muted-foreground">{unit}</p>}
@@ -256,9 +257,9 @@ function TimeSeriesChart(props: TimeSeriesChartProps) {
       .replace('{count}', String(series.length))
       .replace('{from}', String(years[0]))
       .replace('{to}', String(years[years.length - 1]))} ${t('chart_summary_total')
-      .replace('{total}', formatNumber(total))
+      .replace('{total}', formatNumber(total, undefined, locale))
       .replace('{peak}', String(years[peak]))
-      .replace('{value}', formatNumber(totals[peak] ?? 0))}`;
+      .replace('{value}', formatNumber(totals[peak] ?? 0, undefined, locale))}`;
   })();
 
   return (
@@ -298,6 +299,19 @@ function TimeSeriesChart(props: TimeSeriesChartProps) {
           <SvgLegend layout={legend} x={12} y={4} onToggle={toggle} />
 
           <g fontFamily={FONT_MONO} fontSize={11} fill="var(--muted-foreground)" aria-hidden>
+            {/* Grade secundária: meio-passos no eixo y (sem rótulo, para não poluir o eixo)
+                e uma vertical por ano rotulado. */}
+            <g stroke="var(--muted-foreground)" strokeOpacity={0.22} strokeWidth={0.7} strokeDasharray="3 3">
+              {yTicks.slice(1).map((value, index) => {
+                const y = sy((value + (yTicks[index] as number)) / 2);
+                return <line key={`ym${value}`} x1={area.left} x2={area.left + area.width} y1={y} y2={y} />;
+              })}
+              {shownYears.map((year, index) =>
+                index % labelEvery === 0 ? (
+                  <line key={`xg${year}`} x1={cx(index)} x2={cx(index)} y1={area.top} y2={area.top + area.height} />
+                ) : null,
+              )}
+            </g>
             {yTicks.map((value) => (
               <g key={`y${value}`}>
                 <line
@@ -309,7 +323,7 @@ function TimeSeriesChart(props: TimeSeriesChartProps) {
                   strokeWidth={value === 0 ? 1 : 0.6}
                 />
                 <text x={area.left - 8} y={sy(value)} dy="0.32em" textAnchor="end">
-                  {formatTick(value)}
+                  {formatTick(value, locale)}
                 </text>
               </g>
             ))}

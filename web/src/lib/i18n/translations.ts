@@ -35,6 +35,12 @@ export const TRANSLATIONS = {
     upload_confirm_sources: 'Confirme a base de origem de cada arquivo',
     upload_process_btn: 'Processar e integrar',
     upload_processing: 'Processando...',
+    upload_merge_title: 'Já existe uma base carregada',
+    upload_merge_desc:
+      'Acrescentar soma os documentos dos novos arquivos aos {count} da análise atual (a deduplicação escolhida é refeita). Substituir descarta a análise atual.',
+    upload_merge_append: 'Acrescentar à análise',
+    upload_merge_replace: 'Substituir análise',
+    upload_merge_cancel: 'Cancelar',
 
     // Overview KPIs
     kpi_docs: 'Documentos',
@@ -81,7 +87,7 @@ export const TRANSLATIONS = {
     theme_ql_explanation:
       'O Quociente Locacional acima de 1 indica especialização: a entidade publica naquele tema mais do que a média da base. O desempate entre QLs iguais é pelo volume, para que uma entidade com um único documento no tema não lidere.',
     theme_no_key_warning:
-      'Chave de IA não configurada. Configure sua chave própria (Gemini, OpenAI, Claude, OpenRouter) para rotular os temas com IA ou use os rótulos automáticos.',
+      'Sem chave própria, os temas são nomeados pelo DeepSeek do Simetrics (ou, se indisponível, pelos termos característicos). Configure sua chave para usar outro modelo.',
 
     // Visual Analyses
     visual_title: 'Análises visuais avançadas',
@@ -143,6 +149,13 @@ export const TRANSLATIONS = {
     meta_quality_title: 'Qualidade e completude dos metadados',
     meta_quality_description:
       'Campos ausentes limitam o que a análise consegue enxergar — sem afiliação não há mapa de colaboração, sem referências não há rede de cocitação.',
+    meta_col_field: 'Metadado',
+    meta_col_missing: 'Faltantes',
+    meta_col_status: 'Status',
+    meta_status_excellent: 'Excelente',
+    meta_status_good: 'Bom',
+    meta_status_acceptable: 'Aceitável',
+    meta_status_poor: 'Ruim',
 
     // Deep-dive Entity Tables
     tables_title: 'Tabelas analíticas',
@@ -234,6 +247,11 @@ export const TRANSLATIONS = {
     chat_tools_badge: 'Cálculo determinístico no navegador',
     chat_no_key_warning:
       'Para conversar com a Simi, configure sua chave de API própria (BYOK) no botão acima.',
+    chat_free_remaining:
+      'Simi gratuita: restam {remaining} de {limit} perguntas neste dispositivo. Para uso ilimitado, configure sua própria chave de API.',
+    chat_free_exhausted:
+      'Você usou as {limit} perguntas gratuitas da Simi neste dispositivo. Configure sua própria chave de API para continuar.',
+    chat_free_subtitle: 'DeepSeek grátis · {remaining}/{limit}',
 
     // Feedback Tab
     feedback_title: 'Avaliação da Plataforma (SUS)',
@@ -491,6 +509,12 @@ export const TRANSLATIONS = {
     upload_confirm_sources: 'Confirm source database for each file',
     upload_process_btn: 'Process and integrate',
     upload_processing: 'Processing...',
+    upload_merge_title: 'A dataset is already loaded',
+    upload_merge_desc:
+      'Add appends the documents from the new files to the {count} in the current analysis (the chosen deduplication is redone). Replace discards the current analysis.',
+    upload_merge_append: 'Add to analysis',
+    upload_merge_replace: 'Replace analysis',
+    upload_merge_cancel: 'Cancel',
 
     // Overview KPIs
     kpi_docs: 'Documents',
@@ -537,7 +561,7 @@ export const TRANSLATIONS = {
     theme_ql_explanation:
       'A Locational Quotient (LQ) above 1 indicates specialization: the entity publishes in that theme more than the dataset average. Tiebreaks are resolved by volume.',
     theme_no_key_warning:
-      'AI API Key not configured. Configure your own key (Gemini, OpenAI, Claude, OpenRouter) to label themes with AI or use automatic labels.',
+      'Without your own key, themes are named by the Simetrics DeepSeek model (or, if unavailable, by their key terms). Set your key to use another model.',
 
     // Visual Analyses
     visual_title: 'Advanced Visual Analyses',
@@ -598,6 +622,13 @@ export const TRANSLATIONS = {
     meta_quality_title: 'Metadata Quality & Completeness',
     meta_quality_description:
       'Missing fields limit analysis scope — without affiliation there is no collaboration map, without references there is no co-citation network.',
+    meta_col_field: 'Field',
+    meta_col_missing: 'Missing',
+    meta_col_status: 'Status',
+    meta_status_excellent: 'Excellent',
+    meta_status_good: 'Good',
+    meta_status_acceptable: 'Acceptable',
+    meta_status_poor: 'Poor',
 
     // Deep-dive Entity Tables
     tables_title: 'Analytical Tables',
@@ -689,6 +720,11 @@ export const TRANSLATIONS = {
     chat_tools_badge: 'Deterministic in-browser calculation',
     chat_no_key_warning:
       'To chat with Simi, please configure your own API key (BYOK) using the button above.',
+    chat_free_remaining:
+      'Free Simi: {remaining} of {limit} questions left on this device. For unlimited use, set your own API key.',
+    chat_free_exhausted:
+      'You have used the {limit} free Simi questions on this device. Set your own API key to continue.',
+    chat_free_subtitle: 'Free DeepSeek · {remaining}/{limit}',
 
     // Feedback Tab
     feedback_title: 'Platform Usability Scale (SUS)',

@@ -16,6 +16,7 @@ function makeRecord(overrides: Partial<ProjectRecord> = {}): ProjectRecord {
     active: [{ TITLE: 'A' }] as ProjectRecord['active'],
     duplicates: [],
     clustering: null,
+    hybridRun: null,
     ...overrides,
   };
 }

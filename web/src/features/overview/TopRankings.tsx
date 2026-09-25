@@ -14,7 +14,8 @@ import type { EntityRow } from '@/core/tables';
 import { collectColumns, pickColumn, toNumeric } from '@/core/text';
 import { FIELD, FIELD_CANDIDATES } from '@/lib/schema';
 import type { Dataset, SearchEntityType } from '@/lib/types';
-import type { TranslationKey } from '@/lib/i18n/translations';
+import { numberLocale } from '@/lib/i18n/labels';
+import type { Locale, TranslationKey } from '@/lib/i18n/translations';
 import { useLocale } from '@/state/locale.store';
 import { openInSearch } from '@/state/navigation.store';
 import type { EntityTables } from '@/workers/analytics.worker';
@@ -83,8 +84,8 @@ function rankDocuments(dataset: Dataset): RankItem[] {
     .slice(0, TOP_N);
 }
 
-function formatValue(value: number, fractional: boolean): string {
-  return value.toLocaleString('pt-BR', {
+function formatValue(value: number, fractional: boolean, locale: Locale): string {
+  return value.toLocaleString(numberLocale(locale), {
     minimumFractionDigits: fractional ? 2 : 0,
     maximumFractionDigits: fractional ? 2 : 0,
   });
@@ -116,6 +117,7 @@ function RankingPanel({
   fixedMetricLabel,
 }: RankingPanelProps) {
   const t = useLocale((state) => state.t);
+  const locale = useLocale((state) => state.locale);
   const max = Math.max(...items.map((item) => item.value), 0);
   const fractional = metric !== undefined && FRACTIONAL.has(metric);
   const metricLabel = metric ? t(METRIC_LABEL[metric]) : (fixedMetricLabel ?? '');
@@ -129,7 +131,7 @@ function RankingPanel({
           items.map((item) => ({
             label: item.label,
             detail: item.detail,
-            value: formatValue(item.value, fractional),
+            value: formatValue(item.value, fractional, locale),
             ratio: max > 0 ? item.value / max : 0,
           })),
         );
@@ -190,7 +192,7 @@ function RankingPanel({
                   </span>
                 </span>
                 <span className="text-xs font-semibold tabular-nums sm:text-sm">
-                  {formatValue(item.value, fractional)}
+                  {formatValue(item.value, fractional, locale)}
                 </span>
               </button>
             </li>
@@ -215,6 +217,7 @@ export interface TopRankingsProps {
  */
 export function TopRankings({ dataset, tables, className, 'data-tour': tour }: TopRankingsProps) {
   const t = useLocale((state) => state.t);
+  const isEn = useLocale((state) => state.locale) === 'en';
   const [authorMetric, setAuthorMetric] = useState<Metric>('citSum');
   const [countryMetric, setCountryMetric] = useState<Metric>('citSum');
   const [venueMetric, setVenueMetric] = useState<Metric>('citSum');
@@ -235,7 +238,7 @@ export function TopRankings({ dataset, tables, className, 'data-tour': tour }: T
       <CardContent className="grid gap-4 lg:grid-cols-2">
         <RankingPanel
           id="top-authors"
-          exportName="top10-autores"
+          exportName={isEn ? 'top10-authors' : 'top10-autores'}
           title={t('top_authors')}
           items={authors}
           types={['Autor']}
@@ -245,7 +248,7 @@ export function TopRankings({ dataset, tables, className, 'data-tour': tour }: T
         />
         <RankingPanel
           id="top-documents"
-          exportName="top10-documentos"
+          exportName={isEn ? 'top10-documents' : 'top10-documentos'}
           title={t('top_documents')}
           items={documents}
           types={['Documento']}
@@ -253,7 +256,7 @@ export function TopRankings({ dataset, tables, className, 'data-tour': tour }: T
         />
         <RankingPanel
           id="top-countries"
-          exportName="top10-paises"
+          exportName={isEn ? 'top10-countries' : 'top10-paises'}
           title={t('top_countries')}
           items={countries}
           types={['País']}

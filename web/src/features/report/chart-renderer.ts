@@ -710,10 +710,27 @@ export function reportThemesChart(
 ): string {
   const items = clusters.map((c) => ({
     clusterId: c.clusterId,
-    name: `Tema ${c.clusterId + 1}`,
+    name: `${locale === 'en' ? 'Theme' : 'Tema'} ${c.clusterId + 1}`,
     docCount: c.size,
     share: totalDocs > 0 ? (c.size / totalDocs) * 100 : 0,
   }));
+  return renderThemesPieChart(items, { ...REPORT_CHART_SIZE.themes, locale });
+}
+
+/** Pizza de temas já nomeados — usada pela classificação híbrida, cujas categorias têm nome. */
+export function reportNamedThemesChart(
+  themes: readonly { name: string; documents: number }[],
+  totalDocs: number,
+  locale: ReportLocale,
+): string {
+  const items = themes
+    .filter((theme) => theme.documents > 0)
+    .map((theme, index) => ({
+      clusterId: index,
+      name: theme.name,
+      docCount: theme.documents,
+      share: totalDocs > 0 ? (theme.documents / totalDocs) * 100 : 0,
+    }));
   return renderThemesPieChart(items, { ...REPORT_CHART_SIZE.themes, locale });
 }
 

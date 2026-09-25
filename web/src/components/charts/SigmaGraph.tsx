@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Graph from 'graphology';
 import forceAtlas2 from 'graphology-layout-forceatlas2';
 import Sigma from 'sigma';
 
 import type { RenderEdge, RenderNode } from '@/core/graph';
 import { communityColor } from '@/features/overview/viz-shared';
+import { ChartSearch } from '@/components/charts/ChartSearch';
+import { matchKeys } from '@/components/charts/chart-search';
 import { ExpandChartButton, expandedHeight } from '@/components/charts/ExpandChartButton';
 import { ExportImageButton } from '@/components/charts/ExportImageButton';
 import type { ChartImage } from '@/lib/export-image';
@@ -17,7 +19,9 @@ import { withChartBoundary } from '@/components/with-chart-boundary';
  * Renderizador de rede com Sigma.js — substitui o `streamlit_agraph`.
  *
  * O Sigma desenha em WebGL, então milhares de nós continuam fluidos, ao contrário do
- * canvas do agraph.
+ * canvas do agraph. Primeiro clique num nó destaca ele e suas ligações; segundo clique no
+ * mesmo nó chama `onNodeClick` (perfil no Motor de Busca). Clicar no fundo desfaz. A busca
+ * destaca os nós cujo rótulo contém o texto digitado.
  */
 
 export interface SigmaGraphProps {
@@ -34,6 +38,12 @@ export interface SigmaGraphProps {
 }
 
 type Positions = Record<string, [number, number]>;
+
+/** Nós em destaque: o escolhido e seus vizinhos, ou os encontrados pela busca. */
+function emphasisOf(graph: Graph, selected: string | null, matches: Set<string> | null): Set<string> | null {
+  if (selected && graph.hasNode(selected)) return new Set([selected, ...graph.neighbors(selected)]);
+  return matches && matches.size > 0 ? matches : null;
+}
 
 /**
  * Cor das arestas: tinta sobre o papel no tema claro, papel sobre a tinta no escuro, com
@@ -117,12 +127,23 @@ function requestLayout(nodes: readonly RenderNode[], edges: readonly RenderEdge[
 }
 
 function SigmaGraph(props: SigmaGraphProps) {
-  const { nodes, edges, height = 560, className, onNodeClick, exportName = 'rede', expanded } = props;
+  const { nodes, edges, height = 560, className, onNodeClick, expanded } = props;
   const containerRef = useRef<HTMLDivElement>(null);
   const sigmaRef = useRef<Sigma | null>(null);
   const clickHandlerRef = useRef(onNodeClick);
   const [hovered, setHovered] = useState<RenderNode | null>(null);
+  const [chosen, setChosen] = useState<string | null>(null);
+  // Com outra rede (outro tipo, outro filtro), o nó escolhido pode não existir mais.
+  const selected = chosen !== null && nodes.some((node) => node.key === chosen) ? chosen : null;
+  const [query, setQuery] = useState('');
+  const matches = useMemo(() => matchKeys(nodes, query, (node) => node.key, (node) => node.label), [nodes, query]);
+  // Lidos pelos reducers do Sigma, que não enxergam o estado do React.
+  const selectedRef = useRef<string | null>(null);
+  const matchesRef = useRef<Set<string> | null>(null);
+  const emphasisRef = useRef<Set<string> | null>(null);
   const t = useLocale((state) => state.t);
+  const en = useLocale((state) => state.locale === 'en');
+  const exportName = props.exportName ?? (en ? 'network' : 'rede');
   const [layout, setLayout] = useState<{ nodes: readonly RenderNode[]; positions: Positions } | null>(null);
   const positions = layout?.nodes === nodes ? layout.positions : null;
   const [isDark, setIsDark] = useState<boolean>(() =>
@@ -170,6 +191,7 @@ function SigmaGraph(props: SigmaGraphProps) {
     // quase sólido e engoliam o texto claro do modo escuro.
     const labelBackground = isDark ? 'rgba(7, 17, 15, 0.82)' : 'rgba(247, 246, 241, 0.88)';
     const edgeColor = edgeColors(isDark).webgl;
+    const dimColor = isDark ? '#1f2a27' : '#dddbd3';
 
     // Posições já calculadas pelo ForceAtlas2 (no worker).
     nodes.forEach((node) => {
@@ -192,6 +214,7 @@ function SigmaGraph(props: SigmaGraphProps) {
       });
     }
 
+    emphasisRef.current = emphasisOf(graph, selectedRef.current, matchesRef.current);
     const renderer = new Sigma(graph, container, {
       renderLabels: true,
       labelDensity: 0.6,
@@ -217,6 +240,28 @@ function SigmaGraph(props: SigmaGraphProps) {
       },
       // O hover padrão do Sigma pinta uma caixa branca sob o rótulo — um clarão no tema
       // escuro. Aqui o nó ganha um anel no tom de destaque e o rótulo, um fundo do tema.
+      // Destaque: o nó escolhido e seus vizinhos, ou os nós encontrados pela busca. O resto
+      // fica apagado e sem rótulo; as arestas de fora somem.
+      nodeReducer: (node, data) => {
+        const emphasis = emphasisRef.current;
+        if (!emphasis) return data;
+        if (!emphasis.has(node)) return { ...data, color: dimColor, label: '', zIndex: 0 };
+        return {
+          ...data,
+          zIndex: 1,
+          forceLabel: emphasis.size <= 60,
+          highlighted: node === selectedRef.current || (matchesRef.current?.has(node) ?? false),
+        };
+      },
+      edgeReducer: (edge, data) => {
+        const emphasis = emphasisRef.current;
+        if (!emphasis) return data;
+        const [source, target] = graph.extremities(edge);
+        const focus = selectedRef.current;
+        const keep = focus ? source === focus || target === focus : emphasis.has(source) || emphasis.has(target);
+        return keep ? { ...data, zIndex: 1 } : { ...data, hidden: true };
+      },
+      zIndex: true,
       defaultDrawNodeHover: (context, data, settings) => {
         context.beginPath();
         context.arc(data.x, data.y, data.size + 3, 0, Math.PI * 2);
@@ -246,13 +291,27 @@ function SigmaGraph(props: SigmaGraphProps) {
       setHovered(null);
       container.style.cursor = '';
     });
-    renderer.on('clickNode', ({ node }) => clickHandlerRef.current?.(node));
+    renderer.on('clickNode', ({ node }) => {
+      if (selectedRef.current === node) clickHandlerRef.current?.(node);
+      else setChosen(node);
+    });
+    renderer.on('clickStage', () => setChosen(null));
 
     return () => {
       renderer.kill();
       sigmaRef.current = null;
     };
   }, [nodes, edges, isDark, positions]);
+
+  // Destaque mudou: os reducers releem as refs no próximo quadro.
+  useEffect(() => {
+    selectedRef.current = selected;
+    matchesRef.current = matches;
+    const renderer = sigmaRef.current;
+    if (!renderer) return;
+    emphasisRef.current = emphasisOf(renderer.getGraph(), selected, matches);
+    renderer.refresh();
+  }, [selected, matches]);
 
   /**
    * SVG montado a partir do grafo: o Sigma desenha em WebGL, sem SVG próprio. Posições
@@ -318,6 +377,12 @@ function SigmaGraph(props: SigmaGraphProps) {
 
   return (
     <div className={cn('relative w-full overflow-hidden rounded-lg border', className)}>
+      <ChartSearch
+        value={query}
+        onChange={setQuery}
+        found={matches?.size ?? null}
+        className="absolute left-2 top-2 z-10 max-w-[calc(100%-6rem)]"
+      />
       <div className="absolute right-2 top-2 z-10 flex gap-1.5">
         {!expanded && (
           <ExpandChartButton>
@@ -337,17 +402,17 @@ function SigmaGraph(props: SigmaGraphProps) {
 
       {nodes.length === 0 && (
         <div className="absolute inset-0 grid place-items-center text-sm text-muted-foreground">
-          Nenhum nó para exibir com os filtros atuais.
+          {en ? 'No nodes to display with the current filters.' : 'Nenhum nó para exibir com os filtros atuais.'}
         </div>
       )}
 
       {hovered && (
-        <div className="pointer-events-none absolute left-3 top-3 max-w-xs rounded-md border bg-popover/95 p-3 text-xs shadow-lg backdrop-blur">
+        <div className="pointer-events-none absolute left-3 top-12 max-w-xs rounded-md border bg-popover/95 p-3 text-xs shadow-lg backdrop-blur">
           <p className="mb-1 font-semibold break-words">{hovered.label}</p>
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-muted-foreground">
-            <dt>Documentos</dt>
+            <dt>{en ? 'Documents' : 'Documentos'}</dt>
             <dd className="text-foreground tabular-nums">{hovered.count}</dd>
-            <dt>Grau absoluto</dt>
+            <dt>{en ? 'Absolute degree' : 'Grau absoluto'}</dt>
             <dd className="text-foreground tabular-nums">{hovered.degreeAbsolute}</dd>
             <dt>Eigenvector</dt>
             <dd className="text-foreground tabular-nums">{hovered.eigenvector}</dd>
@@ -356,7 +421,11 @@ function SigmaGraph(props: SigmaGraphProps) {
             <dt>Closeness</dt>
             <dd className="text-foreground tabular-nums">{hovered.closeness}</dd>
           </dl>
-          {onNodeClick && <p className="eyebrow mt-2 text-highlight">Clique para abrir o perfil</p>}
+          {onNodeClick && (
+            <p className="eyebrow mt-2 text-highlight">
+              {selected === hovered.key ? t('map_click_open') : t('map_click_highlight')}
+            </p>
+          )}
         </div>
       )}
     </div>

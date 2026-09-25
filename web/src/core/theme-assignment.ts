@@ -7,8 +7,8 @@ import type { ClusterSample } from './clustering';
  * estas funções na thread principal, e `clustering.ts` importa o k-means (ml-kmeans + FFT):
  * juntos, o chunk inicial carregaria a biblioteca de clusterização, que só roda no worker.
  */
-export function fallbackThemeName(cluster: ClusterSample): string {
-  if (cluster.topTerms.length === 0) return `Tema ${cluster.clusterId + 1}`;
+export function fallbackThemeName(cluster: ClusterSample, locale: 'pt' | 'en' = 'pt'): string {
+  if (cluster.topTerms.length === 0) return `${locale === 'pt' ? 'Tema' : 'Theme'} ${cluster.clusterId + 1}`;
   // Sem o modelo, os próprios termos característicos já descrevem o grupo.
   return cluster.topTerms
     .slice(0, 3)
@@ -20,9 +20,15 @@ export function applyThemes(
   rows: Dataset,
   assignments: readonly number[],
   names: ReadonlyMap<number, string>,
+  locale: 'pt' | 'en' = 'pt',
 ): Dataset {
-  return rows.map((doc, index) => ({
-    ...doc,
-    [FIELD.THEME]: names.get(assignments[index] ?? -1) ?? 'Outros/Não Categorizado',
-  }));
+  const unclassified = locale === 'pt' ? 'Não classificado' : 'Unclassified';
+  return rows.map((doc, index) => {
+    // Campos da classificação híbrida não valem para temas do k-means: saem junto.
+    const { [FIELD.THEME_CONFIDENCE]: _confidence, [FIELD.THEME_STATUS]: _status, ...rest } = doc;
+    return {
+      ...rest,
+      [FIELD.THEME]: names.get(assignments[index] ?? -1) ?? unclassified,
+    };
+  });
 }

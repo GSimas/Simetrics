@@ -88,6 +88,7 @@ async function checkpoint(): Promise<void> {
     active: ds.active,
     duplicates: ds.duplicates,
     clustering: ds.clustering,
+    hybridRun: ds.hybridRun,
   };
 
   useProjectStore.setState({ saveStatus: 'saving' });
@@ -164,6 +165,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       sourceFiles: record.sourceFiles,
       ...DERIVED_RESET,
       clustering: record.clustering,
+      hybridRun: record.hybridRun,
       searchOptions: buildSearchOptions(record.active),
       error: null,
     });
@@ -241,7 +243,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
     let parsed: ProjectRecord;
     try {
-      parsed = parseProjectEnvelope(raw);
+      parsed = parseProjectEnvelope(raw, useLocale.getState().locale);
     } catch (cause) {
       set({ error: describeError(cause) });
       return;

@@ -22,9 +22,13 @@ import type { AnalyticsBundle, EntityTables } from '@/workers/analytics.worker';
 import type { CooccurrenceReport, SnaReport } from '@/core/graph';
 import type { CollaborationNetwork } from '@/core/viz/collaboration';
 import type { ClusteringResult } from '@/core/clustering';
+import type { HybridRun } from '@/core/hybrid/types';
+import { hybridMethodsText } from '@/core/hybrid/report';
+import { hybridReportRows, hybridReportTitle } from '@/core/hybrid/report-rows';
 import type { Dataset } from '@/lib/types';
 import { FIELD, FIELD_CANDIDATES } from '@/lib/schema';
 import { collectColumns, pickColumn, toNumeric } from '@/core/text';
+import { localizeMetricText } from '@/core/graph/metrics';
 import type { ReportSectionsSelection } from './pdf-generator';
 import {
   BRAND,
@@ -32,6 +36,7 @@ import {
   reportCountriesChart,
   reportNetworkChart,
   reportProductionChart,
+  reportNamedThemesChart,
   reportThemesChart,
   reportWordCloudChart,
   reportWorldMapChart,
@@ -45,6 +50,8 @@ export interface DocxReportData {
   network: CooccurrenceReport | null;
   collaboration: CollaborationNetwork | null;
   clustering: ClusteringResult | null;
+  /** Quando presente, é a classificação híbrida que define os temas da base. */
+  hybridRun?: HybridRun | null;
   selection: ReportSectionsSelection;
   topN: number;
   locale: 'pt' | 'en';
@@ -146,6 +153,7 @@ export async function generateDocxReport({
   network,
   collaboration,
   clustering,
+  hybridRun = null,
   selection,
   topN = 15,
   locale = 'pt',
@@ -461,7 +469,7 @@ export async function generateDocxReport({
         const share = dataset.length > 0 ? (c.size / dataset.length) * 100 : 0;
         return [
           String(c.clusterId + 1),
-          `Tema ${c.clusterId + 1}`,
+          `${isEn ? 'Theme' : 'Tema'} ${c.clusterId + 1}`,
           c.size.toLocaleString(isEn ? 'en-US' : 'pt-BR'),
           `${share.toFixed(1)}%`,
           c.topTerms.slice(0, 6).join(', '),
@@ -481,7 +489,49 @@ export async function generateDocxReport({
     );
   }
 
+  // --- 7b. CLASSIFICAÇÃO TEMÁTICA HÍBRIDA (DeepSeek + Jev) ---
+  if (selection.themes && hybridRun) {
+    const loc = isEn ? 'en-US' : 'pt-BR';
+    const hybridRows: string[][] = [
+      ['#', isEn ? 'Category' : 'Categoria', 'Docs', '% Share', isEn ? 'Mean confidence' : 'Confiança média'],
+      ...hybridReportRows(hybridRun).map((row, index) => [
+        String(index + 1),
+        row.name,
+        row.documents.toLocaleString(loc),
+        `${row.share.toFixed(1)}%`,
+        row.meanConfidence.toFixed(2),
+      ]),
+    ];
+
+    sectionsChildren.push(
+      ...sectionHeading(6, hybridReportTitle(hybridRun, locale)),
+      createWordTable(hybridRows, [600, 4420, 1000, 1000, 2000], tableHeaderBg),
+      new Paragraph({
+        children: [new TextRun({ text: hybridMethodsText(hybridRun, locale), font: SANS, size: 18, color: H.inkMuted })],
+        spacing: { before: 160, after: 200 },
+      }),
+    );
+  }
+
   // --- GRÁFICO 6: DISTRIBUIÇÃO DE TEMAS ---
+  const themesChartPng =
+    selection.chartThemes && hybridRun
+      ? reportNamedThemesChart(hybridReportRows(hybridRun), dataset.length, locale)
+      : null;
+  if (themesChartPng) {
+    sectionsChildren.push(
+      new Paragraph({
+        children: [
+          new ImageRun({
+            data: dataUrlToUint8Array(themesChartPng),
+            transformation: { width: 560, height: 235 },
+            type: 'png',
+          }),
+        ],
+        spacing: { before: 200, after: 200 },
+      }),
+    );
+  }
   if (selection.chartThemes && clustering && clustering.clusters.length > 0) {
     const chartPng = reportThemesChart(clustering.clusters, dataset.length, locale);
     if (chartPng) {
@@ -509,7 +559,7 @@ export async function generateDocxReport({
         [
           [isEn ? 'Topology Metric' : 'Métrica Topológica', isEn ? 'Value' : 'Valor', isEn ? 'Topology Metric' : 'Métrica Topológica', isEn ? 'Value' : 'Valor'],
           [isEn ? 'Density' : 'Densidade', formatVal(g.density, 4), isEn ? 'Avg Clustering' : 'Clustering Médio', formatVal(g.clustering, 4)],
-          [isEn ? 'Shannon Entropy' : 'Entropia de Shannon', formatVal(g.entropy, 3), isEn ? 'Global Efficiency' : 'Eficiência Global', formatVal(g.efficiency, 4)],
+          [isEn ? 'Shannon Entropy' : 'Entropia de Shannon', formatVal(g.entropy, 3), isEn ? 'Global Efficiency' : 'Eficiência Global', formatVal(localizeMetricText(g.efficiency, locale), 4)],
           [isEn ? 'Mean Degree' : 'Grau Médio', formatVal(g.meanDegree, 2), isEn ? 'Degree Std Dev' : 'Desvio do Grau', formatVal(g.stdDegree, 2)],
           [isEn ? 'Mean PageRank' : 'PageRank Médio', formatVal(g.meanPageRank, 4), isEn ? 'Assortativity' : 'Assortatividade', formatVal(g.assortativity, 3)],
           [isEn ? 'Power Law Exponent' : 'Lei de Potência', formatVal(g.powerLawExponent, 2), isEn ? 'Degree×Betweenness' : 'Spearman Grau×Ponte', formatVal(g.spearmanDegreeBetweenness, 3)],

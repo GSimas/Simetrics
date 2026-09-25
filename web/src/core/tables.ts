@@ -131,6 +131,20 @@ function topDocument(docs: readonly SimetricsDoc[], titleColumn: string | null):
 }
 
 /**
+ * Versão de exibição dos textos fixos acima ("Não Categorizado", "Sem Título", "(N citações)").
+ * As tabelas continuam gerando em português (paridade com o Python e resultado do worker,
+ * que não recalcula ao trocar de idioma); a tela traduz aqui.
+ */
+export function localizeTableText(value: string, locale: 'pt' | 'en' = 'pt'): string {
+  if (locale !== 'en') return value;
+  if (value === 'Não Categorizado') return 'Uncategorized';
+  return value
+    .replace(/^Sem Título(?= \(\d+ citações\)$)/, 'Untitled')
+    .replace(/ \((\d+) citações\)$/, ' ($1 citations)')
+    .replace(/ \(QL: ([\d.]+)\)$/, ' (LQ: $1)');
+}
+
+/**
  * Contexto do Quociente Locacional, calculado uma vez por dataset.
  *
  * QL = (Qik / Qk) / (Qi / Q), onde Qik são os documentos da entidade k no tema i,

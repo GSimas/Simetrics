@@ -65,7 +65,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@google/genai": "^2.18.0",
+    "@netlify/blobs": "^11.1.1",
     "@netlify/functions": "^6.0.0",
     "@tailwindcss/vite": "^4.3.3",
     "@types/d3-cloud": "^1.2.9",

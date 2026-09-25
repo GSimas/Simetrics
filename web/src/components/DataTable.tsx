@@ -22,7 +22,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { downloadCsv, timestampedFilename, toCsv } from '@/core/export';
+import { numberLocale } from '@/lib/i18n/labels';
 import { cn } from '@/lib/utils';
+import { useLocale } from '@/state/locale.store';
 
 /**
  * Tabela analítica com ordenação, filtro, paginação e exportação.
@@ -48,9 +50,11 @@ export function DataTable<T extends Record<string, unknown>>({
   columns,
   exportName,
   pageSize = 20,
-  filterPlaceholder = 'Filtrar…',
+  filterPlaceholder,
   className,
 }: DataTableProps<T>) {
+  const locale = useLocale((s) => s.locale);
+  const isEn = locale === 'en';
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState('');
 
@@ -88,15 +92,16 @@ export function DataTable<T extends Record<string, unknown>>({
         <Input
           value={globalFilter}
           onChange={(event) => setGlobalFilter(event.target.value)}
-          placeholder={filterPlaceholder}
+          placeholder={filterPlaceholder ?? (isEn ? 'Filter…' : 'Filtrar…')}
           className="h-8 max-w-xs"
         />
 
         <div className="flex items-center gap-2.5">
           <span className="inline-flex items-center rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 text-xs font-medium text-muted-foreground tabular-nums">
-            {filteredCount.toLocaleString('pt-BR')}{' '}
-            {filteredCount === 1 ? 'registro' : 'registros'}
-            {filteredCount !== data.length && ` de ${data.length.toLocaleString('pt-BR')}`}
+            {filteredCount.toLocaleString(numberLocale(locale))}{' '}
+            {isEn ? (filteredCount === 1 ? 'record' : 'records') : filteredCount === 1 ? 'registro' : 'registros'}
+            {filteredCount !== data.length &&
+              ` ${isEn ? 'of' : 'de'} ${data.length.toLocaleString(numberLocale(locale))}`}
           </span>
 
           {exportName && (
@@ -109,7 +114,7 @@ export function DataTable<T extends Record<string, unknown>>({
               }
             >
               <Download className="size-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden />
-              Exportar CSV
+              {isEn ? 'Export CSV' : 'Exportar CSV'}
             </Button>
           )}
         </div>
@@ -158,7 +163,7 @@ export function DataTable<T extends Record<string, unknown>>({
                   colSpan={columns.length}
                   className="h-20 text-center text-muted-foreground"
                 >
-                  Nenhum resultado.
+                  {isEn ? 'No results.' : 'Nenhum resultado.'}
                 </TableCell>
               </TableRow>
             ) : (
@@ -179,7 +184,8 @@ export function DataTable<T extends Record<string, unknown>>({
       {table.getPageCount() > 1 && (
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground tabular-nums">
-            Página {table.getState().pagination.pageIndex + 1} de {table.getPageCount()}
+            {isEn ? 'Page' : 'Página'} {table.getState().pagination.pageIndex + 1} {isEn ? 'of' : 'de'}{' '}
+            {table.getPageCount()}
           </span>
           <div className="flex gap-1">
             <Button
@@ -189,7 +195,7 @@ export function DataTable<T extends Record<string, unknown>>({
               disabled={!table.getCanPreviousPage()}
             >
               <ChevronLeft aria-hidden />
-              Anterior
+              {isEn ? 'Previous' : 'Anterior'}
             </Button>
             <Button
               variant="outline"
@@ -197,7 +203,7 @@ export function DataTable<T extends Record<string, unknown>>({
               onClick={() => table.nextPage()}
               disabled={!table.getCanNextPage()}
             >
-              Próxima
+              {isEn ? 'Next' : 'Próxima'}
               <ChevronRight aria-hidden />
             </Button>
           </div>

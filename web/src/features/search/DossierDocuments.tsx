@@ -50,9 +50,10 @@ interface DossierDocumentsProps {
   documents: Dataset;
   columns: DossierColumns;
   onOpenDocument: (title: string) => void;
+  onOpenKeyword: (keyword: string) => void;
 }
 
-export function DossierDocuments({ documents, columns, onOpenDocument }: DossierDocumentsProps) {
+export function DossierDocuments({ documents, columns, onOpenDocument, onOpenKeyword }: DossierDocumentsProps) {
   const locale = useLocale((state) => state.locale);
 
   const sorted = useMemo(
@@ -129,6 +130,7 @@ export function DossierDocuments({ documents, columns, onOpenDocument }: Dossier
                 expanded={expanded.has(index)}
                 onToggle={toggle}
                 onOpen={onOpenDocument}
+                onOpenKeyword={onOpenKeyword}
                 measureRef={virtualize ? virtualizer.measureElement : undefined}
               />
             );
@@ -148,6 +150,7 @@ interface DocumentRowProps {
   expanded: boolean;
   onToggle: (index: number) => void;
   onOpen: (title: string) => void;
+  onOpenKeyword: (keyword: string) => void;
   measureRef: ((node: HTMLTableRowElement | null) => void) | undefined;
 }
 
@@ -159,9 +162,11 @@ const DocumentRow = memo(function DocumentRow({
   expanded,
   onToggle,
   onOpen,
+  onOpenKeyword,
   measureRef,
 }: DocumentRowProps) {
   const t = useLocale((state) => state.t);
+  const locale = useLocale((state) => state.locale);
   const keywords = columns.keywords ? String(doc[columns.keywords] ?? '').trim() : '';
   const abstract = columns.abstract ? String(doc[columns.abstract] ?? '').trim() : '';
   const rawDoi = columns.doi ? doc[columns.doi] : doc[FIELD.DOI];
@@ -201,9 +206,20 @@ const DocumentRow = memo(function DocumentRow({
               {t('search_keywords')}:
             </span>
             {[...new Set(splitTokens(keywords))].slice(0, 6).map((kw) => (
-              <Badge key={kw} variant="secondary" className="text-[10px] px-1.5 py-0">
-                {kw}
-              </Badge>
+              <button
+                key={kw}
+                type="button"
+                onClick={() => onOpenKeyword(kw)}
+                title={locale === 'en' ? `Search keyword: ${kw}` : `Buscar palavra-chave: ${kw}`}
+                className="cursor-pointer"
+              >
+                <Badge
+                  variant="secondary"
+                  className="px-1.5 py-0 text-[10px] transition-colors hover:border-highlight hover:text-highlight"
+                >
+                  {kw}
+                </Badge>
+              </button>
             ))}
           </div>
         )}

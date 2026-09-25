@@ -40,6 +40,8 @@ import { EmptyState } from '@/features/EmptyState';
 import { getAnalyticsWorker } from '@/workers/client';
 import { useIdleRender } from '@/lib/use-idle-render';
 import type { CollaborationNetwork } from '@/core/viz/collaboration';
+import { hybridMethodsText } from '@/core/hybrid/report';
+import { hybridReportRows, hybridReportTitle } from '@/core/hybrid/report-rows';
 // Os geradores (jsPDF, docx) pesam ~1,2 MB: entram só no clique de exportar.
 import type { ReportSectionsSelection } from './pdf-generator';
 import { ReportChartImage } from './ReportChartImage';
@@ -49,6 +51,7 @@ import {
   reportCountriesChart,
   reportNetworkChart,
   reportProductionChart,
+  reportNamedThemesChart,
   reportThemesChart,
   reportWordCloudChart,
   reportWorldMapChart,
@@ -82,6 +85,7 @@ export default function ReportTab() {
   const sna = useDataset((state) => state.sna);
   const network = useDataset((state) => state.network);
   const clustering = useDataset((state) => state.clustering);
+  const hybridRun = useDataset((state) => state.hybridRun);
   const computeOverview = useDataset((state) => state.computeOverview);
   const computeTables = useDataset((state) => state.computeTables);
   const computeSna = useDataset((state) => state.computeSna);
@@ -149,10 +153,12 @@ export default function ReportTab() {
   );
 
   const themesChartImg = useIdleRender(
-    !clustering || clustering.clusters.length === 0
-      ? null
-      : () => reportThemesChart(clustering.clusters, active?.length ?? 0, locale),
-    [clustering, active, locale],
+    hybridRun
+      ? () => reportNamedThemesChart(hybridReportRows(hybridRun), active?.length ?? 0, locale)
+      : !clustering || clustering.clusters.length === 0
+        ? null
+        : () => reportThemesChart(clustering.clusters, active?.length ?? 0, locale),
+    [clustering, hybridRun, active, locale],
   );
 
   const wordCloudChartImg = useIdleRender(
@@ -228,6 +234,7 @@ export default function ReportTab() {
         network,
         collaboration,
         clustering,
+        hybridRun,
         selection,
         topN,
         locale,
@@ -254,6 +261,7 @@ export default function ReportTab() {
         network,
         collaboration,
         clustering,
+        hybridRun,
         selection,
         topN,
         locale,
@@ -312,7 +320,7 @@ export default function ReportTab() {
       desc: 'Tabela de autores com contagem de artigos, citações, índices h, g, i10 e m.',
       descEn: 'Author metrics table including papers, citations, and h/g/i10/m indices.',
       icon: Users,
-      count: tables ? `${tables.authors.length} autores` : undefined,
+      count: tables ? `${tables.authors.length} ${isEn ? 'authors' : 'autores'}` : undefined,
     },
     {
       key: 'chartAuthors',
@@ -330,7 +338,7 @@ export default function ReportTab() {
       desc: 'Produção por países e documentos mais citados de cada nação.',
       descEn: 'Country-level scientific output and most cited articles.',
       icon: Globe2,
-      count: tables ? `${tables.countries.length} países` : undefined,
+      count: tables ? `${tables.countries.length} ${isEn ? 'countries' : 'países'}` : undefined,
     },
     {
       key: 'chartCountries',
@@ -366,7 +374,7 @@ export default function ReportTab() {
       desc: 'Frequência de palavras-chave, citações agregadas e densidade vocabular.',
       descEn: 'Keyword frequency, aggregate citations, and vocabulary density.',
       icon: FileSpreadsheet,
-      count: tables ? `${tables.keywords.length} termos` : undefined,
+      count: tables ? `${tables.keywords.length} ${isEn ? 'terms' : 'termos'}` : undefined,
     },
     {
       key: 'chartKeywords',
@@ -384,7 +392,11 @@ export default function ReportTab() {
       desc: 'Clusters semânticos descobertos, score de silhueta e termos característicos.',
       descEn: 'Semantic research themes, silhouette score, and representative terms.',
       icon: Sparkles,
-      count: clustering ? `${clustering.clusters.length} temas` : undefined,
+      count: hybridRun
+        ? `${hybridRun.finalTaxonomy.length} ${isEn ? 'categories' : 'categorias'}`
+        : clustering
+          ? `${clustering.clusters.length} ${isEn ? 'themes' : 'temas'}`
+          : undefined,
     },
     {
       key: 'chartThemes',
@@ -402,7 +414,7 @@ export default function ReportTab() {
       desc: '11 métricas globais de rede (Densidade, Clustering, Entropia, Eficiência, PageRank, etc.).',
       descEn: '11 global SNA metrics (Density, Clustering, Shannon Entropy, Efficiency, PageRank).',
       icon: Network,
-      count: sna ? `${sna.global.nodeCount} nós` : undefined,
+      count: sna ? `${sna.global.nodeCount} ${isEn ? 'nodes' : 'nós'}` : undefined,
     },
     {
       key: 'chartNetwork',
@@ -676,7 +688,7 @@ export default function ReportTab() {
 
           {/* Gráfico 1: Produção Anual */}
           {selection.chartProduction && (
-            <ReportChartImage image={productionChartImg} {...REPORT_CHART_SIZE.production} alt="Gráfico de Evolução da Produção Científica" />
+            <ReportChartImage image={productionChartImg} {...REPORT_CHART_SIZE.production} alt={isEn ? 'Scientific production over time chart' : 'Gráfico de Evolução da Produção Científica'} />
           )}
 
           {/* 3. Top Autores */}
@@ -720,7 +732,7 @@ export default function ReportTab() {
 
           {/* Gráfico 2: Top Autores */}
           {selection.chartAuthors && (
-            <ReportChartImage image={authorsChartImg} {...REPORT_CHART_SIZE.bars} alt="Gráfico dos Top Autores" />
+            <ReportChartImage image={authorsChartImg} {...REPORT_CHART_SIZE.bars} alt={isEn ? 'Top authors chart' : 'Gráfico dos Top Autores'} />
           )}
 
           {/* 4. Top Países */}
@@ -760,12 +772,12 @@ export default function ReportTab() {
 
           {/* Gráfico 3: Top Países */}
           {selection.chartCountries && (
-            <ReportChartImage image={countriesChartImg} {...REPORT_CHART_SIZE.bars} alt="Gráfico dos Top Países" />
+            <ReportChartImage image={countriesChartImg} {...REPORT_CHART_SIZE.bars} alt={isEn ? 'Top countries chart' : 'Gráfico dos Top Países'} />
           )}
 
           {/* Gráfico 4: Mapa-Múndi de Colaboração Internacional */}
           {selection.chartWorldMap && (
-            <ReportChartImage image={worldMapChartImg} {...REPORT_CHART_SIZE.worldMap} alt="Mapa Global de Colaboração Internacional" />
+            <ReportChartImage image={worldMapChartImg} {...REPORT_CHART_SIZE.worldMap} alt={isEn ? 'Global international collaboration map' : 'Mapa Global de Colaboração Internacional'} />
           )}
 
           {/* 5. Top Venues */}
@@ -838,7 +850,7 @@ export default function ReportTab() {
 
           {/* Gráfico 5: Nuvem de Palavras-Chave */}
           {selection.chartKeywords && (
-            <ReportChartImage image={wordCloudChartImg} {...REPORT_CHART_SIZE.wordCloud} alt="Nuvem de Palavras-Chave" />
+            <ReportChartImage image={wordCloudChartImg} {...REPORT_CHART_SIZE.wordCloud} alt={isEn ? 'Keyword cloud' : 'Nuvem de Palavras-Chave'} />
           )}
 
           {/* 7. Mapeamento Temático por IA */}
@@ -855,7 +867,7 @@ export default function ReportTab() {
                   return (
                     <div key={c.clusterId} className="rounded-xl border border-border/80 bg-card p-3.5 shadow-2xs space-y-1.5">
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs font-bold text-foreground truncate">Tema {c.clusterId + 1}</p>
+                        <p className="text-xs font-bold text-foreground truncate">{isEn ? 'Theme' : 'Tema'} {c.clusterId + 1}</p>
                         <Badge variant="purple" className="text-[10px]">
                           {share.toFixed(1)}%
                         </Badge>
@@ -873,9 +885,35 @@ export default function ReportTab() {
             </div>
           )}
 
+          {/* 7b. Classificação temática híbrida */}
+          {selection.themes && hybridRun && (
+            <div className="space-y-3">
+              <h2 className="text-sm font-bold text-foreground border-b border-border/60 pb-1.5">
+                6. {hybridReportTitle(hybridRun, locale)}
+              </h2>
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                {hybridReportRows(hybridRun).map((row) => (
+                  <div key={row.name} className="rounded-xl border border-border/80 bg-card p-3.5 shadow-2xs space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-bold text-foreground truncate">{row.name}</p>
+                      <Badge variant="purple" className="text-[10px]">
+                        {row.share.toFixed(1)}%
+                      </Badge>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      <strong>{row.documents}</strong> {isEn ? 'documents' : 'artigos'} ·{' '}
+                      {isEn ? 'mean confidence' : 'confiança média'} {row.meanConfidence.toFixed(2)}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[11px] leading-relaxed text-muted-foreground">{hybridMethodsText(hybridRun, locale)}</p>
+            </div>
+          )}
+
           {/* Gráfico 6: Distribuição de Temas por IA */}
           {selection.chartThemes && (
-            <ReportChartImage image={themesChartImg} {...REPORT_CHART_SIZE.themes} alt="Distribuição Temática por IA" />
+            <ReportChartImage image={themesChartImg} {...REPORT_CHART_SIZE.themes} alt={isEn ? 'AI thematic distribution' : 'Distribuição Temática por IA'} />
           )}
 
           {/* 8. Topologia da Rede */}
@@ -900,7 +938,7 @@ export default function ReportTab() {
                 <div className="rounded-lg border border-border/70 p-2.5 bg-muted/20">
                   <p className="text-[10px] font-semibold text-muted-foreground">{isEn ? 'Global Efficiency' : 'Eficiência Global'}</p>
                   <p className="text-sm font-bold tabular-nums text-foreground">
-                    {typeof sna.global.efficiency === 'number' ? sna.global.efficiency.toFixed(4) : String(sna.global.efficiency)}
+                    {typeof sna.global.efficiency === 'number' ? sna.global.efficiency.toFixed(4) : isEn ? String(sna.global.efficiency).replace('Grafo Denso', 'dense graph') : String(sna.global.efficiency)}
                   </p>
                 </div>
                 <div className="rounded-lg border border-border/70 p-2.5 bg-muted/20">
@@ -917,7 +955,7 @@ export default function ReportTab() {
 
           {/* Gráfico 7: Rede de Coocorrência (Louvain) */}
           {selection.chartNetwork && (
-            <ReportChartImage image={networkChartImg} {...REPORT_CHART_SIZE.network} alt="Rede de Coocorrência e Comunidades" />
+            <ReportChartImage image={networkChartImg} {...REPORT_CHART_SIZE.network} alt={isEn ? 'Co-occurrence network and communities' : 'Rede de Coocorrência e Comunidades'} />
           )}
 
           {/* 9. Top Documentos Mais Citados */}
@@ -964,7 +1002,9 @@ export default function ReportTab() {
           {/* Footer do Relatório */}
           <div className="border-t border-border/80 pt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
             <p>
-              Simetrics · Plataforma de Inteligência Bibliométrica · Desenvolvido por{' '}
+              {isEn
+                ? 'Simetrics · Bibliometric Intelligence Platform · Developed by'
+                : 'Simetrics · Plataforma de Inteligência Bibliométrica · Desenvolvido por'}{' '}
               <a
                 href="https://gustavosimas.com"
                 target="_blank"

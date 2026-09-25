@@ -11,26 +11,34 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { topQuotientsByTheme } from '@/core/locational-quotient';
+import { topQuotientsByTheme, type QuotientEntry } from '@/core/locational-quotient';
+import { numberLocale } from '@/lib/i18n/labels';
 import { FIELD } from '@/lib/schema';
 import { useAiConfig } from '@/state/ai-config.store';
 import { useDataset } from '@/state/dataset.store';
 import { useLocale } from '@/state/locale.store';
 import { AiSettingsModal } from '@/components/AiSettingsModal';
 import { ReadingTip } from '@/components/InfoTip';
+import { HybridPanel } from './hybrid/HybridPanel';
 
 export function ThemePanel() {
   const active = useDataset((state) => state.active);
   const clustering = useDataset((state) => state.clustering);
+  const hybridRun = useDataset((state) => state.hybridRun);
+  const hasThemes = clustering !== null || hybridRun !== null;
   const categorize = useDataset((state) => state.categorizeThemes);
   const isCategorizingThemes = useDataset((state) => state.isCategorizingThemes);
   const busy = isCategorizingThemes;
   const t = useLocale((state) => state.t);
+  const locale = useLocale((state) => state.locale);
+  // O rótulo vem pronto do core como "QL"; em inglês a sigla é "LQ" (location quotient).
+  const qlLabel = (entry: QuotientEntry | undefined) =>
+    entry && locale === 'en' ? `${entry.entity} (LQ: ${entry.quotient.toFixed(2)})` : entry?.label;
   const isAiConfigured = useAiConfig((state) => state.isConfigured());
   const [aiModalOpen, setAiModalOpen] = useState(false);
 
   const themes = useMemo(() => {
-    if (!active || !clustering) return [];
+    if (!active || !hasThemes) return [];
 
     const counts = new Map<string, number>();
     for (const doc of active) {
@@ -41,11 +49,11 @@ export function ThemePanel() {
     return [...counts.entries()]
       .map(([name, documents]) => ({ name, documents }))
       .sort((left, right) => right.documents - left.documents);
-  }, [active, clustering]);
+  }, [active, hasThemes]);
 
   const quotients = useMemo(
-    () => (active && clustering ? topQuotientsByTheme(active) : null),
-    [active, clustering],
+    () => (active && hasThemes ? topQuotientsByTheme(active) : null),
+    [active, hasThemes],
   );
 
   if (!active) return null;
@@ -120,26 +128,26 @@ export function ThemePanel() {
                       <TableCell className="font-medium text-foreground">{theme.name}</TableCell>
                       <TableCell>
                         <Badge variant="purple" className="tabular-nums font-semibold">
-                          {theme.documents.toLocaleString('pt-BR')}
+                          {theme.documents.toLocaleString(numberLocale(locale))}
                         </Badge>
                       </TableCell>
                       <TableCell
                         className="max-w-56 truncate text-xs text-muted-foreground"
-                        title={quotients?.authors.get(theme.name)?.label}
+                        title={qlLabel(quotients?.authors.get(theme.name))}
                       >
-                        {quotients?.authors.get(theme.name)?.label ?? '—'}
+                        {qlLabel(quotients?.authors.get(theme.name)) ?? '—'}
                       </TableCell>
                       <TableCell
                         className="max-w-48 truncate text-xs text-muted-foreground"
-                        title={quotients?.countries.get(theme.name)?.label}
+                        title={qlLabel(quotients?.countries.get(theme.name))}
                       >
-                        {quotients?.countries.get(theme.name)?.label ?? '—'}
+                        {qlLabel(quotients?.countries.get(theme.name)) ?? '—'}
                       </TableCell>
                       <TableCell
                         className="max-w-64 truncate text-xs text-muted-foreground"
-                        title={quotients?.venues.get(theme.name)?.label}
+                        title={qlLabel(quotients?.venues.get(theme.name))}
                       >
-                        {quotients?.venues.get(theme.name)?.label ?? '—'}
+                        {qlLabel(quotients?.venues.get(theme.name)) ?? '—'}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -148,7 +156,9 @@ export function ThemePanel() {
             </div>
           )}
 
-          {clustering && <ReadingTip>{t('theme_ql_explanation')}</ReadingTip>}
+          {hasThemes && <ReadingTip>{t('theme_ql_explanation')}</ReadingTip>}
+
+          <HybridPanel />
       </div>
 
       <AiSettingsModal open={aiModalOpen} onOpenChange={setAiModalOpen} />

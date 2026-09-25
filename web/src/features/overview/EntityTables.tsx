@@ -4,81 +4,130 @@ import type { ColumnDef } from '@tanstack/react-table';
 import { DataTable } from '@/components/DataTable';
 import { EntityChip, EntityChips } from '@/components/EntityChip';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import type { EntityRow } from '@/core/tables';
+import { localizeTableText, type EntityRow } from '@/core/tables';
 import type { EntityTables as Tables } from '@/workers/analytics.worker';
 import type { Dataset, SearchEntityType } from '@/lib/types';
+import { entityTypeLabel, numberLocale } from '@/lib/i18n/labels';
+import type { Locale } from '@/lib/i18n/translations';
 import { useDataset } from '@/state/dataset.store';
 import { useLocale } from '@/state/locale.store';
 
-function numeric(value: number, digits = 0): ReactElement {
+const COPY = {
+  pt: {
+    citations: 'Citações',
+    h: 'Índice h',
+    g: 'Índice g',
+    i10: 'Índice i10',
+    m: 'Índice m',
+    mean: 'Média',
+    median: 'Mediana',
+    std: 'Desvio padrão',
+    specialization: 'Especialização (maior QL)',
+    coauthors: 'Coautores',
+    topDocument: 'Documento mais citado',
+  },
+  en: {
+    citations: 'Citations',
+    h: 'h-index',
+    g: 'g-index',
+    i10: 'i10-index',
+    m: 'm-index',
+    mean: 'Mean',
+    median: 'Median',
+    std: 'Standard deviation',
+    specialization: 'Specialization (highest LQ)',
+    coauthors: 'Co-authors',
+    topDocument: 'Most cited document',
+  },
+} as const;
+
+/** Cabeçalhos em inglês das colunas da base cujo nome é português; em pt fica o nome cru. */
+const DATASET_KEY_EN: Record<string, string> = {
+  'BASE DE DADOS': 'DATABASE',
+  TEMA_GEMINI: 'THEME',
+  TEMA_CONFIANCA: 'THEME CONFIDENCE',
+  TEMA_STATUS: 'THEME STATUS',
+};
+
+/** Valores gravados em TEMA_STATUS (core/hybrid/apply.ts) e como aparecem em inglês. */
+const THEME_STATUS_EN: Record<string, string> = {
+  auto: 'auto',
+  revisar: 'review',
+  nao_classificado: 'unclassified',
+};
+
+function numeric(value: number, locale: Locale, digits = 0): ReactElement {
   return (
     <span className="tabular-nums">
-      {value.toLocaleString('pt-BR', { minimumFractionDigits: digits, maximumFractionDigits: digits })}
+      {value.toLocaleString(numberLocale(locale), { minimumFractionDigits: digits, maximumFractionDigits: digits })}
     </span>
   );
 }
 
-function indexColumns(): ColumnDef<EntityRow, unknown>[] {
+function indexColumns(locale: Locale): ColumnDef<EntityRow, unknown>[] {
+  const copy = COPY[locale];
   return [
     {
       accessorKey: 'docCount',
       header: 'Docs',
-      cell: ({ row }) => numeric(row.original.docCount),
+      cell: ({ row }) => numeric(row.original.docCount, locale),
     },
     {
       accessorKey: 'citations',
-      header: 'Citações',
-      cell: ({ row }) => numeric(row.original.citations),
+      header: copy.citations,
+      cell: ({ row }) => numeric(row.original.citations, locale),
     },
-    { accessorKey: 'h', header: 'Índice h', cell: ({ row }) => numeric(row.original.h) },
-    { accessorKey: 'g', header: 'Índice g', cell: ({ row }) => numeric(row.original.g) },
-    { accessorKey: 'i10', header: 'Índice i10', cell: ({ row }) => numeric(row.original.i10) },
+    { accessorKey: 'h', header: copy.h, cell: ({ row }) => numeric(row.original.h, locale) },
+    { accessorKey: 'g', header: copy.g, cell: ({ row }) => numeric(row.original.g, locale) },
+    { accessorKey: 'i10', header: copy.i10, cell: ({ row }) => numeric(row.original.i10, locale) },
     {
       accessorKey: 'm',
-      header: 'Índice m',
-      cell: ({ row }) => numeric(row.original.m, 3),
+      header: copy.m,
+      cell: ({ row }) => numeric(row.original.m, locale, 3),
     },
     {
       accessorKey: 'meanCitations',
-      header: 'Média',
-      cell: ({ row }) => numeric(row.original.meanCitations, 2),
+      header: copy.mean,
+      cell: ({ row }) => numeric(row.original.meanCitations, locale, 2),
     },
     {
       accessorKey: 'medianCitations',
-      header: 'Mediana',
-      cell: ({ row }) => numeric(row.original.medianCitations, 2),
+      header: copy.median,
+      cell: ({ row }) => numeric(row.original.medianCitations, locale, 2),
     },
     {
       accessorKey: 'stdCitations',
-      header: 'Desvio padrão',
-      cell: ({ row }) => numeric(row.original.stdCitations, 2),
+      header: copy.std,
+      cell: ({ row }) => numeric(row.original.stdCitations, locale, 2),
     },
   ];
 }
 
 type Extra = 'coauthors' | 'topDocument' | 'none';
 
-/** "Tema (QL: 1.83)" → "Tema"; "Título (12 citações)" → "Título". */
+/** "Tema (QL: 1.83)" → "Tema"; "Título (12 citações)" → "Título". Opera no valor cru de core/tables. */
 const stripSuffix = (value: string): string => value.replace(/\s*\((?:QL: [\d.]+|\d+ citações)\)$/, '');
 
 function buildColumns(
-  entityLabel: string,
-  types: readonly SearchEntityType[],
+  type: SearchEntityType,
   extra: Extra,
+  locale: Locale,
 ): ColumnDef<EntityRow, unknown>[] {
+  const types = [type];
+  const copy = COPY[locale];
   const columns: ColumnDef<EntityRow, unknown>[] = [
     {
       accessorKey: 'entity',
-      header: entityLabel,
+      header: entityTypeLabel(type, locale),
       cell: ({ row }) => <EntityChip label={row.original.entity} types={types} />,
     },
-    ...indexColumns(),
+    ...indexColumns(locale),
     {
       accessorKey: 'topSpecialization',
-      header: 'Especialização (maior QL)',
+      header: copy.specialization,
       cell: ({ row }) => (
         <EntityChip
-          label={row.original.topSpecialization}
+          label={localizeTableText(row.original.topSpecialization, locale)}
           term={stripSuffix(row.original.topSpecialization)}
           types={['Tema']}
         />
@@ -89,7 +138,7 @@ function buildColumns(
   if (extra === 'coauthors') {
     columns.push({
       id: 'coauthors',
-      header: 'Coautores',
+      header: copy.coauthors,
       accessorFn: (row) => row.coauthors.join(', '),
       cell: ({ row }) => <EntityChips values={row.original.coauthors} types={['Autor']} />,
     });
@@ -97,10 +146,10 @@ function buildColumns(
     columns.push({
       id: 'topDocument',
       accessorKey: 'topDocument',
-      header: 'Documento mais citado',
+      header: copy.topDocument,
       cell: ({ row }) => (
         <EntityChip
-          label={row.original.topDocument}
+          label={localizeTableText(row.original.topDocument, locale)}
           term={stripSuffix(row.original.topDocument)}
           types={['Documento']}
         />
@@ -135,7 +184,7 @@ const PRIORITY_COLUMNS = [
   'TEMA_GEMINI',
 ] as const;
 
-function buildAllDocsColumns(activeDocs: Dataset | null): ColumnDef<Record<string, unknown>, unknown>[] {
+function buildAllDocsColumns(activeDocs: Dataset | null, locale: Locale): ColumnDef<Record<string, unknown>, unknown>[] {
   if (!activeDocs || activeDocs.length === 0) return [];
 
   const allKeys = new Set<string>();
@@ -157,7 +206,7 @@ function buildAllDocsColumns(activeDocs: Dataset | null): ColumnDef<Record<strin
 
   return orderedKeys.map((key) => ({
     accessorKey: key,
-    header: key,
+    header: locale === 'en' ? (DATASET_KEY_EN[key] ?? key) : key,
     cell: ({ row }) => {
       const val = row.original[key];
       if (val === null || val === undefined || val === '') {
@@ -165,10 +214,11 @@ function buildAllDocsColumns(activeDocs: Dataset | null): ColumnDef<Record<strin
       }
       if (typeof val === 'number') {
         // Ano não leva separador de milhar ("1.993").
-        const text = /YEAR|ANO/.test(key) ? String(val) : val.toLocaleString('pt-BR');
+        const text = /YEAR|ANO/.test(key) ? String(val) : val.toLocaleString(numberLocale(locale));
         return <span className="tabular-nums font-medium">{text}</span>;
       }
-      const str = String(val);
+      const raw = String(val);
+      const str = locale === 'en' && key === 'TEMA_STATUS' ? (THEME_STATUS_EN[raw] ?? raw) : raw;
       const entity = ENTITY_COLUMNS[key];
       if (entity) {
         return entity.multiple ? (
@@ -193,39 +243,40 @@ export interface EntityTablesProps {
 export function EntityTables({ tables }: EntityTablesProps) {
   const active = useDataset((state) => state.active);
   const t = useLocale((state) => state.t);
+  const locale = useLocale((state) => state.locale);
 
   const entityColumns = useMemo(
     () => ({
-      authors: buildColumns('Autor', ['Autor'], 'coauthors'),
-      countries: buildColumns('País', ['País'], 'topDocument'),
-      venues: buildColumns('Local de Publicação (Venue)', ['Local de Publicação (Venue)'], 'topDocument'),
-      keywords: buildColumns('Palavra-chave', ['Palavra-chave'], 'none'),
+      authors: buildColumns('Autor', 'coauthors', locale),
+      countries: buildColumns('País', 'topDocument', locale),
+      venues: buildColumns('Local de Publicação (Venue)', 'topDocument', locale),
+      keywords: buildColumns('Palavra-chave', 'none', locale),
     }),
-    [],
+    [locale],
   );
 
-  const allDocsColumns = useMemo(() => buildAllDocsColumns(active), [active]);
+  const allDocsColumns = useMemo(() => buildAllDocsColumns(active, locale), [active, locale]);
 
   const panels = [
     {
       value: 'all_docs',
       label: t('table_tab_all_docs'),
       rows: (active ?? []) as unknown as Record<string, unknown>[],
-      export: 'todos-documentos',
+      export: locale === 'en' ? 'all-documents' : 'todos-documentos',
       columns: allDocsColumns,
     },
     {
       value: 'authors',
       label: t('table_tab_authors'),
       rows: tables.authors as unknown as Record<string, unknown>[],
-      export: 'autores',
+      export: locale === 'en' ? 'authors' : 'autores',
       columns: entityColumns.authors as unknown as ColumnDef<Record<string, unknown>, unknown>[],
     },
     {
       value: 'countries',
       label: t('table_tab_countries'),
       rows: tables.countries as unknown as Record<string, unknown>[],
-      export: 'paises',
+      export: locale === 'en' ? 'countries' : 'paises',
       columns: entityColumns.countries as unknown as ColumnDef<Record<string, unknown>, unknown>[],
     },
     {
@@ -251,7 +302,7 @@ export function EntityTables({ tables }: EntityTablesProps) {
           <TabsTrigger key={panel.value} value={panel.value} className="gap-1.5 text-xs sm:text-sm">
             <span>{panel.label}</span>
             <span className="rounded-full bg-card px-2 py-0.2 text-[11px] font-semibold text-primary shadow-2xs tabular-nums">
-              {panel.rows.length.toLocaleString('pt-BR')}
+              {panel.rows.length.toLocaleString(numberLocale(locale))}
             </span>
           </TabsTrigger>
         ))}

@@ -29,6 +29,7 @@ export function CollaborationPanel({ dataset }: CollaborationPanelProps) {
   const [topN, setTopN] = useState(30);
   const [view, setView] = useState<'mapa' | 'radial'>('mapa');
   const t = useLocale((state) => state.t);
+  const en = useLocale((state) => state.locale === 'en');
 
   const { data: network } = useAsyncResult<CollaborationNetwork>(`collab ${topN}`, () =>
     getAnalyticsWorker().collaboration(dataset, topN),
@@ -55,11 +56,14 @@ export function CollaborationPanel({ dataset }: CollaborationPanelProps) {
         </div>
 
         {!network ? (
-          chartMessage('Calculando rede de colaboração…')
+          chartMessage(en ? 'Computing the collaboration network…' : 'Calculando rede de colaboração…')
         ) : network.nodes.length === 0 ? (
           chartMessage(
-            'A base não traz informação de país. Isso depende do campo de afiliação, que ' +
-              'nem toda exportação inclui.',
+            en
+              ? 'The dataset has no country information. That depends on the affiliation field, ' +
+                  'which not every export includes.'
+              : 'A base não traz informação de país. Isso depende do campo de afiliação, que ' +
+                  'nem toda exportação inclui.',
           )
         ) : (
           <Tabs value={view} onValueChange={(value) => setView(value as 'mapa' | 'radial')}>
@@ -85,9 +89,10 @@ export function CollaborationPanel({ dataset }: CollaborationPanelProps) {
  * colaborações; o segundo abre o perfil do país no Motor de Busca.
  */
 function GeoView({ network }: { network: CollaborationNetwork }) {
+  const en = useLocale((state) => state.locale === 'en');
   const labelOf = new Map(network.nodes.map((node) => [node.country, node.label]));
   return (
-    <Suspense fallback={chartMessage('Carregando mapa…')}>
+    <Suspense fallback={chartMessage(en ? 'Loading map…' : 'Carregando mapa…')}>
       <WorldMap
         nodes={network.nodes.map((node) => ({
           key: node.country,
@@ -102,7 +107,7 @@ function GeoView({ network }: { network: CollaborationNetwork }) {
           documents: edge.documents,
         }))}
         onOpenProfile={(key) => openInSearch(labelOf.get(key) ?? key, ['País'])}
-        exportName="colaboracao-internacional"
+        exportName={en ? 'international-collaboration' : 'colaboracao-internacional'}
       />
     </Suspense>
   );
@@ -124,6 +129,7 @@ const CONTINENT_KEYS = {
  */
 function RadialView({ network }: { network: CollaborationNetwork }) {
   const t = useLocale((state) => state.t);
+  const en = useLocale((state) => state.locale === 'en');
   const labelOf = new Map(network.nodes.map((node) => [node.country, node.label]));
   // Índice do continente = grupo no círculo e cor; país sem continente conhecido fica no fim.
   const groupOf = (country: string): number => {
@@ -135,7 +141,7 @@ function RadialView({ network }: { network: CollaborationNetwork }) {
   const groups = [...new Set(network.nodes.map((node) => groupOf(node.country)))].sort((a, b) => a - b);
 
   return (
-    <Suspense fallback={chartMessage('Carregando grafo…')}>
+    <Suspense fallback={chartMessage(en ? 'Loading graph…' : 'Carregando grafo…')}>
       <RadialGraph
         nodes={network.nodes.map((node) => ({
           key: node.country,
@@ -158,7 +164,7 @@ function RadialView({ network }: { network: CollaborationNetwork }) {
           };
         })}
         onNodeClick={(key) => openInSearch(labelOf.get(key) ?? key, ['País'])}
-        exportName="colaboracao-radial"
+        exportName={en ? 'radial-collaboration' : 'colaboracao-radial'}
       />
     </Suspense>
   );

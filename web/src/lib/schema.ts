@@ -23,6 +23,10 @@ export const FIELD = {
   CITED_REFERENCES: 'CITED REFERENCES',
   DATABASE: 'BASE DE DADOS',
   THEME: 'TEMA_GEMINI',
+  /** Confiança (0–1) do Jev na categoria do documento — só na classificação híbrida. */
+  THEME_CONFIDENCE: 'TEMA_CONFIANCA',
+  /** Faixa de confiança: 'auto', 'revisar' ou 'nao_classificado' — só na classificação híbrida. */
+  THEME_STATUS: 'TEMA_STATUS',
 } as const;
 
 /**

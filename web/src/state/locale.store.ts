@@ -68,3 +68,18 @@ useLocale.getState = (): LocaleHookState => {
   const t = (key: TranslationKey) => TRANSLATIONS[locale]?.[key] ?? TRANSLATIONS.pt[key] ?? key;
   return { locale, setLocale, toggleLocale, t };
 };
+
+// Título da aba e `lang` do documento acompanham o idioma (o index.html vem em português).
+const PAGE_TITLE: Record<Locale, string> = {
+  pt: 'Simetrics — Análise Bibliométrica e Cientométrica',
+  en: 'Simetrics — Bibliometric and Scientometric Analysis',
+};
+
+function syncDocument(locale: Locale): void {
+  if (typeof document === 'undefined') return;
+  document.title = PAGE_TITLE[locale];
+  document.documentElement.lang = locale === 'en' ? 'en' : 'pt-BR';
+}
+
+syncDocument(useLocaleStore.getState().locale);
+useLocaleStore.subscribe((state) => syncDocument(state.locale));

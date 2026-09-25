@@ -3,7 +3,9 @@ import type { LucideIcon } from 'lucide-react';
 
 import { InfoTip } from '@/components/InfoTip';
 
+import { numberLocale } from '@/lib/i18n/labels';
 import { cn } from '@/lib/utils';
+import { useLocale } from '@/state/locale.store';
 
 export type KpiTone =
   | 'default'
@@ -52,9 +54,10 @@ export function KpiCard({
   tone = 'default',
   className,
 }: KpiCardProps) {
+  const locale = useLocale((state) => state.locale);
   const formatted =
     typeof value === 'number'
-      ? value.toLocaleString('pt-BR', { maximumFractionDigits: 2 })
+      ? value.toLocaleString(numberLocale(locale), { maximumFractionDigits: 2 })
       : value;
 
   const iconColor = TONE_ICON[tone] ?? TONE_ICON.default;

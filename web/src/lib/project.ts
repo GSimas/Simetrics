@@ -1,4 +1,5 @@
 import type { ClusteringResult } from '@/core/clustering';
+import type { HybridRun } from '@/core/hybrid/types';
 import type { DatabaseName } from '@/lib/schema';
 import type { Dataset, DuplicateRecord } from '@/lib/types';
 
@@ -37,6 +38,9 @@ export interface ProjectRecord {
   active: Dataset;
   duplicates: DuplicateRecord[];
   clustering: ClusteringResult | null;
+  /** Registro da classificação híbrida — a taxonomia e os parâmetros que a tornam
+   * reproduzível. Opcional no arquivo: projetos anteriores a ela chegam como `null`. */
+  hybridRun: HybridRun | null;
 }
 
 /** Campos leves para listar projetos sem desserializar datasets inteiros. */
@@ -90,24 +94,25 @@ function isDataset(value: unknown): value is Dataset {
  * responsabilidade de quem chama (`project.store.ts`), que tem acesso à lista de
  * projetos já salvos. Esta função só garante que o formato é válido e utilizável.
  */
-export function parseProjectEnvelope(raw: unknown): ProjectRecord {
+export function parseProjectEnvelope(raw: unknown, locale: 'pt' | 'en' = 'pt'): ProjectRecord {
+  const tr = (pt: string, en: string) => (locale === 'en' ? en : pt);
   if (typeof raw !== 'object' || raw === null) {
-    throw new Error('Arquivo inválido: não é um JSON de projeto do Simetrics.');
+    throw new Error(tr('Arquivo inválido: não é um JSON de projeto do Simetrics.', 'Invalid file: not a Simetrics project JSON.'));
   }
 
   const envelope = raw as Partial<ProjectEnvelope>;
 
   if (envelope.kind !== ENVELOPE_KIND) {
-    throw new Error('Arquivo inválido: não é um projeto exportado do Simetrics.');
+    throw new Error(tr('Arquivo inválido: não é um projeto exportado do Simetrics.', 'Invalid file: not a project exported from Simetrics.'));
   }
 
   if (typeof envelope.schemaVersion !== 'number') {
-    throw new Error('Arquivo inválido: versão do projeto ausente.');
+    throw new Error(tr('Arquivo inválido: versão do projeto ausente.', 'Invalid file: project version missing.'));
   }
 
   const project = envelope.project as Partial<ProjectRecord> | undefined;
   if (!project || !isDataset(project.original) || !isDataset(project.active)) {
-    throw new Error('Arquivo inválido: dados do projeto ausentes ou corrompidos.');
+    throw new Error(tr('Arquivo inválido: dados do projeto ausentes ou corrompidos.', 'Invalid file: project data missing or corrupted.'));
   }
 
   switch (envelope.schemaVersion) {
@@ -115,7 +120,10 @@ export function parseProjectEnvelope(raw: unknown): ProjectRecord {
       return normalizeV1(project);
     default:
       throw new Error(
-        `Versão de projeto não suportada (${envelope.schemaVersion}). Atualize o Simetrics.`,
+        tr(
+          `Versão de projeto não suportada (${envelope.schemaVersion}). Atualize o Simetrics.`,
+          `Unsupported project version (${envelope.schemaVersion}). Update Simetrics.`,
+        ),
       );
   }
 }
@@ -137,5 +145,6 @@ function normalizeV1(project: Partial<ProjectRecord>): ProjectRecord {
     active: project.active as Dataset,
     duplicates: Array.isArray(project.duplicates) ? project.duplicates : [],
     clustering: project.clustering ?? null,
+    hybridRun: project.hybridRun ?? null,
   };
 }

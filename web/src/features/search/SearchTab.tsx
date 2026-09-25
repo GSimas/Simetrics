@@ -54,6 +54,7 @@ import { openInSearch, resolveEntity, useNavigation } from '@/state/navigation.s
 import { EmptyState } from '@/features/EmptyState';
 import { collaborationNetwork } from '@/core/viz/collaboration';
 import { cn } from '@/lib/utils';
+import { entityTypeLabel, numberLocale } from '@/lib/i18n/labels';
 import { PALETTE } from '@/features/overview/viz-shared';
 
 import { cleanDoiUrl } from './doi';
@@ -74,6 +75,7 @@ export default function SearchTab() {
   // e a busca continua no lugar ao voltar para esta aba.
   const type = useNavigation((state) => state.searchType);
   const term = useNavigation((state) => state.searchTerm);
+  const typeLabel = entityTypeLabel(type, locale);
   const setType = (searchType: SearchEntityType): void => useNavigation.setState({ searchType });
   const setTerm = (searchTerm: string | null): void => useNavigation.setState({ searchTerm });
   const [showAllCoauthors, setShowAllCoauthors] = useState(false);
@@ -128,9 +130,9 @@ export default function SearchTab() {
       timespan:
         years.length > 0
           ? `${Math.min(...years)}–${Math.max(...years)}`
-          : 'N/S',
+          : locale === 'en' ? 'N/A' : 'N/S',
     };
-  }, [documents]);
+  }, [documents, locale]);
 
   const similar = useMemo(
     () => (profiles && term ? findSimilar(profiles, term, type) : []),
@@ -273,12 +275,12 @@ export default function SearchTab() {
                 }}
               >
                 <SelectTrigger id="search-type" className="h-10 rounded-xl">
-                  <SelectValue />
+                  <SelectValue>{typeLabel}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {types.map((option) => (
                     <SelectItem key={option} value={option}>
-                      {option}
+                      {entityTypeLabel(option, locale)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -286,7 +288,7 @@ export default function SearchTab() {
             </div>
 
             <div className="space-y-1.5">
-              <Label>{locale === 'en' ? `Select ${type}` : `Selecionar ${type}`}</Label>
+              <Label>{locale === 'en' ? `Select ${typeLabel}` : `Selecionar ${typeLabel}`}</Label>
               <SearchableSelect
                 options={rawOptions}
                 value={term}
@@ -295,13 +297,13 @@ export default function SearchTab() {
                 }}
                 placeholder={
                   locale === 'en'
-                    ? `Click to select ${type.toLowerCase()}...`
-                    : `Clique para selecionar ${type.toLowerCase()}...`
+                    ? `Click to select ${typeLabel.toLowerCase()}...`
+                    : `Clique para selecionar ${typeLabel.toLowerCase()}...`
                 }
                 searchPlaceholder={
                   locale === 'en'
-                    ? `Type to filter ${type.toLowerCase()}...`
-                    : `Digite para filtrar ${type.toLowerCase()}...`
+                    ? `Type to filter ${typeLabel.toLowerCase()}...`
+                    : `Digite para filtrar ${typeLabel.toLowerCase()}...`
                 }
                 emptyText={
                   locale === 'en'
@@ -322,11 +324,11 @@ export default function SearchTab() {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <CardTitle className="text-lg font-bold text-foreground break-words">{term}</CardTitle>
                 <Badge variant="blue" className="text-xs">
-                  {type}
+                  {typeLabel}
                 </Badge>
               </div>
               <CardDescription>
-                {documents.length.toLocaleString('pt-BR')}{' '}
+                {documents.length.toLocaleString(numberLocale(locale))}{' '}
                 {locale === 'en' ? 'documents' : 'documentos'} · {dossier.timespan}
               </CardDescription>
 
@@ -412,7 +414,7 @@ export default function SearchTab() {
                   tone="amber"
                 />
                 <KpiCard
-                  title="Índice h"
+                  title={locale === 'en' ? 'h-index' : 'Índice h'}
                   value={dossier.indices.h}
                   tone="purple"
                   info={
@@ -422,7 +424,7 @@ export default function SearchTab() {
                   }
                 />
                 <KpiCard
-                  title="Índice g"
+                  title={locale === 'en' ? 'g-index' : 'Índice g'}
                   value={dossier.indices.g}
                   tone="purple"
                   info={
@@ -432,7 +434,7 @@ export default function SearchTab() {
                   }
                 />
                 <KpiCard
-                  title="Índice i10"
+                  title={locale === 'en' ? 'i10-index' : 'Índice i10'}
                   value={dossier.indices.i10}
                   tone="indigo"
                   info={
@@ -442,7 +444,7 @@ export default function SearchTab() {
                   }
                 />
                 <KpiCard
-                  title="Índice m"
+                  title={locale === 'en' ? 'm-index' : 'Índice m'}
                   value={dossier.indices.m}
                   tone="indigo"
                   info={
@@ -584,10 +586,10 @@ export default function SearchTab() {
                                 </button>
                               </TableCell>
                               <TableCell className="text-right tabular-nums font-semibold">
-                                {count.toLocaleString('pt-BR')}
+                                {count.toLocaleString(numberLocale(locale))}
                               </TableCell>
                               <TableCell className="text-right tabular-nums text-muted-foreground">
-                                {citations.toLocaleString('pt-BR')}
+                                {citations.toLocaleString(numberLocale(locale))}
                               </TableCell>
                             </TableRow>
                           ))}
@@ -692,7 +694,7 @@ export default function SearchTab() {
                         <WordCloud
                           words={cloudWords}
                           height={320}
-                          exportName={`nuvem-${term}`}
+                          exportName={`${locale === 'en' ? 'cloud' : 'nuvem'}-${term}`}
                           onWordClick={(word) => openInSearch(word, ['Palavra-chave'])}
                           isClickable={(word) => resolveEntity(word, ['Palavra-chave']) !== null}
                         />
@@ -721,7 +723,7 @@ export default function SearchTab() {
                         yLabel={t('search_timeline_docs')}
                         unit={t('prod_unit_docs')}
                         height={320}
-                        exportName={`producao-historica-${term}`}
+                        exportName={`${locale === 'en' ? 'historical-production' : 'producao-historica'}-${term}`}
                       />
                     )}
                   </TabsContent>
@@ -753,7 +755,7 @@ export default function SearchTab() {
                                 ['País'],
                               )
                             }
-                            exportName={`mapa-${term}`}
+                            exportName={`${locale === 'en' ? 'map' : 'mapa'}-${term}`}
                           />
                         </Suspense>
                       ) : (
@@ -778,6 +780,10 @@ export default function SearchTab() {
                   onOpenDocument={(title) => {
                     setType('Documento');
                     setTerm(title);
+                  }}
+                  onOpenKeyword={(keyword) => {
+                    setType('Palavra-chave');
+                    setTerm(keyword);
                   }}
                 />
               </CardContent>

@@ -10,6 +10,8 @@ import { useLocale } from '@/state/locale.store';
 import { getAiWorker } from '@/workers/client';
 import { cn } from '@/lib/utils';
 import { AiSettingsModal } from '@/components/AiSettingsModal';
+import { FreeQuotaNotice } from '@/components/FreeQuotaNotice';
+import { useFreeTier } from '@/state/free-tier.store';
 import { MarkdownContent } from '@/components/MarkdownContent';
 import { usePresence } from '@/lib/use-presence';
 
@@ -28,6 +30,8 @@ export function ChatWidget() {
   const isEn = locale === 'en';
   const { config, isConfigured } = useAiConfig();
   const isAiConfigured = isConfigured();
+  const freeStatus = useFreeTier((state) => state.status);
+  const freeSimi = freeStatus?.deepseek.available && freeStatus.simi.limit > 0 ? freeStatus.simi : null;
 
   const [isOpen, setIsOpen] = useState(false);
   const panel = usePresence(isOpen);
@@ -214,7 +218,11 @@ export function ChatWidget() {
                 <p className="text-[10px] text-muted-foreground truncate max-w-[190px]">
                   {isAiConfigured
                     ? `${config.provider.toUpperCase()} · ${config.model}`
-                    : t('ai_not_configured')}
+                    : freeSimi
+                      ? t('chat_free_subtitle')
+                          .replace('{remaining}', String(freeSimi.remaining))
+                          .replace('{limit}', String(freeSimi.limit))
+                      : t('ai_not_configured')}
                 </p>
               </div>
             </div>
@@ -236,7 +244,7 @@ export function ChatWidget() {
                   onClick={clearChat}
                   className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
                   title={isEn ? 'Clear history' : 'Limpar conversa'}
-                  aria-label="Limpar conversa"
+                  aria-label={isEn ? 'Clear history' : 'Limpar conversa'}
                 >
                   <Trash2 className="size-4" />
                 </button>
@@ -247,7 +255,7 @@ export function ChatWidget() {
                 onClick={() => setIsOpen(false)}
                 className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 title={isEn ? 'Minimize' : 'Minimizar'}
-                aria-label="Fechar"
+                aria-label={isEn ? 'Close' : 'Fechar'}
               >
                 <X className="size-4" />
               </button>
@@ -279,24 +287,7 @@ export function ChatWidget() {
               </div>
             ) : (
               <>
-                {!isAiConfigured && (
-                  <div className="rounded-xl border border-purple-200 bg-purple-50/80 p-2.5 text-[11px] text-purple-950 dark:border-purple-900 dark:bg-purple-950/40 dark:text-purple-300">
-                    <div className="flex items-start gap-2">
-                      <KeyRound className="size-4 shrink-0 text-purple-600 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="font-medium leading-snug">{t('chat_no_key_warning')}</p>
-                        <Button
-                          variant="ai"
-                          size="sm"
-                          onClick={() => setAiModalOpen(true)}
-                          className="mt-2 h-6 text-[10px] font-bold"
-                        >
-                          {t('ai_settings_btn')}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                <FreeQuotaNotice compact onConfigure={() => setAiModalOpen(true)} />
 
                 {displayedMessages.map((message, index) => (
                   <div
@@ -398,7 +389,7 @@ export function ChatWidget() {
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
                 placeholder={t('chat_placeholder')}
-                aria-label="Pergunta para a Simi"
+                aria-label={isEn ? 'Question for Simi' : 'Pergunta para a Simi'}
                 disabled={streaming || !active}
                 className="h-9 rounded-lg text-xs"
               />

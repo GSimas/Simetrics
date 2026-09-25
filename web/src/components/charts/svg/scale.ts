@@ -4,6 +4,9 @@
  * Substituem o que o Plotly fazia por dentro: mapear domínio → pixels, achar marcas
  * "redondas" (1, 2, 5 × 10ⁿ) e formatar números no padrão brasileiro.
  */
+import { numberLocale } from '@/lib/i18n/labels';
+import type { Locale } from '@/lib/i18n/translations';
+
 export interface Scale {
   (value: number): number;
   invert: (pixel: number) => number;
@@ -81,18 +84,19 @@ export function logTicks(min: number, max: number): number[] {
   return ticks;
 }
 
-/** Número no padrão brasileiro; `digits` limita as casas decimais. */
-export function formatNumber(value: number, digits = 2): string {
-  return value.toLocaleString('pt-BR', { maximumFractionDigits: digits });
+/** Número no padrão do idioma (brasileiro por padrão); `digits` limita as casas decimais. */
+export function formatNumber(value: number, digits = 2, locale: Locale = 'pt'): string {
+  return value.toLocaleString(numberLocale(locale), { maximumFractionDigits: digits });
 }
 
-/** Rótulo curto de eixo: 1.200 → "1,2 mil", 3.400.000 → "3,4 mi". */
-export function formatTick(value: number): string {
+/** Rótulo curto de eixo: 1.200 → "1,2 mil", 3.400.000 → "3,4 mi" (em inglês, "k" e "M"). */
+export function formatTick(value: number, locale: Locale = 'pt'): string {
   const abs = Math.abs(value);
-  if (abs >= 1e6) return `${formatNumber(value / 1e6, 1)} mi`;
-  if (abs >= 1e4) return `${formatNumber(value / 1e3, 1)} mil`;
+  const en = locale === 'en';
+  if (abs >= 1e6) return `${formatNumber(value / 1e6, 1, locale)}${en ? 'M' : ' mi'}`;
+  if (abs >= 1e4) return `${formatNumber(value / 1e3, 1, locale)}${en ? 'k' : ' mil'}`;
   if (abs > 0 && abs < 0.01) return value.toExponential(0);
-  return formatNumber(value, abs < 1 ? 2 : abs < 10 ? 1 : 0);
+  return formatNumber(value, abs < 1 ? 2 : abs < 10 ? 1 : 0, locale);
 }
 
 export function clamp(value: number, min: number, max: number): number {

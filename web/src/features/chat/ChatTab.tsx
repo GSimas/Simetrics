@@ -18,6 +18,7 @@ import { getAiWorker } from '@/workers/client';
 import { EmptyState } from '@/features/EmptyState';
 import { cn } from '@/lib/utils';
 import { AiSettingsModal } from '@/components/AiSettingsModal';
+import { FreeQuotaNotice } from '@/components/FreeQuotaNotice';
 import { MarkdownContent } from '@/components/MarkdownContent';
 
 /** Quantos documentos o BM25 seleciona por pergunta. */
@@ -26,6 +27,7 @@ const CONTEXT_SIZE = 40;
 export default function ChatTab() {
   const active = useDataset((state) => state.active);
   const t = useLocale((state) => state.t);
+  const locale = useLocale((state) => state.locale);
   const isAiConfigured = useAiConfig((state) => state.isConfigured());
 
   const [aiModalOpen, setAiModalOpen] = useState(false);
@@ -169,22 +171,7 @@ export default function ChatTab() {
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {!isAiConfigured && (
-            <div className="rounded-xl border border-purple-200 bg-purple-50/70 p-3 text-xs text-purple-900 flex flex-wrap items-center justify-between gap-2 dark:border-purple-900 dark:bg-purple-950/40 dark:text-purple-300">
-              <div className="flex items-center gap-2">
-                <KeyRound className="size-4 shrink-0 text-purple-600" />
-                <span>{t('chat_no_key_warning')}</span>
-              </div>
-              <Button
-                variant="ai"
-                size="sm"
-                onClick={() => setAiModalOpen(true)}
-                className="h-7 text-xs font-bold"
-              >
-                {t('ai_settings_btn')}
-              </Button>
-            </div>
-          )}
+          <FreeQuotaNotice onConfigure={() => setAiModalOpen(true)} />
 
           <div
             ref={scrollRef}
@@ -287,7 +274,7 @@ export default function ChatTab() {
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               placeholder={t('chat_placeholder')}
-              aria-label="Pergunta para a Simi"
+              aria-label={locale === 'en' ? 'Question for Simi' : 'Pergunta para a Simi'}
               disabled={streaming}
               className="rounded-lg shadow-2xs"
             />
