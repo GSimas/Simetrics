@@ -242,7 +242,9 @@ export default function App() {
 
       {/* Rodapé com crédito de desenvolvimento centralizado */}
       <footer className="mt-20 border-t border-border bg-background py-8">
-        <div className="container flex flex-col items-center justify-between gap-4 text-center text-xs text-muted-foreground md:flex-row">
+        {/* Reserva a área dos botões flutuantes (Simi e café, canto inferior direito): embaixo
+            no layout empilhado, à direita no layout em linha — o crédito nunca fica coberto. */}
+        <div className="container flex flex-col items-center justify-between gap-4 pb-24 text-center text-xs text-muted-foreground md:flex-row md:pb-0 md:pr-24">
           <div className="flex items-center justify-center md:justify-start gap-3">
             <span className="brand-mark h-6 text-foreground" aria-hidden />
             <a
