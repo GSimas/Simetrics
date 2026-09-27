@@ -113,6 +113,11 @@ export function UploadPanel() {
             {t('upload_load_demo')}
           </Button>
 
+          {/* Sempre montado: uma região viva que nasce junto com o texto não é anunciada. */}
+          <span role="status" className="sr-only">
+            {active && !busy ? `${active.length.toLocaleString(numberLocale(locale))} ${t('upload_loaded_count')}` : ''}
+          </span>
+
           {active && (
             <>
               <span className="eyebrow inline-flex items-center gap-2 px-1 text-foreground">
@@ -194,21 +199,22 @@ export function UploadPanel() {
             {shownProgress && (
               <div className="space-y-1.5 pt-4">
                 <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>
+                  {/* Só a fase é anunciada: o percentual mudaria a cada passo e soterraria o leitor. */}
+                  <span aria-live="polite">
                     {shownProgress.detail
                       ? `${shownProgress.phase} — ${shownProgress.detail}`
                       : shownProgress.phase}
                   </span>
                   <span className="tabular-nums">{Math.round(shownProgress.ratio * 100)}%</span>
                 </div>
-                <Progress value={shownProgress.ratio * 100} />
+                <Progress value={shownProgress.ratio * 100} aria-label={shownProgress.phase} />
               </div>
             )}
           </Collapse>
 
           <Collapse open={error !== null}>
             {shownError && (
-              <p className="mt-4 border border-destructive/40 bg-destructive/5 p-2 text-sm text-destructive">
+              <p role="alert" className="mt-4 border border-destructive/40 bg-destructive/5 p-2 text-sm text-destructive">
                 {shownError}
               </p>
             )}

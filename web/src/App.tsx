@@ -216,6 +216,9 @@ export default function App() {
 
             {TABS.map(({ value, labelKey, Panel }) => (
               <TabsContent key={value} value={value} className="mt-5">
+                {/* h1 (marca) → h2 (aba) → h3 (seções): sem ele, a hierarquia pulava do h1
+                    para o h3 (heading-order no Lighthouse). Só para leitores de tela. */}
+                <h2 className="sr-only">{t(labelKey)}</h2>
                 {/* Uma aba que quebre (ou cujo chunk não baixe) não leva as outras junto. */}
                 <ErrorBoundary variant="page" label={t(labelKey)}>
                   <Suspense fallback={<TabFallback />}>
@@ -240,7 +243,7 @@ export default function App() {
       <BuyMeCoffeeButton />
 
       {/* Rodapé com crédito de desenvolvimento centralizado */}
-      <footer className="mt-20 border-t border-border bg-background py-8">
+      <footer className="app-footer mt-20 border-t border-border bg-background py-8">
         {/* Reserva a área dos botões flutuantes (Simi e café, canto inferior direito): embaixo
             no layout empilhado, à direita no layout em linha — o crédito nunca fica coberto. */}
         <div className="container flex flex-col items-center justify-between gap-4 pb-24 text-center text-xs text-muted-foreground md:flex-row md:pb-0 md:pr-24">
@@ -293,7 +296,8 @@ export default function App() {
 function TabFallback() {
   const t = useLocale((state) => state.t);
   return (
-    <div className="min-h-[60vh]" aria-busy="true">
+    // data-tab-fallback: o rodapé fica invisível enquanto isto existe (ver index.css).
+    <div className="min-h-[60vh]" aria-busy="true" data-tab-fallback>
       <span className="sr-only">{t('loading')}</span>
     </div>
   );

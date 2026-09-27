@@ -296,6 +296,15 @@
   --color-zinc-950: #07110f;
 }
 
+/*
+ * Enquanto a aba carrega, o fallback reserva 60vh e o conteúdo real quase nunca tem essa
+ * altura: o rodapé mudava de lugar à vista (CLS). Invisível, ele se move sem contar como
+ * deslocamento, e reaparece já na posição final.
+ */
+body:has([data-tab-fallback]) .app-footer {
+  visibility: hidden;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

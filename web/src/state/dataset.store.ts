@@ -9,7 +9,6 @@ import type { ClusteringResult } from '@/core/clustering';
 import type { HybridRun } from '@/core/hybrid/types';
 import { applyThemes, fallbackThemeName } from '@/core/theme-assignment';
 import { buildSearchOptions, type SearchOptions } from '@/core/search';
-import { labelCluster } from '@/lib/ai-client';
 import { DEMO_FILES } from '@/lib/demo';
 import { useLocale } from './locale.store';
 import { MAX_DOCUMENTS, type DatabaseName } from '@/lib/schema';
@@ -366,6 +365,8 @@ export const useDataset = create<DatasetState>()(subscribeWithSelector((set, get
         return;
       }
 
+      // Import sob demanda: o cliente de IA só serve aqui e no chat, e estava no JS inicial.
+      const { labelCluster } = await import('@/lib/ai-client');
       const names = new Map<number, string>();
       let failures = 0;
 
