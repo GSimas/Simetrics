@@ -24,6 +24,24 @@ const MessageMarkdown = memo(MarkdownContent);
 /** Quantos documentos o BM25 seleciona por pergunta. */
 const CONTEXT_SIZE = 40;
 
+/** Três pontos pulsando + rótulo: "pensando" antes do texto chegar, "escrevendo" durante. */
+function TypingIndicator({ label, className }: { label: string; className?: string | undefined }) {
+  return (
+    <span className={cn('flex items-center gap-2 text-[11px] text-muted-foreground', className)}>
+      <span className="flex items-center gap-1" aria-hidden>
+        {[0, 150, 300].map((delay) => (
+          <span
+            key={delay}
+            className="size-1.5 animate-bounce rounded-full bg-emerald-500"
+            style={{ animationDelay: `${delay}ms` }}
+          />
+        ))}
+      </span>
+      {label}
+    </span>
+  );
+}
+
 export function ChatWidget() {
   const active = useDataset((state) => state.active);
   const { t, locale } = useLocale();
@@ -334,14 +352,23 @@ export function ChatWidget() {
 
                       {message.role === 'user' ? (
                         <p className="whitespace-pre-wrap">{message.content}</p>
-                      ) : message.content ? (
-                        <MessageMarkdown content={message.content} />
-                      ) : streaming && index === displayedMessages.length - 1 ? (
-                        <span className="flex items-center gap-1.5 text-muted-foreground text-[11px]">
-                          <span className="size-1.5 animate-bounce rounded-full bg-emerald-500" />
-                          {currentStatus || t('chat_analyzing')}
-                        </span>
-                      ) : null}
+                      ) : (
+                        <>
+                          {/* trim: modelos com raciocínio costumam abrir com quebras de linha,
+                              que o Markdown não desenha — o balão ficava em branco. */}
+                          {message.content.trim() && <MessageMarkdown content={message.content} />}
+                          {streaming && index === displayedMessages.length - 1 && (
+                            <TypingIndicator
+                              label={
+                                message.content.trim()
+                                  ? t('chat_writing')
+                                  : currentStatus || t('chat_thinking')
+                              }
+                              className={message.content.trim() ? 'mt-2' : undefined}
+                            />
+                          )}
+                        </>
+                      )}
                     </div>
                   </div>
                 ))}
