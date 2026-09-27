@@ -10,8 +10,12 @@
  * Acentos: sinal (#b8ff4a) no escuro e pinho (#236e5e) no claro — o verde-limão não tem
  * contraste sobre o papel. Cantos retos, linhas finas no lugar de sombras, tipografia
  * Manrope + Instrument Serif (itálico de destaque) + DM Mono (rótulos em caixa-alta).
+ *
+ * `.report-paper`: a folha da prévia do relatório herda sempre as cores claras — o PDF e
+ * o DOCX são impressos em papel, e a prévia mostra exatamente o que vai para eles.
  */
-:root {
+:root,
+.report-paper {
   --radius: 0px;
 
   --ink: #07110f;
@@ -294,6 +298,17 @@
   --color-zinc-800: #1f2c28;
   --color-zinc-900: #13201c;
   --color-zinc-950: #07110f;
+}
+
+/*
+ * Gráficos na folha do relatório são figuras estáticas: sem barra de ferramentas (ampliar,
+ * exportar, zoom, busca) e sem interação — o que se vê é o que vai para o documento.
+ */
+.report-paper [data-report-chart] :is(button, input, [data-chart-toolbar]) {
+  display: none;
+}
+.report-paper [data-report-chart] > :not(figcaption) {
+  pointer-events: none;
 }
 
 /*

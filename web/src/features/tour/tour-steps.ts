@@ -546,11 +546,11 @@ export const TOUR_STEPS: TourStep[] = [
     needsData: true,
     pt: {
       title: 'Relatório executivo',
-      body: 'Monte o relatório marcando as seções — resumo executivo, indicadores, rankings, gráficos, temas de IA, topologia da rede — e quantos itens entram em cada ranking. Gere em PDF diagramado ou Word (DOCX) editável, direto no navegador.',
+      body: 'Monte o relatório marcando seções e gráficos — do resumo executivo às redes, mapas e análises visuais avançadas — e quantas linhas entram em cada tabela. Em Baixar, escolha PDF diagramado ou Word (DOCX) editável, gerados no navegador.',
     },
     en: {
       title: 'Executive report',
-      body: 'Build the report by ticking sections — executive summary, indicators, rankings, charts, AI themes, network topology — and how many items each ranking includes. Generate a laid-out PDF or an editable Word (DOCX) file, right in the browser.',
+      body: 'Build the report by ticking sections and charts — from the executive summary to networks, maps and advanced visual analyses — and how many rows each table includes. Under Download, pick a laid-out PDF or an editable Word (DOCX) file, generated in the browser.',
     },
   },
   {
@@ -561,11 +561,11 @@ export const TOUR_STEPS: TourStep[] = [
     needsData: true,
     pt: {
       title: 'Pré-visualização',
-      body: 'Uma prévia ao vivo do documento, atualizada a cada seção marcada ou desmarcada. O que você vê aqui é o que vai para o arquivo.',
+      body: 'Uma prévia ao vivo do documento, ao lado da seleção, atualizada a cada item marcado ou desmarcado. O que você vê aqui é o que vai para o arquivo.',
     },
     en: {
       title: 'Preview',
-      body: 'A live preview of the document, updated whenever you tick or untick a section. What you see here is what goes into the file.',
+      body: 'A live preview of the document, next to the selection, updated whenever you tick or untick an item. What you see here is what goes into the file.',
     },
   },
   {

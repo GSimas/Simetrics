@@ -24,6 +24,12 @@ const escapeXml = (text: string): string =>
   text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 export function rankingImage(title: string, metric: string, items: readonly RankingExportItem[]): ChartImage {
+  const { svg, width, height } = rankingSvg(title, metric, items);
+  return { svg: resolveCssVariables(svg), width, height };
+}
+
+/** O mesmo SVG com as cores ainda em `var(--token)` — para desenhar na página e herdar o tema. */
+export function rankingSvg(title: string, metric: string, items: readonly RankingExportItem[]): ChartImage {
   const height = HEADER + items.length * ROW + PAD;
   const valueWidth = Math.max(...items.map((item) => measureText(item.value, 13, FONT_SANS, 700)), 30);
   const labelLeft = PAD + 30;
@@ -52,5 +58,5 @@ export function rankingImage(title: string, metric: string, items: readonly Rank
     rows +
     `</svg>`;
 
-  return { svg: resolveCssVariables(svg), width: WIDTH, height };
+  return { svg, width: WIDTH, height };
 }

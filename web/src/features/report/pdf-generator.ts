@@ -2,8 +2,7 @@ import jsPDF from 'jspdf';
 import autoTable, { type UserOptions } from 'jspdf-autotable';
 
 import type { AnalyticsBundle, EntityTables } from '@/workers/analytics.worker';
-import type { CooccurrenceReport, SnaReport } from '@/core/graph';
-import type { CollaborationNetwork } from '@/core/viz/collaboration';
+import type { SnaReport } from '@/core/graph';
 import type { ClusteringResult } from '@/core/clustering';
 import type { HybridRun } from '@/core/hybrid/types';
 import { hybridMethodsText } from '@/core/hybrid/report';
@@ -13,48 +12,26 @@ import { FIELD, FIELD_CANDIDATES } from '@/lib/schema';
 import { collectColumns, pickColumn, toNumeric } from '@/core/text';
 import { localizeMetricText } from '@/core/graph/metrics';
 import { localizeTableText } from '@/core/tables';
+import { BRAND } from './chart-renderer';
 import {
-  BRAND,
-  reportAuthorsChart,
-  reportCountriesChart,
-  reportNetworkChart,
-  reportProductionChart,
-  reportNamedThemesChart,
-  reportThemesChart,
-  reportWordCloudChart,
-  reportWorldMapChart,
-} from './chart-renderer';
-
-export interface ReportSectionsSelection {
-  summary: boolean;
-  kpis: boolean;
-  chartProduction: boolean;
-  authors: boolean;
-  chartAuthors: boolean;
-  countries: boolean;
-  chartCountries: boolean;
-  chartWorldMap: boolean;
-  venues: boolean;
-  keywords: boolean;
-  chartKeywords: boolean;
-  themes: boolean;
-  chartThemes: boolean;
-  networkTopology: boolean;
-  chartNetwork: boolean;
-  topDocuments: boolean;
-}
+  ADVANCED_CHARTS,
+  reportLabel,
+  type ReportChartId,
+  type ReportImages,
+  type ReportSelection,
+} from './report-catalog';
 
 export interface PdfReportData {
   dataset: Dataset;
   overview: AnalyticsBundle | null;
   tables: EntityTables | null;
   sna: SnaReport | null;
-  network: CooccurrenceReport | null;
-  collaboration: CollaborationNetwork | null;
   clustering: ClusteringResult | null;
   /** Quando presente, é a classificação híbrida que define os temas da base. */
   hybridRun?: HybridRun | null;
-  selection: ReportSectionsSelection;
+  selection: ReportSelection;
+  /** Gráficos capturados da prévia (`capture.ts`), já em PNG. */
+  images: ReportImages;
   topN: number;
   locale: 'pt' | 'en';
 }
@@ -89,11 +66,10 @@ export function generatePdfReport({
   overview,
   tables,
   sna,
-  network,
-  collaboration,
   clustering,
   hybridRun = null,
   selection,
+  images,
   topN = 15,
   locale = 'pt',
 }: PdfReportData): void {
@@ -187,6 +163,26 @@ export function generatePdfReport({
     cursorY += Math.ceil(items.length / cols) * (cardH + gap) + 8;
   };
 
+  // Gráfico da prévia: legenda com o nome, largura do conteúdo e a proporção original;
+  // alto demais para a página, encolhe pela altura.
+  const chart = (id: ReportChartId) => {
+    const image = selection[id] ? images[id] : undefined;
+    if (!image) return;
+    let width = contentWidth;
+    let height = (width * image.height) / image.width;
+    const maxHeight = pageHeight - margin * 2 - 90;
+    if (height > maxHeight) {
+      height = maxHeight;
+      width = (height * image.width) / image.height;
+    }
+    checkPageBreak(height + 30);
+    eyebrow(reportLabel(id, locale), margin, cursorY + 6, C.inkMuted);
+    cursorY += 16;
+    // O jsPDF embute PNG como pixels crus por padrão (≈130 MB com todos os gráficos).
+    doc.addImage(image.dataUrl, 'PNG', margin + (contentWidth - width) / 2, cursorY, width, height, undefined, 'FAST');
+    cursorY += height + 20;
+  };
+
   const totalCitations = dataset.reduce((acc, d) => acc + (toNumeric(d[FIELD.TOTAL_CITATIONS]) ?? 0), 0);
   const meanCitations = dataset.length > 0 ? totalCitations / dataset.length : 0;
 
@@ -278,15 +274,7 @@ export function generatePdfReport({
     ]);
   }
 
-  // --- GRÁFICO 1: EVOLUÇÃO TEMPORAL DA PRODUÇÃO ---
-  if (selection.chartProduction && overview && overview.docsPerYear.length > 0) {
-    checkPageBreak(210);
-    const chartImg = reportProductionChart(overview.docsPerYear, locale);
-    if (chartImg) {
-      doc.addImage(chartImg, 'PNG', margin, cursorY, contentWidth, 200);
-      cursorY += 215;
-    }
-  }
+  chart('production');
 
   // --- 3. TOP AUTORES ---
   if (selection.authors && tables && tables.authors.length > 0) {
@@ -331,15 +319,7 @@ export function generatePdfReport({
     cursorY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 16;
   }
 
-  // --- GRÁFICO 2: TOP AUTORES ---
-  if (selection.chartAuthors && tables && tables.authors.length > 0) {
-    checkPageBreak(210);
-    const chartImg = reportAuthorsChart(tables.authors, locale);
-    if (chartImg) {
-      doc.addImage(chartImg, 'PNG', margin, cursorY, contentWidth, 200);
-      cursorY += 215;
-    }
-  }
+  chart('rankingAuthors');
 
   // --- 4. TOP PAÍSES ---
   if (selection.countries && tables && tables.countries.length > 0) {
@@ -381,25 +361,9 @@ export function generatePdfReport({
     cursorY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 16;
   }
 
-  // --- GRÁFICO 3: TOP PAÍSES ---
-  if (selection.chartCountries && tables && tables.countries.length > 0) {
-    checkPageBreak(210);
-    const chartImg = reportCountriesChart(tables.countries, locale);
-    if (chartImg) {
-      doc.addImage(chartImg, 'PNG', margin, cursorY, contentWidth, 200);
-      cursorY += 215;
-    }
-  }
-
-  // --- GRÁFICO 4: MAPA-MÚNDI DE COLABORAÇÃO INTERNACIONAL ---
-  if (selection.chartWorldMap && collaboration && collaboration.nodes.length > 0) {
-    checkPageBreak(250);
-    const mapImg = reportWorldMapChart(collaboration, locale);
-    if (mapImg) {
-      doc.addImage(mapImg, 'PNG', margin, cursorY, contentWidth, 230);
-      cursorY += 245;
-    }
-  }
+  chart('rankingCountries');
+  chart('worldMap');
+  chart('collabChord');
 
   // --- 5. TOP VENUES ---
   if (selection.venues && tables && tables.venues.length > 0) {
@@ -437,6 +401,7 @@ export function generatePdfReport({
 
     cursorY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 16;
   }
+  chart('rankingVenues');
 
   // --- 6. PALAVRAS-CHAVE ---
   if (selection.keywords && tables && tables.keywords.length > 0) {
@@ -475,15 +440,7 @@ export function generatePdfReport({
     cursorY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 16;
   }
 
-  // --- GRÁFICO 5: NUVEM DE PALAVRAS-CHAVE ---
-  if (selection.chartKeywords && tables && tables.keywords.length > 0) {
-    checkPageBreak(210);
-    const chartImg = reportWordCloudChart(tables.keywords, locale);
-    if (chartImg) {
-      doc.addImage(chartImg, 'PNG', margin, cursorY, contentWidth, 200);
-      cursorY += 215;
-    }
-  }
+  chart('wordCloud');
 
   // --- 7. MAPEAMENTO TEMÁTICO POR IA ---
   if (selection.themes && clustering && clustering.clusters.length > 0) {
@@ -569,23 +526,7 @@ export function generatePdfReport({
     cursorY += methodLines.length * 10.5 + 16;
   }
 
-  // --- GRÁFICO 6: DISTRIBUIÇÃO DE TEMAS ---
-  if (selection.chartThemes && clustering && clustering.clusters.length > 0) {
-    checkPageBreak(210);
-    const chartImg = reportThemesChart(clustering.clusters, dataset.length, locale);
-    if (chartImg) {
-      doc.addImage(chartImg, 'PNG', margin, cursorY, contentWidth, 200);
-      cursorY += 215;
-    }
-  }
-  if (selection.chartThemes && hybridRun) {
-    checkPageBreak(210);
-    const chartImg = reportNamedThemesChart(hybridReportRows(hybridRun), dataset.length, locale);
-    if (chartImg) {
-      doc.addImage(chartImg, 'PNG', margin, cursorY, contentWidth, 200);
-      cursorY += 215;
-    }
-  }
+  chart('themesChart');
 
   // --- 8. TOPOLOGIA DA REDE & ECOLOGIA PROFUNDA ---
   if (selection.networkTopology && sna) {
@@ -644,15 +585,8 @@ export function generatePdfReport({
     cursorY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 16;
   }
 
-  // --- GRÁFICO 7: REDE DE COOCORRÊNCIA (GRAFOS) ---
-  if (selection.chartNetwork && network && network.nodes.length > 0) {
-    checkPageBreak(260);
-    const netImg = reportNetworkChart(network.nodes, network.edges, locale);
-    if (netImg) {
-      doc.addImage(netImg, 'PNG', margin, cursorY, contentWidth, 240);
-      cursorY += 255;
-    }
-  }
+  chart('network');
+  chart('networkChord');
 
   // --- 9. TOP DOCUMENTOS MAIS CITADOS ---
   if (selection.topDocuments && dataset.length > 0) {
@@ -700,6 +634,16 @@ export function generatePdfReport({
         5: { cellWidth: 'auto' },
       },
     });
+    cursorY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 16;
+  }
+  chart('rankingDocuments');
+
+  // --- 9. ANÁLISES VISUAIS AVANÇADAS ---
+  const advanced = ADVANCED_CHARTS.filter((id) => selection[id] && images[id]);
+  if (advanced.length > 0) {
+    checkPageBreak(120);
+    sectionHeading(9, isEn ? 'Advanced Visual Analyses' : 'Análises Visuais Avançadas');
+    advanced.forEach(chart);
   }
 
   // --- NUMERAÇÃO DE PÁGINAS E RODAPÉ ---

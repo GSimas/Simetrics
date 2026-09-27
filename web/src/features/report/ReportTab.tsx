@@ -1,28 +1,16 @@
-import { useEffect, useState } from 'react';
-import {
-  BarChart3,
-  BookOpen,
-  CheckSquare,
-  Download,
-  FileCheck,
-  FileSpreadsheet,
-  FileText,
-  Globe2,
-  Image as ImageIcon,
-  Layers,
-  Network,
-  PieChart,
-  Quote,
-  Sparkles,
-  Square,
-  Users,
-} from 'lucide-react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { CheckSquare, Download, FileText, FileType, Loader2, Square } from 'lucide-react';
 
 import { SectionTitle } from '@/components/InfoTip';
-
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -42,41 +30,43 @@ import { useIdleRender } from '@/lib/use-idle-render';
 import type { CollaborationNetwork } from '@/core/viz/collaboration';
 import { hybridMethodsText } from '@/core/hybrid/report';
 import { hybridReportRows, hybridReportTitle } from '@/core/hybrid/report-rows';
-// Os geradores (jsPDF, docx) pesam ~1,2 MB: entram só no clique de exportar.
-import type { ReportSectionsSelection } from './pdf-generator';
-import { ReportChartImage } from './ReportChartImage';
-import {
-  REPORT_CHART_SIZE,
-  reportAuthorsChart,
-  reportCountriesChart,
-  reportNetworkChart,
-  reportProductionChart,
-  reportNamedThemesChart,
-  reportThemesChart,
-  reportWordCloudChart,
-  reportWorldMapChart,
-} from './chart-renderer';
+import { cn } from '@/lib/utils';
 
-const DEFAULT_SELECTION: ReportSectionsSelection = {
-  summary: true,
-  kpis: true,
-  chartProduction: true,
-  authors: true,
-  chartAuthors: true,
-  countries: true,
-  chartCountries: true,
-  chartWorldMap: true,
-  venues: true,
-  keywords: true,
-  chartKeywords: true,
-  themes: true,
-  chartThemes: true,
-  networkTopology: true,
-  chartNetwork: true,
-  topDocuments: true,
-};
+import { captureReportCharts } from './capture';
+import { reportNamedThemesChart, reportThemesChart } from './chart-renderer';
+import {
+  ADVANCED_CHARTS,
+  DEFAULT_SELECTION,
+  REPORT_GROUPS,
+  REPORT_ITEMS,
+  selectionOf,
+  type ReportChartId,
+  type ReportGroup,
+  type ReportItemId,
+  type ReportSelection,
+} from './report-catalog';
+import {
+  BoxplotFigure,
+  CollabChordFigure,
+  ConceptFigure,
+  GeneticsFigure,
+  HistoriographFigure,
+  LotkaFigure,
+  NetworkChordFigure,
+  NetworkFigure,
+  ProductionFigure,
+  RankingFigure,
+  SafeFigure,
+  SankeyFigure,
+  ThematicMapFigure,
+  ThemesFigure,
+  WordCloudFigure,
+  WorldMapFigure,
+} from './ReportCharts';
 
 const TOP_N_OPTIONS = [10, 15, 25, 50] as const;
+
+type ExportFormat = 'pdf' | 'docx';
 
 export default function ReportTab() {
   const active = useDataset((state) => state.active);
@@ -93,12 +83,14 @@ export default function ReportTab() {
   const { locale, t } = useLocale();
   const isEn = locale === 'en';
 
-  const [selection, setSelection] = useState<ReportSectionsSelection>(DEFAULT_SELECTION);
+  const [selection, setSelection] = useState<ReportSelection>(DEFAULT_SELECTION);
   const [topN, setTopN] = useState<number>(15);
-  const [collaboration, setCollaboration] = useState<CollaborationNetwork | null>(null);
-  const [isExportingPdf, setIsExportingPdf] = useState(false);
-  const [isExportingDocx, setIsExportingDocx] = useState(false);
-  const [exportError, setExportError] = useState<string | null>(null);
+  // `undefined`: ainda calculando; `null`: falhou.
+  const [collaboration, setCollaboration] = useState<CollaborationNetwork | null | undefined>(undefined);
+  const [downloadOpen, setDownloadOpen] = useState(false);
+  const [exporting, setExporting] = useState<ExportFormat | null>(null);
+  const [exportMessage, setExportMessage] = useState<string | null>(null);
+  const paperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!active) return;
@@ -126,391 +118,113 @@ export default function ReportTab() {
     };
   }, [active]);
 
-  // Gera as imagens dos gráficos sob demanda — as mesmas que a exportação reaproveita.
-  const productionChartImg = useIdleRender(
-    !overview || overview.docsPerYear.length === 0 ? null : () => reportProductionChart(overview.docsPerYear, locale),
-    [overview, locale],
-  );
-
-  const authorsChartImg = useIdleRender(
-    !tables || tables.authors.length === 0 ? null : () => reportAuthorsChart(tables.authors, locale),
-    [tables, locale],
-  );
-
-  const countriesChartImg = useIdleRender(
-    !tables || tables.countries.length === 0 ? null : () => reportCountriesChart(tables.countries, locale),
-    [tables, locale],
-  );
-
-  const worldMapChartImg = useIdleRender(
-    !collaboration || collaboration.nodes.length === 0 ? null : () => reportWorldMapChart(collaboration, locale),
-    [collaboration, locale],
-  );
-
-  const networkChartImg = useIdleRender(
-    !network || network.nodes.length === 0 ? null : () => reportNetworkChart(network.nodes, network.edges, locale),
-    [network, locale],
-  );
-
+  // O gráfico de temas não tem equivalente nas abas: segue desenhado em canvas.
   const themesChartImg = useIdleRender(
-    hybridRun
-      ? () => reportNamedThemesChart(hybridReportRows(hybridRun), active?.length ?? 0, locale)
-      : !clustering || clustering.clusters.length === 0
-        ? null
-        : () => reportThemesChart(clustering.clusters, active?.length ?? 0, locale),
-    [clustering, hybridRun, active, locale],
-  );
-
-  const wordCloudChartImg = useIdleRender(
-    !tables || tables.keywords.length === 0 ? null : () => reportWordCloudChart(tables.keywords, locale),
-    [tables, locale],
+    !selection.themesChart
+      ? null
+      : hybridRun
+        ? () => reportNamedThemesChart(hybridReportRows(hybridRun), active?.length ?? 0, locale)
+        : !clustering || clustering.clusters.length === 0
+          ? null
+          : () => reportThemesChart(clustering.clusters, active?.length ?? 0, locale),
+    [selection.themesChart, clustering, hybridRun, active, locale],
   );
 
   if (!active) {
     return <EmptyState title={isEn ? 'Scientific Report' : 'Relatório Científico'} />;
   }
 
-  const toggleSection = (key: keyof ReportSectionsSelection) => {
-    setSelection((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
+  const toggle = (id: ReportItemId) => setSelection((prev) => ({ ...prev, [id]: !prev[id] }));
 
-  const selectAll = () => {
-    setSelection({
-      summary: true,
-      kpis: true,
-      chartProduction: true,
-      authors: true,
-      chartAuthors: true,
-      countries: true,
-      chartCountries: true,
-      chartWorldMap: true,
-      venues: true,
-      keywords: true,
-      chartKeywords: true,
-      themes: true,
-      chartThemes: true,
-      networkTopology: true,
-      chartNetwork: true,
-      topDocuments: true,
-    });
-  };
-
-  const deselectAll = () => {
-    setSelection({
-      summary: false,
-      kpis: false,
-      chartProduction: false,
-      authors: false,
-      chartAuthors: false,
-      countries: false,
-      chartCountries: false,
-      chartWorldMap: false,
-      venues: false,
-      keywords: false,
-      chartKeywords: false,
-      themes: false,
-      chartThemes: false,
-      networkTopology: false,
-      chartNetwork: false,
-      topDocuments: false,
-    });
-  };
-
-  // Um frame para o botão mostrar "Gerando…" antes do trabalho pesado ocupar a página.
+  // Um frame para o modal mostrar "Gerando…" antes do trabalho pesado ocupar a página.
   const nextPaint = (): Promise<void> =>
     new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
 
-  const handleExportPdf = async () => {
-    setIsExportingPdf(true);
-    setExportError(null);
+  const handleDownload = async (format: ExportFormat) => {
+    const paper = paperRef.current;
+    if (!paper) return;
+    setExporting(format);
+    setExportMessage(null);
     try {
       await nextPaint();
-      const { generatePdfReport } = await import('./pdf-generator');
-      generatePdfReport({
-        dataset: active,
-        overview,
-        tables,
-        sna,
-        network,
-        collaboration,
-        clustering,
-        hybridRun,
-        selection,
-        topN,
-        locale,
-      });
+      const chartIds = REPORT_ITEMS.filter((item) => item.kind === 'chart' && selection[item.id]).map(
+        (item) => item.id as ReportChartId,
+      );
+      const { images, missing } = await captureReportCharts(paper, chartIds);
+      const data = { dataset: active, overview, tables, sna, clustering, hybridRun, selection, images, topN, locale };
+      if (format === 'pdf') {
+        const { generatePdfReport } = await import('./pdf-generator');
+        generatePdfReport(data);
+      } else {
+        const { generateDocxReport } = await import('./docx-generator');
+        await generateDocxReport(data);
+      }
+      if (missing.length > 0) {
+        const names = missing.map((id) => REPORT_ITEMS.find((item) => item.id === id)?.label[locale] ?? id).join(', ');
+        setExportMessage(
+          isEn
+            ? `Downloaded. These charts had not finished loading and were left out: ${names}.`
+            : `Baixado. Estes gráficos ainda não tinham terminado de carregar e ficaram de fora: ${names}.`,
+        );
+      } else {
+        setDownloadOpen(false);
+      }
     } catch (error) {
       console.error(error);
-      setExportError(isEn ? 'Could not generate the PDF.' : 'Não foi possível gerar o PDF.');
+      setExportMessage(isEn ? 'Could not generate the file.' : 'Não foi possível gerar o arquivo.');
     } finally {
-      setIsExportingPdf(false);
+      setExporting(null);
     }
   };
 
-  const handleExportDocx = async () => {
-    setIsExportingDocx(true);
-    setExportError(null);
-    try {
-      await nextPaint();
-      const { generateDocxReport } = await import('./docx-generator');
-      await generateDocxReport({
-        dataset: active,
-        overview,
-        tables,
-        sna,
-        network,
-        collaboration,
-        clustering,
-        hybridRun,
-        selection,
-        topN,
-        locale,
-      });
-    } catch (error) {
-      console.error(error);
-      setExportError(isEn ? 'Could not generate the DOCX file.' : 'Não foi possível gerar o DOCX.');
-    } finally {
-      setIsExportingDocx(false);
-    }
+  const counts: Partial<Record<ReportItemId, string | undefined>> = {
+    summary: `${active.length} docs`,
+    authors: tables ? `${tables.authors.length}` : undefined,
+    countries: tables ? `${tables.countries.length}` : undefined,
+    venues: tables ? `${tables.venues.length}` : undefined,
+    keywords: tables ? `${tables.keywords.length}` : undefined,
+    themes: hybridRun ? `${hybridRun.finalTaxonomy.length}` : clustering ? `${clustering.clusters.length}` : undefined,
+    networkTopology: sna ? `${sna.global.nodeCount}` : undefined,
   };
-
-  const totalCitations = active.reduce((acc, d) => acc + (toNumeric(d[FIELD.TOTAL_CITATIONS]) ?? 0), 0);
-
-  const sectionsList: {
-    key: keyof ReportSectionsSelection;
-    label: string;
-    labelEn: string;
-    desc: string;
-    descEn: string;
-    icon: typeof FileText;
-    isChart?: boolean;
-    count?: string | undefined;
-  }[] = [
-    {
-      key: 'summary',
-      label: 'Resumo Executivo & Escopo',
-      labelEn: 'Executive Summary & Scope',
-      desc: 'Panorama sintético, período temporal e contagens gerais da base.',
-      descEn: 'High-level synthesis, timespan, and global dataset volume.',
-      icon: FileText,
-      count: `${active.length} docs`,
-    },
-    {
-      key: 'kpis',
-      label: 'Indicadores Cientométricos Globais',
-      labelEn: 'Core Scientometric KPIs',
-      desc: 'Documentos, Citações, Taxa de Crescimento Anual e Colaboração Internacional.',
-      descEn: 'Articles, Citations, Annual Growth Rate, and International Collaboration Rate.',
-      icon: Quote,
-      count: overview ? `${overview.summary.totalDocs} docs` : undefined,
-    },
-    {
-      key: 'chartProduction',
-      label: '📈 Gráfico: Produção Anual (Linha do Tempo)',
-      labelEn: '📈 Chart: Annual Production Timeline',
-      desc: 'Visualização da evolução histórica da publicação de artigos por ano.',
-      descEn: 'Historical evolution chart of published papers per year.',
-      icon: BarChart3,
-      isChart: true,
-    },
-    {
-      key: 'authors',
-      label: 'Ranking de Autores & Produtividade',
-      labelEn: 'Authors Ranking & Impact',
-      desc: 'Tabela de autores com contagem de artigos, citações, índices h, g, i10 e m.',
-      descEn: 'Author metrics table including papers, citations, and h/g/i10/m indices.',
-      icon: Users,
-      count: tables ? `${tables.authors.length} ${isEn ? 'authors' : 'autores'}` : undefined,
-    },
-    {
-      key: 'chartAuthors',
-      label: '📊 Gráfico: Top 10 Autores Mais Produtivos',
-      labelEn: '📊 Chart: Top 10 Most Prolific Authors',
-      desc: 'Gráfico horizontal comparativo do volume de artigos e impacto dos autores.',
-      descEn: 'Horizontal bar chart comparing author publication volume and impact.',
-      icon: BarChart3,
-      isChart: true,
-    },
-    {
-      key: 'countries',
-      label: 'Geografia & Colaboração Internacional',
-      labelEn: 'Geographic Distribution',
-      desc: 'Produção por países e documentos mais citados de cada nação.',
-      descEn: 'Country-level scientific output and most cited articles.',
-      icon: Globe2,
-      count: tables ? `${tables.countries.length} ${isEn ? 'countries' : 'países'}` : undefined,
-    },
-    {
-      key: 'chartCountries',
-      label: '🌍 Gráfico: Top 10 Países com Maior Produção',
-      labelEn: '🌍 Chart: Top 10 Leading Countries',
-      desc: 'Gráfico de barras da distribuição geográfica da pesquisa.',
-      descEn: 'Bar chart of geographic distribution across nations.',
-      icon: Globe2,
-      isChart: true,
-    },
-    {
-      key: 'chartWorldMap',
-      label: '🌐 Gráfico: Mapa-Múndi de Colaboração Global',
-      labelEn: '🌐 Chart: World Collaboration Map',
-      desc: 'Mapa-múndi cartográfico com conexões e arcos de coautoria entre países.',
-      descEn: 'World map showing cross-border co-authorship arcs and output hubs.',
-      icon: Globe2,
-      isChart: true,
-    },
-    {
-      key: 'venues',
-      label: 'Veículos de Publicação (Periódicos/Venues)',
-      labelEn: 'Publishing Venues / Journals',
-      desc: 'Principais periódicos, anais e veículos que publicam sobre o tema.',
-      descEn: 'Top journals, conferences, and publishing outlets.',
-      icon: BookOpen,
-      count: tables ? `${tables.venues.length} venues` : undefined,
-    },
-    {
-      key: 'keywords',
-      label: 'Palavras-Chave & Lexicometria',
-      labelEn: 'Keywords & Lexicometrics',
-      desc: 'Frequência de palavras-chave, citações agregadas e densidade vocabular.',
-      descEn: 'Keyword frequency, aggregate citations, and vocabulary density.',
-      icon: FileSpreadsheet,
-      count: tables ? `${tables.keywords.length} ${isEn ? 'terms' : 'termos'}` : undefined,
-    },
-    {
-      key: 'chartKeywords',
-      label: '☁️ Gráfico: Nuvem de Palavras-Chave',
-      labelEn: '☁️ Chart: Lexicometric Word Cloud',
-      desc: 'Diagrama visual de nuvem com termos e densidades mais expressivas.',
-      descEn: 'Visual keyword cloud showing prominent scientific concepts.',
-      icon: ImageIcon,
-      isChart: true,
-    },
-    {
-      key: 'themes',
-      label: 'Estrutura Temática por IA (Clusters)',
-      labelEn: 'AI Thematic Clusters',
-      desc: 'Clusters semânticos descobertos, score de silhueta e termos característicos.',
-      descEn: 'Semantic research themes, silhouette score, and representative terms.',
-      icon: Sparkles,
-      count: hybridRun
-        ? `${hybridRun.finalTaxonomy.length} ${isEn ? 'categories' : 'categorias'}`
-        : clustering
-          ? `${clustering.clusters.length} ${isEn ? 'themes' : 'temas'}`
-          : undefined,
-    },
-    {
-      key: 'chartThemes',
-      label: '🎯 Gráfico: Distribuição de Temas por IA',
-      labelEn: '🎯 Chart: AI Thematic Distribution (Donut)',
-      desc: 'Gráfico de pizza/donut demonstrando a proporção de cada vertente de pesquisa.',
-      descEn: 'Donut chart illustrating the relative share of each research theme.',
-      icon: PieChart,
-      isChart: true,
-    },
-    {
-      key: 'networkTopology',
-      label: 'Topologia da Rede (Ecologia Profunda)',
-      labelEn: 'Deep Knowledge Ecology Topology',
-      desc: '11 métricas globais de rede (Densidade, Clustering, Entropia, Eficiência, PageRank, etc.).',
-      descEn: '11 global SNA metrics (Density, Clustering, Shannon Entropy, Efficiency, PageRank).',
-      icon: Network,
-      count: sna ? `${sna.global.nodeCount} ${isEn ? 'nodes' : 'nós'}` : undefined,
-    },
-    {
-      key: 'chartNetwork',
-      label: '🕸️ Gráfico: Rede de Coocorrência (Louvain)',
-      labelEn: '🕸️ Chart: Co-occurrence Network (Louvain)',
-      desc: 'Grafo de conexões conceituais, nós centrais e agrupamento por comunidades.',
-      descEn: 'Network graph of conceptual co-occurrences and Louvain community hubs.',
-      icon: Network,
-      isChart: true,
-    },
-    {
-      key: 'topDocuments',
-      label: 'Documentos Fundamentais (Mais Citados)',
-      labelEn: 'Highly Cited Seminal Documents',
-      desc: 'Tabela dos artigos mais influentes com autores, ano, citações e periódico.',
-      descEn: 'Most influential publications with authors, year, citations, and journal.',
-      icon: Layers,
-      count: `${active.length} total`,
-    },
-  ];
-
-  const selectedCount = sectionsList.filter(({ key }) => selection[key]).length;
-
-  const columns = collectColumns(active);
-  const titleCol = pickColumn(columns, FIELD_CANDIDATES.title);
-  const authCol = pickColumn(columns, FIELD_CANDIDATES.authors);
-
-  const sortedTopDocs = [...active]
-    .sort((a, b) => (toNumeric(b[FIELD.TOTAL_CITATIONS]) ?? 0) - (toNumeric(a[FIELD.TOTAL_CITATIONS]) ?? 0))
-    .slice(0, topN);
+  const selectedCount = REPORT_ITEMS.filter((item) => selection[item.id]).length;
+  const groups = Object.keys(REPORT_GROUPS) as ReportGroup[];
+  const firstAdvanced = REPORT_ITEMS.find((item) => ADVANCED_CHARTS.includes(item.id as ReportChartId) && selection[item.id])?.id;
 
   return (
-    <div className="space-y-6">
-      {/* 1. Painel de Controle de Exportação */}
-      <Card data-tour="report-builder">
-        <CardHeader>
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="space-y-1">
-              <SectionTitle title={t('report_title')} info={t('report_info')} />
-              <p className="eyebrow">
-                {selectedCount} / {sectionsList.length} {t('report_selected')} · Top {topN}
-              </p>
-            </div>
-
-            {/* Botões de Ação de Download */}
-            <div className="flex flex-wrap items-center gap-2.5">
-              <Button
-                variant="default"
-                onClick={() => void handleExportPdf()}
-                disabled={isExportingPdf}
-                aria-busy={isExportingPdf}
-                className="gap-2 cursor-pointer"
-              >
-                <Download className="size-4" />
-                {isExportingPdf ? (isEn ? 'Building PDF...' : 'Gerando PDF...') : isEn ? 'Export PDF' : 'Baixar PDF'}
-              </Button>
-
-              <Button
-                variant="outline"
-                onClick={() => void handleExportDocx()}
-                disabled={isExportingDocx}
-                aria-busy={isExportingDocx}
-                className="gap-2 cursor-pointer"
-              >
-                <FileCheck className="size-4" />
-                {isExportingDocx ? (isEn ? 'Building DOCX...' : 'Gerando DOCX...') : isEn ? 'Export DOCX (Word)' : 'Baixar DOCX (Word)'}
-              </Button>
-              {exportError && (
-                <p role="alert" className="basis-full text-sm text-destructive">
-                  {exportError}
-                </p>
-              )}
-            </div>
+    <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
+      {/* Seleção: coluna própria, fixa enquanto a prévia rola ao lado. */}
+      <Card data-tour="report-builder" className="lg:sticky lg:top-36 lg:max-h-[calc(100vh-10rem)] lg:overflow-y-auto">
+        <CardHeader className="space-y-4">
+          <div className="space-y-1">
+            <SectionTitle title={t('report_title')} info={t('report_info')} />
+            <p className="eyebrow">
+              {selectedCount} / {REPORT_ITEMS.length} {t('report_selected')}
+            </p>
           </div>
+          <Button onClick={() => { setExportMessage(null); setDownloadOpen(true); }} className="w-full cursor-pointer gap-2">
+            <Download className="size-4" aria-hidden />
+            {isEn ? 'Download' : 'Baixar'}
+          </Button>
         </CardHeader>
 
         <CardContent className="space-y-5">
-          {/* Barra de Seleção Rápida e Opções */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-y border-border/70 py-3">
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" onClick={selectAll} className="h-8 gap-1.5 text-xs font-semibold cursor-pointer">
-                <CheckSquare className="size-3.5 text-primary" />
-                {isEn ? 'Select All' : 'Selecionar Tudo'}
+          <div className="flex flex-wrap items-center justify-between gap-2 border-y border-border/70 py-2">
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="sm" onClick={() => setSelection(selectionOf(() => true))} className="h-8 cursor-pointer gap-1.5 px-2 text-xs font-semibold">
+                <CheckSquare className="size-3.5 text-primary" aria-hidden />
+                {isEn ? 'All' : 'Tudo'}
               </Button>
-              <Button variant="ghost" size="sm" onClick={deselectAll} className="h-8 gap-1.5 text-xs font-semibold text-muted-foreground cursor-pointer">
-                <Square className="size-3.5" />
-                {isEn ? 'Deselect All' : 'Desmarcar Tudo'}
+              <Button variant="ghost" size="sm" onClick={() => setSelection(selectionOf(() => false))} className="h-8 cursor-pointer gap-1.5 px-2 text-xs font-semibold text-muted-foreground">
+                <Square className="size-3.5" aria-hidden />
+                {isEn ? 'None' : 'Nenhum'}
               </Button>
             </div>
-
             <div className="flex items-center gap-2">
               <Label htmlFor="top-n-select" className="text-xs font-semibold text-muted-foreground">
-                {isEn ? 'Items per table:' : 'Itens por tabela:'}
+                {isEn ? 'Table rows' : 'Linhas por tabela'}
               </Label>
               <Select value={String(topN)} onValueChange={(val) => setTopN(Number(val))}>
-                <SelectTrigger id="top-n-select" className="h-8 w-28 text-xs font-bold">
+                <SelectTrigger id="top-n-select" className="h-8 w-24 text-xs font-bold">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -524,495 +238,60 @@ export default function ReportTab() {
             </div>
           </div>
 
-          {/* Grid de Seções e Gráficos com Checkboxes Interativos */}
-          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-            {sectionsList.map(({ key, label, labelEn, desc, descEn, count, isChart }) => {
-              const isChecked = selection[key];
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => toggleSection(key)}
-                  className={`flex items-start gap-3 rounded-xl border p-3 text-left transition-all duration-150 cursor-pointer ${
-                    isChecked
-                      ? isChart
-                        ? 'border-indigo-500/80 bg-indigo-500/[0.08] shadow-2xs'
-                        : 'border-blue-500/80 bg-blue-500/[0.06] shadow-2xs'
-                      : 'border-border/60 bg-card opacity-65 hover:opacity-100 hover:border-border'
-                  }`}
+          {groups.map((group) => (
+            <fieldset key={group} className="space-y-1">
+              <legend className="eyebrow mb-1.5 text-muted-foreground">{REPORT_GROUPS[group][locale]}</legend>
+              {REPORT_ITEMS.filter((item) => item.group === group).map((item) => (
+                <label
+                  key={item.id}
+                  className="flex cursor-pointer items-center gap-2.5 rounded-md px-1.5 py-1.5 text-sm transition-colors hover:bg-muted/60"
                 >
-                  <div
-                    className={`mt-0.5 grid size-5 shrink-0 place-items-center rounded border transition-colors ${
-                      isChecked
-                        ? isChart
-                          ? 'border-indigo-600 bg-indigo-600 text-white'
-                          : 'border-blue-600 bg-blue-600 text-white'
-                        : 'border-muted-foreground/40 bg-background'
-                    }`}
-                  >
-                    {isChecked && <CheckSquare className="size-3.5" />}
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-1">
-                      <p className="text-xs font-bold text-foreground truncate">
-                        {isEn ? labelEn : label}
-                      </p>
-                      {count && (
-                        <span className="rounded bg-muted px-1.5 py-0.2 text-[10px] font-semibold text-muted-foreground shrink-0">
-                          {count}
-                        </span>
-                      )}
-                      {isChart && (
-                        <Badge variant="purple" className="text-[9px] px-1 py-0 shrink-0">
-                          {isEn ? 'Chart' : 'Gráfico'}
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground line-clamp-2">
-                      {isEn ? descEn : desc}
-                    </p>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+                  <input
+                    type="checkbox"
+                    checked={selection[item.id]}
+                    onChange={() => toggle(item.id)}
+                    className="size-4 shrink-0 cursor-pointer accent-[var(--highlight)]"
+                  />
+                  <span className={cn('min-w-0 flex-1', !selection[item.id] && 'text-muted-foreground')}>{item.label[locale]}</span>
+                  {counts[item.id] && (
+                    <span className="shrink-0 tabular-nums text-[11px] text-muted-foreground">{counts[item.id]}</span>
+                  )}
+                </label>
+              ))}
+            </fieldset>
+          ))}
         </CardContent>
       </Card>
 
-      {/* 2. Pré-Visualização Ao Vivo do Documento (A4 Executive Styling com Gráficos) */}
-      <div data-tour="report-preview" className="space-y-3">
+      {/* Prévia ao vivo: a folha que vai para o PDF e o DOCX, sempre em papel claro. */}
+      <div data-tour="report-preview" className="min-w-0 space-y-3">
         <SectionTitle
           title={isEn ? 'Report preview' : 'Pré-visualização do relatório'}
           info={
             isEn
-              ? 'Laid out according to the sections and charts selected above.'
-              : 'Diagramado conforme as seções e gráficos selecionados acima.'
+              ? 'Updates live as you select sections and charts. The downloaded file follows this layout.'
+              : 'Atualiza ao vivo conforme a seleção. O arquivo baixado segue esta diagramação.'
           }
         />
 
-        <div className="mx-auto max-w-4xl rounded-2xl border border-border/90 bg-card p-6 sm:p-10 shadow-lg space-y-8 text-foreground transition-all">
-          {/* Header do Relatório */}
-          <div className="border-b border-border/80 pb-6">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="grid size-11 place-items-center border border-border text-highlight">
-                  <FileText className="size-6" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-black tracking-tight text-foreground">
-                    SIMETRICS
-                  </h1>
-                  <p className="text-xs font-semibold text-blue-600 dark:text-blue-400">
-                    {isEn ? 'Scientometric & Bibliometric Intelligence Report' : 'Relatório Cientométrico & Bibliométrico'}
-                  </p>
-                </div>
-              </div>
-              <Badge variant="blue" className="text-xs font-semibold">
-                {isEn ? 'Official Synthesis' : 'Síntese Oficial'}
-              </Badge>
+        <div ref={paperRef} className="report-paper space-y-8 border border-border bg-background p-6 text-foreground shadow-lg sm:p-10">
+          <ReportHeader overview={overview} total={active.length} isEn={isEn} />
+
+          {REPORT_ITEMS.filter((item) => selection[item.id]).map((item) => (
+            <div key={item.id} className="space-y-8">
+              {item.id === firstAdvanced && (
+                <SectionHeading>{isEn ? '9. Advanced Visual Analyses' : '9. Análises Visuais Avançadas'}</SectionHeading>
+              )}
+              <SafeFigure>{renderBlock(item.id)}</SafeFigure>
             </div>
+          ))}
 
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground border-t border-border/40 pt-3">
-              <span>
-                <strong>{isEn ? 'Corpus Scope' : 'Escopo'}:</strong> {active.length.toLocaleString(isEn ? 'en-US' : 'pt-BR')}{' '}
-                {isEn ? 'documents' : 'artigos'} · {overview?.summary.timespan || 'N/A'}
-              </span>
-              <span>
-                <strong>{isEn ? 'Generated on' : 'Emissão'}:</strong>{' '}
-                {new Date().toLocaleDateString(isEn ? 'en-US' : 'pt-BR', {
-                  day: '2-digit',
-                  month: 'long',
-                  year: 'numeric',
-                })}
-              </span>
-            </div>
-          </div>
-
-          {/* 1. Resumo Executivo */}
-          {selection.summary && overview && (
-            <div className="rounded-xl border border-blue-200 bg-blue-500/[0.04] p-4.5 dark:border-blue-900/60 space-y-2">
-              <h2 className="text-sm font-bold text-blue-700 dark:text-blue-400">
-                {isEn ? 'Executive Summary & Dataset Scope' : 'Resumo Executivo & Escopo da Base'}
-              </h2>
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                {isEn
-                  ? `This report compiles bibliometric metrics, collaboration graphs, and research themes from a corpus of ${active.length.toLocaleString('en-US')} papers published between ${overview.summary.timespan || 'N/A'}. A total of ${overview.summary.authorsCount.toLocaleString('en-US')} authors and ${overview.summary.countriesCount.toLocaleString('en-US')} countries participated in the production.`
-                  : `Este relatório consolida indicadores cientométricos, redes de colaboração e tópicos de pesquisa a partir de uma base com ${active.length.toLocaleString('pt-BR')} documentos indexados no período ${overview.summary.timespan || 'N/A'}. A produção envolveu ${overview.summary.authorsCount.toLocaleString('pt-BR')} autores e ${overview.summary.countriesCount.toLocaleString('pt-BR')} países.`}
-              </p>
-            </div>
-          )}
-
-          {/* 2. Indicadores Cientométricos Globais */}
-          {selection.kpis && overview && (
-            <div className="space-y-3">
-              <h2 className="text-sm font-bold text-foreground border-b border-border/60 pb-1.5">
-                {isEn ? '1. Core Scientometric Indicators' : '1. Indicadores Cientométricos Globais'}
-              </h2>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <div className="rounded-lg border border-border/70 p-3 bg-muted/20">
-                  <p className="text-[10px] font-semibold uppercase text-muted-foreground">
-                    {isEn ? 'Total Documents' : 'Documentos'}
-                  </p>
-                  <p className="text-xl font-bold tabular-nums text-foreground mt-0.5">
-                    {overview.summary.totalDocs.toLocaleString(isEn ? 'en-US' : 'pt-BR')}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-border/70 p-3 bg-muted/20">
-                  <p className="text-[10px] font-semibold uppercase text-muted-foreground">
-                    {isEn ? 'Total Authors' : 'Autores'}
-                  </p>
-                  <p className="text-xl font-bold tabular-nums text-foreground mt-0.5">
-                    {overview.summary.authorsCount.toLocaleString(isEn ? 'en-US' : 'pt-BR')}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-border/70 p-3 bg-muted/20">
-                  <p className="text-[10px] font-semibold uppercase text-muted-foreground">
-                    {isEn ? 'Total Citations' : 'Citações'}
-                  </p>
-                  <p className="text-xl font-bold tabular-nums text-foreground mt-0.5">
-                    {totalCitations.toLocaleString(isEn ? 'en-US' : 'pt-BR')}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-border/70 p-3 bg-muted/20">
-                  <p className="text-[10px] font-semibold uppercase text-muted-foreground">
-                    {isEn ? 'Annual Growth' : 'Crescimento Anual'}
-                  </p>
-                  <p className="text-xl font-bold tabular-nums text-foreground mt-0.5">
-                    {overview.summary.bibliometrix.growthRate.toFixed(2)}%
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Gráfico 1: Produção Anual */}
-          {selection.chartProduction && (
-            <ReportChartImage image={productionChartImg} {...REPORT_CHART_SIZE.production} alt={isEn ? 'Scientific production over time chart' : 'Gráfico de Evolução da Produção Científica'} />
-          )}
-
-          {/* 3. Top Autores */}
-          {selection.authors && tables && tables.authors.length > 0 && (
-            <div className="space-y-3">
-              <h2 className="text-sm font-bold text-foreground border-b border-border/60 pb-1.5">
-                {isEn ? `2. Top ${topN} Authors by Production & Impact` : `2. Principais Autores (Top ${topN})`}
-              </h2>
-              <div className="rounded-xl border overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50 text-[11px]">
-                      <TableHead className="w-10">#</TableHead>
-                      <TableHead>{isEn ? 'Author' : 'Autor'}</TableHead>
-                      <TableHead className="text-right">Docs</TableHead>
-                      <TableHead className="text-right">{isEn ? 'Citations' : 'Citações'}</TableHead>
-                      <TableHead className="text-right">h</TableHead>
-                      <TableHead className="text-right">g</TableHead>
-                      <TableHead className="text-right">i10</TableHead>
-                      <TableHead className="text-right">m</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody className="text-xs">
-                    {tables.authors.slice(0, topN).map((a, idx) => (
-                      <TableRow key={a.entity}>
-                        <TableCell className="font-semibold text-muted-foreground">{idx + 1}</TableCell>
-                        <TableCell className="font-bold text-foreground">{a.entity}</TableCell>
-                        <TableCell className="text-right tabular-nums">{a.docCount}</TableCell>
-                        <TableCell className="text-right tabular-nums font-semibold">{a.citations}</TableCell>
-                        <TableCell className="text-right tabular-nums">{a.h}</TableCell>
-                        <TableCell className="text-right tabular-nums">{a.g}</TableCell>
-                        <TableCell className="text-right tabular-nums">{a.i10}</TableCell>
-                        <TableCell className="text-right tabular-nums">{a.m.toFixed(2)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          )}
-
-          {/* Gráfico 2: Top Autores */}
-          {selection.chartAuthors && (
-            <ReportChartImage image={authorsChartImg} {...REPORT_CHART_SIZE.bars} alt={isEn ? 'Top authors chart' : 'Gráfico dos Top Autores'} />
-          )}
-
-          {/* 4. Top Países */}
-          {selection.countries && tables && tables.countries.length > 0 && (
-            <div className="space-y-3">
-              <h2 className="text-sm font-bold text-foreground border-b border-border/60 pb-1.5">
-                {isEn ? `3. Geographic Distribution (Top ${topN} Countries)` : `3. Distribuição Geográfica (Top ${topN})`}
-              </h2>
-              <div className="rounded-xl border overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50 text-[11px]">
-                      <TableHead className="w-10">#</TableHead>
-                      <TableHead>{isEn ? 'Country' : 'País'}</TableHead>
-                      <TableHead className="text-right">Docs</TableHead>
-                      <TableHead className="text-right">{isEn ? 'Citations' : 'Citações'}</TableHead>
-                      <TableHead className="text-right">h</TableHead>
-                      <TableHead className="text-right">{isEn ? 'Mean' : 'Média'}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody className="text-xs">
-                    {tables.countries.slice(0, topN).map((c, idx) => (
-                      <TableRow key={c.entity}>
-                        <TableCell className="font-semibold text-muted-foreground">{idx + 1}</TableCell>
-                        <TableCell className="font-bold text-foreground">{c.entity}</TableCell>
-                        <TableCell className="text-right tabular-nums">{c.docCount}</TableCell>
-                        <TableCell className="text-right tabular-nums font-semibold">{c.citations}</TableCell>
-                        <TableCell className="text-right tabular-nums">{c.h}</TableCell>
-                        <TableCell className="text-right tabular-nums">{c.meanCitations.toFixed(1)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          )}
-
-          {/* Gráfico 3: Top Países */}
-          {selection.chartCountries && (
-            <ReportChartImage image={countriesChartImg} {...REPORT_CHART_SIZE.bars} alt={isEn ? 'Top countries chart' : 'Gráfico dos Top Países'} />
-          )}
-
-          {/* Gráfico 4: Mapa-Múndi de Colaboração Internacional */}
-          {selection.chartWorldMap && (
-            <ReportChartImage image={worldMapChartImg} {...REPORT_CHART_SIZE.worldMap} alt={isEn ? 'Global international collaboration map' : 'Mapa Global de Colaboração Internacional'} />
-          )}
-
-          {/* 5. Top Venues */}
-          {selection.venues && tables && tables.venues.length > 0 && (
-            <div className="space-y-3">
-              <h2 className="text-sm font-bold text-foreground border-b border-border/60 pb-1.5">
-                {isEn ? `4. Top Publishing Venues (Top ${topN})` : `4. Principais Veículos de Publicação (Top ${topN})`}
-              </h2>
-              <div className="rounded-xl border overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50 text-[11px]">
-                      <TableHead className="w-10">#</TableHead>
-                      <TableHead>Venue / Journal</TableHead>
-                      <TableHead className="text-right">Docs</TableHead>
-                      <TableHead className="text-right">{isEn ? 'Citations' : 'Citações'}</TableHead>
-                      <TableHead className="text-right">h</TableHead>
-                      <TableHead className="text-right">{isEn ? 'Mean Cit.' : 'Média Cit.'}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody className="text-xs">
-                    {tables.venues.slice(0, topN).map((v, idx) => (
-                      <TableRow key={v.entity}>
-                        <TableCell className="font-semibold text-muted-foreground">{idx + 1}</TableCell>
-                        <TableCell className="font-bold text-foreground">{v.entity}</TableCell>
-                        <TableCell className="text-right tabular-nums">{v.docCount}</TableCell>
-                        <TableCell className="text-right tabular-nums font-semibold">{v.citations}</TableCell>
-                        <TableCell className="text-right tabular-nums">{v.h}</TableCell>
-                        <TableCell className="text-right tabular-nums">{v.meanCitations.toFixed(1)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          )}
-
-          {/* 6. Palavras-Chave */}
-          {selection.keywords && tables && tables.keywords.length > 0 && (
-            <div className="space-y-3">
-              <h2 className="text-sm font-bold text-foreground border-b border-border/60 pb-1.5">
-                {isEn ? `5. Top Keywords & Lexicometrics (Top ${topN})` : `5. Palavras-Chave & Lexicometria (Top ${topN})`}
-              </h2>
-              <div className="rounded-xl border overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50 text-[11px]">
-                      <TableHead className="w-10">#</TableHead>
-                      <TableHead>{isEn ? 'Keyword' : 'Palavra-chave'}</TableHead>
-                      <TableHead className="text-right">Docs</TableHead>
-                      <TableHead className="text-right">{isEn ? 'Citations' : 'Citações'}</TableHead>
-                      <TableHead className="text-right">h</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody className="text-xs">
-                    {tables.keywords.slice(0, topN).map((k, idx) => (
-                      <TableRow key={k.entity}>
-                        <TableCell className="font-semibold text-muted-foreground">{idx + 1}</TableCell>
-                        <TableCell className="font-bold text-foreground">{k.entity}</TableCell>
-                        <TableCell className="text-right tabular-nums">{k.docCount}</TableCell>
-                        <TableCell className="text-right tabular-nums font-semibold">{k.citations}</TableCell>
-                        <TableCell className="text-right tabular-nums">{k.h}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          )}
-
-          {/* Gráfico 5: Nuvem de Palavras-Chave */}
-          {selection.chartKeywords && (
-            <ReportChartImage image={wordCloudChartImg} {...REPORT_CHART_SIZE.wordCloud} alt={isEn ? 'Keyword cloud' : 'Nuvem de Palavras-Chave'} />
-          )}
-
-          {/* 7. Mapeamento Temático por IA */}
-          {selection.themes && clustering && clustering.clusters.length > 0 && (
-            <div className="space-y-3">
-              <h2 className="text-sm font-bold text-foreground border-b border-border/60 pb-1.5">
-                {isEn
-                  ? `6. AI Thematic Clusters (Silhouette: ${clustering.silhouette.toFixed(3)})`
-                  : `6. Agrupamento Temático por IA (Silhouette: ${clustering.silhouette.toFixed(3)})`}
-              </h2>
-              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                {clustering.clusters.map((c) => {
-                  const share = active.length > 0 ? (c.size / active.length) * 100 : 0;
-                  return (
-                    <div key={c.clusterId} className="rounded-xl border border-border/80 bg-card p-3.5 shadow-2xs space-y-1.5">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs font-bold text-foreground truncate">{isEn ? 'Theme' : 'Tema'} {c.clusterId + 1}</p>
-                        <Badge variant="purple" className="text-[10px]">
-                          {share.toFixed(1)}%
-                        </Badge>
-                      </div>
-                      <p className="text-[11px] text-muted-foreground">
-                        <strong>{c.size}</strong> {isEn ? 'documents' : 'artigos'}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground/80 italic truncate">
-                        {c.topTerms.slice(0, 5).join(', ')}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* 7b. Classificação temática híbrida */}
-          {selection.themes && hybridRun && (
-            <div className="space-y-3">
-              <h2 className="text-sm font-bold text-foreground border-b border-border/60 pb-1.5">
-                6. {hybridReportTitle(hybridRun, locale)}
-              </h2>
-              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                {hybridReportRows(hybridRun).map((row) => (
-                  <div key={row.name} className="rounded-xl border border-border/80 bg-card p-3.5 shadow-2xs space-y-1.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs font-bold text-foreground truncate">{row.name}</p>
-                      <Badge variant="purple" className="text-[10px]">
-                        {row.share.toFixed(1)}%
-                      </Badge>
-                    </div>
-                    <p className="text-[11px] text-muted-foreground">
-                      <strong>{row.documents}</strong> {isEn ? 'documents' : 'artigos'} ·{' '}
-                      {isEn ? 'mean confidence' : 'confiança média'} {row.meanConfidence.toFixed(2)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-              <p className="text-[11px] leading-relaxed text-muted-foreground">{hybridMethodsText(hybridRun, locale)}</p>
-            </div>
-          )}
-
-          {/* Gráfico 6: Distribuição de Temas por IA */}
-          {selection.chartThemes && (
-            <ReportChartImage image={themesChartImg} {...REPORT_CHART_SIZE.themes} alt={isEn ? 'AI thematic distribution' : 'Distribuição Temática por IA'} />
-          )}
-
-          {/* 8. Topologia da Rede */}
-          {selection.networkTopology && sna && (
-            <div className="space-y-3">
-              <h2 className="text-sm font-bold text-foreground border-b border-border/60 pb-1.5">
-                {isEn ? '7. Deep Knowledge Ecology & Network Topology' : '7. Topologia da Rede & Ecologia Profunda'}
-              </h2>
-              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-                <div className="rounded-lg border border-border/70 p-2.5 bg-muted/20">
-                  <p className="text-[10px] font-semibold text-muted-foreground">{isEn ? 'Density' : 'Densidade'}</p>
-                  <p className="text-sm font-bold tabular-nums text-foreground">{sna.global.density.toFixed(4)}</p>
-                </div>
-                <div className="rounded-lg border border-border/70 p-2.5 bg-muted/20">
-                  <p className="text-[10px] font-semibold text-muted-foreground">{isEn ? 'Clustering' : 'Clustering Médio'}</p>
-                  <p className="text-sm font-bold tabular-nums text-foreground">{sna.global.clustering.toFixed(4)}</p>
-                </div>
-                <div className="rounded-lg border border-border/70 p-2.5 bg-muted/20">
-                  <p className="text-[10px] font-semibold text-muted-foreground">{isEn ? 'Shannon Entropy' : 'Entropia de Shannon'}</p>
-                  <p className="text-sm font-bold tabular-nums text-foreground">{sna.global.entropy.toFixed(3)}</p>
-                </div>
-                <div className="rounded-lg border border-border/70 p-2.5 bg-muted/20">
-                  <p className="text-[10px] font-semibold text-muted-foreground">{isEn ? 'Global Efficiency' : 'Eficiência Global'}</p>
-                  <p className="text-sm font-bold tabular-nums text-foreground">
-                    {typeof sna.global.efficiency === 'number' ? sna.global.efficiency.toFixed(4) : isEn ? String(sna.global.efficiency).replace('Grafo Denso', 'dense graph') : String(sna.global.efficiency)}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-border/70 p-2.5 bg-muted/20">
-                  <p className="text-[10px] font-semibold text-muted-foreground">{isEn ? 'Mean Degree' : 'Grau Médio'}</p>
-                  <p className="text-sm font-bold tabular-nums text-foreground">{sna.global.meanDegree.toFixed(2)}</p>
-                </div>
-                <div className="rounded-lg border border-border/70 p-2.5 bg-muted/20">
-                  <p className="text-[10px] font-semibold text-muted-foreground">{isEn ? 'Power Law Exponent' : 'Lei de Potência'}</p>
-                  <p className="text-sm font-bold tabular-nums text-foreground">{sna.global.powerLawExponent.toFixed(2)}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Gráfico 7: Rede de Coocorrência (Louvain) */}
-          {selection.chartNetwork && (
-            <ReportChartImage image={networkChartImg} {...REPORT_CHART_SIZE.network} alt={isEn ? 'Co-occurrence network and communities' : 'Rede de Coocorrência e Comunidades'} />
-          )}
-
-          {/* 9. Top Documentos Mais Citados */}
-          {selection.topDocuments && sortedTopDocs.length > 0 && (
-            <div className="space-y-3">
-              <h2 className="text-sm font-bold text-foreground border-b border-border/60 pb-1.5">
-                {isEn ? `8. Highly Cited Seminal Documents (Top ${topN})` : `8. Documentos Mais Citados da Base (Top ${topN})`}
-              </h2>
-              <div className="rounded-xl border overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50 text-[11px]">
-                      <TableHead className="w-10">#</TableHead>
-                      <TableHead>{isEn ? 'Title' : 'Título'}</TableHead>
-                      <TableHead>{isEn ? 'Authors' : 'Autores'}</TableHead>
-                      <TableHead className="text-right">{isEn ? 'Year' : 'Ano'}</TableHead>
-                      <TableHead className="text-right">{isEn ? 'Citations' : 'Citações'}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody className="text-xs">
-                    {sortedTopDocs.map((d, idx) => (
-                      <TableRow key={idx}>
-                        <TableCell className="font-semibold text-muted-foreground">{idx + 1}</TableCell>
-                        <TableCell className="font-bold text-foreground max-w-72 truncate">
-                          {titleCol ? String(d[titleCol] ?? '') : '—'}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground max-w-40 truncate">
-                          {authCol ? String(d[authCol] ?? '') : '—'}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {toNumeric(d[FIELD.YEAR_CLEAN]) ?? '—'}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums font-bold text-amber-600">
-                          {toNumeric(d[FIELD.TOTAL_CITATIONS]) ?? 0}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          )}
-
-          {/* Footer do Relatório */}
-          <div className="border-t border-border/80 pt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4 text-xs text-muted-foreground">
             <p>
               {isEn
                 ? 'Simetrics · Bibliometric Intelligence Platform · Developed by'
                 : 'Simetrics · Plataforma de Inteligência Bibliométrica · Desenvolvido por'}{' '}
-              <a
-                href="https://gustavosimas.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-bold text-primary hover:underline"
-              >
-                Gustavo Simas
-              </a>
+              <span className="font-bold text-foreground">Gustavo Simas</span>
             </p>
             <p className="text-[11px] italic">
               {isEn ? 'Document rendered client-side.' : 'Documento processado localmente no navegador.'}
@@ -1020,6 +299,338 @@ export default function ReportTab() {
           </div>
         </div>
       </div>
+
+      <Dialog open={downloadOpen} onOpenChange={(open) => !exporting && setDownloadOpen(open)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{isEn ? 'Download report' : 'Baixar relatório'}</DialogTitle>
+            <DialogDescription>
+              {isEn
+                ? `${selectedCount} selected items, laid out as in the preview.`
+                : `${selectedCount} itens selecionados, diagramados como na pré-visualização.`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {(
+              [
+                ['pdf', FileText, 'PDF', isEn ? 'To read and print' : 'Para ler e imprimir'],
+                ['docx', FileType, 'Word (.docx)', isEn ? 'To edit' : 'Para editar'],
+              ] as const
+            ).map(([format, Icon, title, hint]) => (
+              <button
+                key={format}
+                type="button"
+                disabled={exporting !== null}
+                aria-busy={exporting === format}
+                onClick={() => void handleDownload(format)}
+                className="flex cursor-pointer flex-col items-start gap-2 border border-border p-4 text-left transition-colors hover:border-highlight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-60"
+              >
+                {exporting === format ? (
+                  <Loader2 className="size-6 animate-spin text-highlight" aria-hidden />
+                ) : (
+                  <Icon className="size-6 text-highlight" aria-hidden />
+                )}
+                <span className="text-sm font-semibold">{title}</span>
+                <span className="text-xs text-muted-foreground">
+                  {exporting === format ? (isEn ? 'Generating…' : 'Gerando…') : hint}
+                </span>
+              </button>
+            ))}
+          </div>
+          {exportMessage && (
+            <p role="alert" className="text-sm text-muted-foreground">
+              {exportMessage}
+            </p>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+
+  function renderBlock(id: ReportItemId): ReactNode {
+    const nf = (value: number) => value.toLocaleString(isEn ? 'en-US' : 'pt-BR');
+    switch (id) {
+      case 'summary':
+        return overview && (
+          <div className="space-y-2 border border-border bg-card p-4">
+            <h2 className="eyebrow text-highlight">{isEn ? 'Executive Summary & Dataset Scope' : 'Resumo Executivo & Escopo da Base'}</h2>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              {isEn
+                ? `This report compiles bibliometric metrics, collaboration graphs, and research themes from a corpus of ${nf(active!.length)} papers published between ${overview.summary.timespan || 'N/A'}. A total of ${nf(overview.summary.authorsCount)} authors and ${nf(overview.summary.countriesCount)} countries participated in the production.`
+                : `Este relatório consolida indicadores cientométricos, redes de colaboração e tópicos de pesquisa a partir de uma base com ${nf(active!.length)} documentos indexados no período ${overview.summary.timespan || 'N/A'}. A produção envolveu ${nf(overview.summary.authorsCount)} autores e ${nf(overview.summary.countriesCount)} países.`}
+            </p>
+          </div>
+        );
+      case 'kpis': {
+        if (!overview) return null;
+        const totalCitations = active!.reduce((acc, d) => acc + (toNumeric(d[FIELD.TOTAL_CITATIONS]) ?? 0), 0);
+        return (
+          <div className="space-y-3">
+            <SectionHeading>{isEn ? '1. Core Scientometric Indicators' : '1. Indicadores Cientométricos Globais'}</SectionHeading>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {(
+                [
+                  [isEn ? 'Documents' : 'Documentos', nf(overview.summary.totalDocs)],
+                  [isEn ? 'Authors' : 'Autores', nf(overview.summary.authorsCount)],
+                  [isEn ? 'Citations' : 'Citações', nf(totalCitations)],
+                  [isEn ? 'Annual growth' : 'Crescimento anual', `${overview.summary.bibliometrix.growthRate.toFixed(2)}%`],
+                ] as const
+              ).map(([label, value]) => (
+                <div key={label} className="border border-border bg-card p-3">
+                  <p className="eyebrow text-muted-foreground">{label}</p>
+                  <p className="mt-1 text-xl font-bold tabular-nums">{value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      }
+      case 'authors':
+        return tables && tables.authors.length > 0 && (
+          <EntityTable
+            title={isEn ? `2. Top ${topN} Authors by Production & Impact` : `2. Principais Autores (Top ${topN})`}
+            head={[isEn ? 'Author' : 'Autor', 'Docs', isEn ? 'Citations' : 'Citações', 'h', 'g', 'i10', 'm']}
+            rows={tables.authors.slice(0, topN).map((a) => [a.entity, a.docCount, a.citations, a.h, a.g, a.i10, a.m.toFixed(2)])}
+          />
+        );
+      case 'countries':
+        return tables && tables.countries.length > 0 && (
+          <EntityTable
+            title={isEn ? `3. Geographic Distribution (Top ${topN} Countries)` : `3. Distribuição Geográfica (Top ${topN})`}
+            head={[isEn ? 'Country' : 'País', 'Docs', isEn ? 'Citations' : 'Citações', 'h', isEn ? 'Mean' : 'Média']}
+            rows={tables.countries.slice(0, topN).map((c) => [c.entity, c.docCount, c.citations, c.h, c.meanCitations.toFixed(1)])}
+          />
+        );
+      case 'venues':
+        return tables && tables.venues.length > 0 && (
+          <EntityTable
+            title={isEn ? `4. Top Publishing Venues (Top ${topN})` : `4. Principais Veículos de Publicação (Top ${topN})`}
+            head={['Venue', 'Docs', isEn ? 'Citations' : 'Citações', 'h', isEn ? 'Mean Cit.' : 'Média Cit.']}
+            rows={tables.venues.slice(0, topN).map((v) => [v.entity, v.docCount, v.citations, v.h, v.meanCitations.toFixed(1)])}
+          />
+        );
+      case 'keywords':
+        return tables && tables.keywords.length > 0 && (
+          <EntityTable
+            title={isEn ? `5. Top Keywords & Lexicometrics (Top ${topN})` : `5. Palavras-Chave & Lexicometria (Top ${topN})`}
+            head={[isEn ? 'Keyword' : 'Palavra-chave', 'Docs', isEn ? 'Citations' : 'Citações', 'h']}
+            rows={tables.keywords.slice(0, topN).map((k) => [k.entity, k.docCount, k.citations, k.h])}
+          />
+        );
+      case 'themes':
+        // Agrupamento e classificação híbrida, quando os dois existem — como nos geradores.
+        return (
+          <>
+            {clustering && clustering.clusters.length > 0 && (
+              <div className="space-y-3">
+                <SectionHeading>
+                  {isEn
+                    ? `6. AI Thematic Clusters (Silhouette: ${clustering.silhouette.toFixed(3)})`
+                    : `6. Agrupamento Temático por IA (Silhouette: ${clustering.silhouette.toFixed(3)})`}
+                </SectionHeading>
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                  {clustering.clusters.map((c) => (
+                    <ThemeCard key={c.clusterId} name={`${isEn ? 'Theme' : 'Tema'} ${c.clusterId + 1}`} share={(c.size / active!.length) * 100}>
+                      <strong>{c.size}</strong> {isEn ? 'documents' : 'artigos'} · {c.topTerms.slice(0, 5).join(', ')}
+                    </ThemeCard>
+                  ))}
+                </div>
+              </div>
+            )}
+            {hybridRun && (
+            <div className="space-y-3">
+              <SectionHeading>6. {hybridReportTitle(hybridRun, locale)}</SectionHeading>
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                {hybridReportRows(hybridRun).map((row) => (
+                  <ThemeCard key={row.name} name={row.name} share={row.share}>
+                    <strong>{row.documents}</strong> {isEn ? 'documents' : 'artigos'} · {isEn ? 'mean confidence' : 'confiança média'}{' '}
+                    {row.meanConfidence.toFixed(2)}
+                  </ThemeCard>
+                ))}
+              </div>
+              <p className="text-xs leading-relaxed text-muted-foreground">{hybridMethodsText(hybridRun, locale)}</p>
+            </div>
+            )}
+          </>
+        );
+      case 'networkTopology':
+        return sna && (
+          <div className="space-y-3">
+            <SectionHeading>{isEn ? '7. Deep Knowledge Ecology & Network Topology' : '7. Topologia da Rede & Ecologia Profunda'}</SectionHeading>
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+              {(
+                [
+                  [isEn ? 'Density' : 'Densidade', sna.global.density.toFixed(4)],
+                  [isEn ? 'Clustering' : 'Clustering médio', sna.global.clustering.toFixed(4)],
+                  [isEn ? 'Shannon entropy' : 'Entropia de Shannon', sna.global.entropy.toFixed(3)],
+                  [
+                    isEn ? 'Global efficiency' : 'Eficiência global',
+                    typeof sna.global.efficiency === 'number'
+                      ? sna.global.efficiency.toFixed(4)
+                      : isEn
+                        ? String(sna.global.efficiency).replace('Grafo Denso', 'dense graph')
+                        : String(sna.global.efficiency),
+                  ],
+                  [isEn ? 'Mean degree' : 'Grau médio', sna.global.meanDegree.toFixed(2)],
+                  [isEn ? 'Power law exponent' : 'Lei de potência', sna.global.powerLawExponent.toFixed(2)],
+                ] as const
+              ).map(([label, value]) => (
+                <div key={label} className="border border-border bg-card p-2.5">
+                  <p className="text-[11px] font-semibold text-muted-foreground">{label}</p>
+                  <p className="text-sm font-bold tabular-nums">{value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      case 'topDocuments': {
+        const columns = collectColumns(active!);
+        const titleCol = pickColumn(columns, FIELD_CANDIDATES.title);
+        const authCol = pickColumn(columns, FIELD_CANDIDATES.authors);
+        const docs = [...active!]
+          .sort((a, b) => (toNumeric(b[FIELD.TOTAL_CITATIONS]) ?? 0) - (toNumeric(a[FIELD.TOTAL_CITATIONS]) ?? 0))
+          .slice(0, topN);
+        return (
+          <EntityTable
+            title={isEn ? `8. Highly Cited Seminal Documents (Top ${topN})` : `8. Documentos Mais Citados da Base (Top ${topN})`}
+            head={[isEn ? 'Title' : 'Título', isEn ? 'Authors' : 'Autores', isEn ? 'Year' : 'Ano', isEn ? 'Citations' : 'Citações']}
+            rows={docs.map((d) => [
+              titleCol ? String(d[titleCol] ?? '') : '—',
+              authCol ? String(d[authCol] ?? '') : '—',
+              toNumeric(d[FIELD.YEAR_CLEAN]) ?? '—',
+              toNumeric(d[FIELD.TOTAL_CITATIONS]) ?? 0,
+            ])}
+            truncate
+          />
+        );
+      }
+      case 'production':
+        return <ProductionFigure docsPerYear={overview?.docsPerYear} />;
+      case 'rankingAuthors':
+        return <RankingFigure id={id} rows={tables?.authors} dataset={active!} />;
+      case 'rankingCountries':
+        return <RankingFigure id={id} rows={tables?.countries} dataset={active!} />;
+      case 'rankingVenues':
+        return <RankingFigure id={id} rows={tables?.venues} dataset={active!} />;
+      case 'rankingDocuments':
+        return <RankingFigure id={id} rows={undefined} dataset={active!} />;
+      case 'worldMap':
+        return <WorldMapFigure collaboration={collaboration} />;
+      case 'collabChord':
+        return <CollabChordFigure collaboration={collaboration} />;
+      case 'wordCloud':
+        return <WordCloudFigure keywords={tables?.keywords} />;
+      case 'themesChart':
+        return <ThemesFigure image={themesChartImg} alt={isEn ? 'AI thematic distribution' : 'Distribuição temática por IA'} />;
+      case 'network':
+        return <NetworkFigure network={network} />;
+      case 'networkChord':
+        return <NetworkChordFigure network={network} />;
+      case 'sankey':
+        return <SankeyFigure dataset={active!} />;
+      case 'boxplot':
+        return <BoxplotFigure dataset={active!} />;
+      case 'genetics':
+        return <GeneticsFigure dataset={active!} />;
+      case 'concept2d':
+        return <ConceptFigure dataset={active!} dimensions="2d" />;
+      case 'concept3d':
+        return <ConceptFigure dataset={active!} dimensions="3d" />;
+      case 'thematicMap':
+        return <ThematicMapFigure dataset={active!} />;
+      case 'historiograph':
+        return <HistoriographFigure dataset={active!} />;
+      case 'lotka':
+        return <LotkaFigure lotka={overview ? overview.lotka : undefined} />;
+    }
+  }
+}
+
+function ReportHeader({ overview, total, isEn }: { overview: { summary: { timespan: string } } | null; total: number; isEn: boolean }) {
+  return (
+    <div className="border-b border-border pb-6">
+      <p className="eyebrow text-highlight">{isEn ? 'Simetrics · Scientometric Report' : 'Simetrics · Relatório Cientométrico'}</p>
+      <h1 className="mt-3 text-2xl font-bold tracking-tight">
+        {isEn ? 'Scientometric Intelligence ' : 'Relatório Cientométrico & '}
+        <em className="accent-serif text-highlight">{isEn ? 'Report' : 'Bibliométrico'}</em>
+      </h1>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3 text-xs text-muted-foreground">
+        <span>
+          <strong>{isEn ? 'Corpus scope' : 'Escopo'}:</strong> {total.toLocaleString(isEn ? 'en-US' : 'pt-BR')}{' '}
+          {isEn ? 'documents' : 'documentos'} · {overview?.summary.timespan || 'N/A'}
+        </span>
+        <span>
+          <strong>{isEn ? 'Generated on' : 'Emissão'}:</strong>{' '}
+          {new Date().toLocaleDateString(isEn ? 'en-US' : 'pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function SectionHeading({ children }: { children: ReactNode }) {
+  return <h2 className="border-b border-border pb-1.5 text-sm font-bold">{children}</h2>;
+}
+
+function EntityTable({
+  title,
+  head,
+  rows,
+  truncate = false,
+}: {
+  title: string;
+  head: readonly string[];
+  rows: readonly (readonly (string | number)[])[];
+  truncate?: boolean;
+}) {
+  return (
+    <div className="space-y-3">
+      <SectionHeading>{title}</SectionHeading>
+      <div className="overflow-hidden border border-border">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/60 text-[11px]">
+              <TableHead className="w-10">#</TableHead>
+              {head.map((label, index) => (
+                <TableHead key={label} className={index === 0 ? undefined : 'text-right'}>
+                  {label}
+                </TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody className="text-xs">
+            {rows.map((row, rowIndex) => (
+              <TableRow key={rowIndex}>
+                <TableCell className="font-semibold text-muted-foreground">{rowIndex + 1}</TableCell>
+                {row.map((cell, index) => (
+                  <TableCell
+                    key={index}
+                    className={cn(
+                      index === 0 ? 'font-semibold' : 'text-right tabular-nums',
+                      truncate && index === 0 && 'max-w-72 truncate',
+                      truncate && index === 1 && 'max-w-40 truncate text-left text-muted-foreground',
+                    )}
+                  >
+                    {cell}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
+
+function ThemeCard({ name, share, children }: { name: string; share: number; children: ReactNode }) {
+  return (
+    <div className="space-y-1.5 border border-border bg-card p-3.5">
+      <div className="flex items-center justify-between gap-2">
+        <p className="truncate text-xs font-bold">{name}</p>
+        <span className="eyebrow text-highlight">{share.toFixed(1)}%</span>
+      </div>
+      <p className="text-[11px] text-muted-foreground">{children}</p>
     </div>
   );
 }

@@ -25,9 +25,13 @@ function cssVariable(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
-/** Troca `var(--token)` pela cor resolvida: fora da página as variáveis não existem. */
-export function resolveCssVariables(svg: string): string {
-  return svg.replace(/var\((--[\w-]+)\)/g, (match, name: string) => cssVariable(name) || match);
+/**
+ * Troca `var(--token)` pela cor resolvida: fora da página as variáveis não existem.
+ * `context`: o elemento cujo tema vale — a folha do relatório é clara mesmo no tema escuro.
+ */
+export function resolveCssVariables(svg: string, context: Element = document.documentElement): string {
+  const style = getComputedStyle(context);
+  return svg.replace(/var\((--[\w-]+)\)/g, (match, name: string) => style.getPropertyValue(name).trim() || match);
 }
 
 /** SVG de um elemento da página, com tamanho explícito e cores resolvidas. */
@@ -40,7 +44,39 @@ export function imageFromSvgElement(element: SVGSVGElement): ChartImage {
   // "100%" não significa nada num arquivo isolado; o raster precisa de pixels.
   clone.setAttribute('width', String(width));
   clone.setAttribute('height', String(height));
-  return { svg: resolveCssVariables(new XMLSerializer().serializeToString(clone)), width, height };
+  return { svg: resolveCssVariables(new XMLSerializer().serializeToString(clone), element), width, height };
+}
+
+/** Desenha o SVG num canvas em escala 2×; `background` pinta o fundo antes (JPG). */
+async function rasterize(image: ChartImage, background?: string): Promise<HTMLCanvasElement> {
+  const url = URL.createObjectURL(new Blob([image.svg], { type: 'image/svg+xml;charset=utf-8' }));
+  try {
+    const element = new Image();
+    await new Promise<void>((resolve, reject) => {
+      element.onload = () => resolve();
+      element.onerror = () => reject(fail('Não foi possível converter o gráfico em imagem.', 'Could not convert the chart to an image.'));
+      element.src = url;
+    });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = image.width * RASTER_SCALE;
+    canvas.height = image.height * RASTER_SCALE;
+    const context = canvas.getContext('2d');
+    if (!context) throw fail('Canvas indisponível neste navegador.', 'Canvas is not available in this browser.');
+    if (background) {
+      context.fillStyle = background;
+      context.fillRect(0, 0, canvas.width, canvas.height);
+    }
+    context.drawImage(element, 0, 0, canvas.width, canvas.height);
+    return canvas;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+/** PNG (data URL, fundo transparente) de um gráfico — o formato que PDF e DOCX embutem. */
+export async function chartToPngDataUrl(image: ChartImage): Promise<string> {
+  return (await rasterize(image)).toDataURL('image/png');
 }
 
 export async function exportChartImage(
@@ -56,34 +92,11 @@ export async function exportChartImage(
     return;
   }
 
-  const url = URL.createObjectURL(new Blob([image.svg], { type: 'image/svg+xml;charset=utf-8' }));
-  try {
-    const element = new Image();
-    await new Promise<void>((resolve, reject) => {
-      element.onload = () => resolve();
-      element.onerror = () => reject(fail('Não foi possível converter o gráfico em imagem.', 'Could not convert the chart to an image.'));
-      element.src = url;
-    });
-
-    const canvas = document.createElement('canvas');
-    canvas.width = image.width * RASTER_SCALE;
-    canvas.height = image.height * RASTER_SCALE;
-    const context = canvas.getContext('2d');
-    if (!context) throw fail('Canvas indisponível neste navegador.', 'Canvas is not available in this browser.');
-
-    // JPG não tem transparência: leva o fundo do tema, como o gráfico aparece na tela.
-    if (format === 'jpg') {
-      context.fillStyle = cssVariable('--background') || '#07110f';
-      context.fillRect(0, 0, canvas.width, canvas.height);
-    }
-    context.drawImage(element, 0, 0, canvas.width, canvas.height);
-
-    const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, format === 'jpg' ? 'image/jpeg' : 'image/png', 0.92),
-    );
-    if (!blob) throw fail('Falha ao gerar a imagem.', 'Failed to generate the image.');
-    downloadBlob(timestampedFilename(filename, format), blob);
-  } finally {
-    URL.revokeObjectURL(url);
-  }
+  // JPG não tem transparência: leva o fundo do tema, como o gráfico aparece na tela.
+  const canvas = await rasterize(image, format === 'jpg' ? cssVariable('--background') || '#07110f' : undefined);
+  const blob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob(resolve, format === 'jpg' ? 'image/jpeg' : 'image/png', 0.92),
+  );
+  if (!blob) throw fail('Falha ao gerar a imagem.', 'Failed to generate the image.');
+  downloadBlob(timestampedFilename(filename, format), blob);
 }

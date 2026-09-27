@@ -65,3 +65,6 @@ export function chartMessage(text: string): ReactElement {
     text,
   );
 }
+
+/** Escala de citações do tema claro (Genética das ideias): mais citado = mais escuro. */
+export const CITATION_SCALE_LIGHT = ['#cdeee4', '#8fd3c1', '#3fae8f', '#236e5e', '#0f3b33'] as const;

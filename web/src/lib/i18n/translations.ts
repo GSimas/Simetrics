@@ -402,8 +402,8 @@ export const TRANSLATIONS = {
     sum_meta: 'Quanto falta em cada metadado — e o que isso impede a análise de enxergar.',
     report_title: 'Relatório cientométrico',
     report_info:
-      'Monte o relatório escolhendo seções no primeiro bloco, confira no segundo e exporte em PDF diagramado em alta resolução ou em DOCX editável.',
-    report_selected: 'seções selecionadas',
+      'Escolha as seções e os gráficos nesta coluna e confira o resultado ao vivo na pré-visualização. Em Baixar, exporte em PDF diagramado ou em DOCX editável.',
+    report_selected: 'itens selecionados',
 
     // Tela Inicial (Landing)
     landing_eyebrow: 'Bibliometria · Cientometria · Redes',
@@ -880,8 +880,8 @@ export const TRANSLATIONS = {
     sum_meta: 'How much is missing in each field — and what that keeps the analysis from seeing.',
     report_title: 'Scientometric report',
     report_info:
-      'Build the report by choosing sections in the first block, review it in the second, and export as high-resolution PDF or editable DOCX.',
-    report_selected: 'sections selected',
+      'Pick sections and charts in this column and check the result live in the preview. Under Download, export as a laid-out PDF or an editable DOCX.',
+    report_selected: 'items selected',
 
     landing_eyebrow: 'Bibliometrics · Scientometrics · Networks',
     landing_family: 'A Scientata application',

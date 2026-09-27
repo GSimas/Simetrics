@@ -34,7 +34,7 @@ import { boxplotDimensionLabel, boxplotMetricLabel } from '@/lib/i18n/labels';
 import { useLocale } from '@/state/locale.store';
 import { getAnalyticsWorker } from '@/workers/client';
 import { VISUAL_COPY } from './visual-copy';
-import { PALETTE, QUADRANT_NOTE, chartMessage } from './viz-shared';
+import { CITATION_SCALE_LIGHT, PALETTE, QUADRANT_NOTE, chartMessage } from './viz-shared';
 import { ReadingTip } from '@/components/InfoTip';
 import { openInSearch } from '@/state/navigation.store';
 import { useDataset } from '@/state/dataset.store';
@@ -119,7 +119,6 @@ const KEYWORD: SearchEntityType[] = ['Palavra-chave'];
  * Escala de cor das citações na genética dos termos — no lugar do "Teal" do Plotly. Mais
  * citado = mais contraste com o fundo: escurece no tema claro e clareia no escuro.
  */
-const CITATION_SCALE_LIGHT = ['#cdeee4', '#8fd3c1', '#3fae8f', '#236e5e', '#0f3b33'] as const;
 const CITATION_SCALE_DARK = ['#1d4a40', '#236e5e', '#3fae8f', '#8fd3c1', '#d9ffa0'] as const;
 
 /** Distribuição estatística comparativa. */

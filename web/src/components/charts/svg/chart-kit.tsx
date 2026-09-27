@@ -146,7 +146,8 @@ export function ChartFrame({
   const t = useLocale((state) => state.t);
   return (
     <div className={cn('min-w-0 space-y-2', className)}>
-      <div className="flex flex-wrap items-center justify-end gap-1.5">
+      {/* data-chart-toolbar: a folha do relatório esconde a barra (figura estática). */}
+      <div data-chart-toolbar className="flex flex-wrap items-center justify-end gap-1.5">
         {toolbar && <div className="mr-auto flex min-w-0 flex-wrap items-center gap-2">{toolbar}</div>}
         {onResetZoom && (
           <button

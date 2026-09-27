@@ -19,8 +19,7 @@ import {
 } from 'docx';
 
 import type { AnalyticsBundle, EntityTables } from '@/workers/analytics.worker';
-import type { CooccurrenceReport, SnaReport } from '@/core/graph';
-import type { CollaborationNetwork } from '@/core/viz/collaboration';
+import type { SnaReport } from '@/core/graph';
 import type { ClusteringResult } from '@/core/clustering';
 import type { HybridRun } from '@/core/hybrid/types';
 import { hybridMethodsText } from '@/core/hybrid/report';
@@ -29,30 +28,26 @@ import type { Dataset } from '@/lib/types';
 import { FIELD, FIELD_CANDIDATES } from '@/lib/schema';
 import { collectColumns, pickColumn, toNumeric } from '@/core/text';
 import { localizeMetricText } from '@/core/graph/metrics';
-import type { ReportSectionsSelection } from './pdf-generator';
+import { BRAND } from './chart-renderer';
 import {
-  BRAND,
-  reportAuthorsChart,
-  reportCountriesChart,
-  reportNetworkChart,
-  reportProductionChart,
-  reportNamedThemesChart,
-  reportThemesChart,
-  reportWordCloudChart,
-  reportWorldMapChart,
-} from './chart-renderer';
+  ADVANCED_CHARTS,
+  reportLabel,
+  type ReportChartId,
+  type ReportImages,
+  type ReportSelection,
+} from './report-catalog';
 
 export interface DocxReportData {
   dataset: Dataset;
   overview: AnalyticsBundle | null;
   tables: EntityTables | null;
   sna: SnaReport | null;
-  network: CooccurrenceReport | null;
-  collaboration: CollaborationNetwork | null;
   clustering: ClusteringResult | null;
   /** Quando presente, é a classificação híbrida que define os temas da base. */
   hybridRun?: HybridRun | null;
-  selection: ReportSectionsSelection;
+  selection: ReportSelection;
+  /** Gráficos capturados da prévia (`capture.ts`), já em PNG. */
+  images: ReportImages;
   topN: number;
   locale: 'pt' | 'en';
 }
@@ -150,11 +145,10 @@ export async function generateDocxReport({
   overview,
   tables,
   sna,
-  network,
-  collaboration,
   clustering,
   hybridRun = null,
   selection,
+  images,
   topN = 15,
   locale = 'pt',
 }: DocxReportData): Promise<void> {
@@ -162,6 +156,30 @@ export async function generateDocxReport({
   const sectionsChildren: (Paragraph | Table)[] = [];
 
   const tableHeaderBg = H.ink;
+
+  // Gráfico da prévia: legenda com o nome e a proporção original, na largura do texto
+  // (560 px ≈ 15 cm); alto demais para a página, encolhe pela altura.
+  const chart = (id: ReportChartId) => {
+    const image = selection[id] ? images[id] : undefined;
+    if (!image) return;
+    let width = 560;
+    let height = Math.round((width * image.height) / image.width);
+    if (height > 820) {
+      height = 820;
+      width = Math.round((height * image.width) / image.height);
+    }
+    sectionsChildren.push(
+      new Paragraph({
+        children: [eyebrowRun(reportLabel(id, locale), H.inkMuted)],
+        spacing: { before: 200, after: 60 },
+        keepNext: true,
+      }),
+      new Paragraph({
+        children: [new ImageRun({ data: dataUrlToUint8Array(image.dataUrl), transformation: { width, height }, type: 'png' })],
+        spacing: { after: 200 },
+      }),
+    );
+  };
 
   const totalCitations = dataset.reduce((acc, d) => acc + (toNumeric(d[FIELD.TOTAL_CITATIONS]) ?? 0), 0);
   const meanCitations = dataset.length > 0 ? totalCitations / dataset.length : 0;
@@ -267,24 +285,7 @@ export async function generateDocxReport({
     );
   }
 
-  // --- GRÁFICO 1: EVOLUÇÃO TEMPORAL DA PRODUÇÃO ---
-  if (selection.chartProduction && overview && overview.docsPerYear.length > 0) {
-    const chartPng = reportProductionChart(overview.docsPerYear, locale);
-    if (chartPng) {
-      sectionsChildren.push(
-        new Paragraph({
-          children: [
-            new ImageRun({
-              data: dataUrlToUint8Array(chartPng),
-              transformation: { width: 560, height: 235 },
-              type: 'png',
-            }),
-          ],
-          spacing: { before: 200, after: 200 },
-        }),
-      );
-    }
-  }
+  chart('production');
 
   // --- 3. TOP AUTORES ---
   if (selection.authors && tables && tables.authors.length > 0) {
@@ -313,24 +314,7 @@ export async function generateDocxReport({
     );
   }
 
-  // --- GRÁFICO 2: TOP AUTORES ---
-  if (selection.chartAuthors && tables && tables.authors.length > 0) {
-    const chartPng = reportAuthorsChart(tables.authors, locale);
-    if (chartPng) {
-      sectionsChildren.push(
-        new Paragraph({
-          children: [
-            new ImageRun({
-              data: dataUrlToUint8Array(chartPng),
-              transformation: { width: 560, height: 235 },
-              type: 'png',
-            }),
-          ],
-          spacing: { before: 200, after: 200 },
-        }),
-      );
-    }
-  }
+  chart('rankingAuthors');
 
   // --- 4. TOP PAÍSES ---
   if (selection.countries && tables && tables.countries.length > 0) {
@@ -356,43 +340,9 @@ export async function generateDocxReport({
     );
   }
 
-  // --- GRÁFICO 3: TOP PAÍSES ---
-  if (selection.chartCountries && tables && tables.countries.length > 0) {
-    const chartPng = reportCountriesChart(tables.countries, locale);
-    if (chartPng) {
-      sectionsChildren.push(
-        new Paragraph({
-          children: [
-            new ImageRun({
-              data: dataUrlToUint8Array(chartPng),
-              transformation: { width: 560, height: 235 },
-              type: 'png',
-            }),
-          ],
-          spacing: { before: 200, after: 200 },
-        }),
-      );
-    }
-  }
-
-  // --- GRÁFICO 4: MAPA-MÚNDI DE COLABORAÇÃO INTERNACIONAL ---
-  if (selection.chartWorldMap && collaboration && collaboration.nodes.length > 0) {
-    const mapPng = reportWorldMapChart(collaboration, locale);
-    if (mapPng) {
-      sectionsChildren.push(
-        new Paragraph({
-          children: [
-            new ImageRun({
-              data: dataUrlToUint8Array(mapPng),
-              transformation: { width: 560, height: 280 },
-              type: 'png',
-            }),
-          ],
-          spacing: { before: 200, after: 200 },
-        }),
-      );
-    }
-  }
+  chart('rankingCountries');
+  chart('worldMap');
+  chart('collabChord');
 
   // --- 5. TOP VENUES ---
   if (selection.venues && tables && tables.venues.length > 0) {
@@ -417,6 +367,7 @@ export async function generateDocxReport({
       ),
     );
   }
+  chart('rankingVenues');
 
   // --- 6. PALAVRAS-CHAVE ---
   if (selection.keywords && tables && tables.keywords.length > 0) {
@@ -442,24 +393,7 @@ export async function generateDocxReport({
     );
   }
 
-  // --- GRÁFICO 5: NUVEM DE PALAVRAS-CHAVE ---
-  if (selection.chartKeywords && tables && tables.keywords.length > 0) {
-    const chartPng = reportWordCloudChart(tables.keywords, locale);
-    if (chartPng) {
-      sectionsChildren.push(
-        new Paragraph({
-          children: [
-            new ImageRun({
-              data: dataUrlToUint8Array(chartPng),
-              transformation: { width: 560, height: 235 },
-              type: 'png',
-            }),
-          ],
-          spacing: { before: 200, after: 200 },
-        }),
-      );
-    }
-  }
+  chart('wordCloud');
 
   // --- 7. CLUSTERS TEMÁTICOS ---
   if (selection.themes && clustering && clustering.clusters.length > 0) {
@@ -513,42 +447,7 @@ export async function generateDocxReport({
     );
   }
 
-  // --- GRÁFICO 6: DISTRIBUIÇÃO DE TEMAS ---
-  const themesChartPng =
-    selection.chartThemes && hybridRun
-      ? reportNamedThemesChart(hybridReportRows(hybridRun), dataset.length, locale)
-      : null;
-  if (themesChartPng) {
-    sectionsChildren.push(
-      new Paragraph({
-        children: [
-          new ImageRun({
-            data: dataUrlToUint8Array(themesChartPng),
-            transformation: { width: 560, height: 235 },
-            type: 'png',
-          }),
-        ],
-        spacing: { before: 200, after: 200 },
-      }),
-    );
-  }
-  if (selection.chartThemes && clustering && clustering.clusters.length > 0) {
-    const chartPng = reportThemesChart(clustering.clusters, dataset.length, locale);
-    if (chartPng) {
-      sectionsChildren.push(
-        new Paragraph({
-          children: [
-            new ImageRun({
-              data: dataUrlToUint8Array(chartPng),
-              transformation: { width: 560, height: 235 },
-              type: 'png',
-            }),
-          ],
-          spacing: { before: 200, after: 200 },
-        }),
-      );
-    }
-  }
+  chart('themesChart');
 
   // --- 8. TOPOLOGIA DA REDE ---
   if (selection.networkTopology && sna) {
@@ -570,24 +469,8 @@ export async function generateDocxReport({
     );
   }
 
-  // --- GRÁFICO 7: REDE DE COOCORRÊNCIA (GRAFOS) ---
-  if (selection.chartNetwork && network && network.nodes.length > 0) {
-    const netPng = reportNetworkChart(network.nodes, network.edges, locale);
-    if (netPng) {
-      sectionsChildren.push(
-        new Paragraph({
-          children: [
-            new ImageRun({
-              data: dataUrlToUint8Array(netPng),
-              transformation: { width: 560, height: 290 },
-              type: 'png',
-            }),
-          ],
-          spacing: { before: 200, after: 200 },
-        }),
-      );
-    }
-  }
+  chart('network');
+  chart('networkChord');
 
   // --- 9. TOP DOCUMENTOS ---
   if (selection.topDocuments && dataset.length > 0) {
@@ -620,6 +503,14 @@ export async function generateDocxReport({
         tableHeaderBg,
       ),
     );
+  }
+  chart('rankingDocuments');
+
+  // --- 9. ANÁLISES VISUAIS AVANÇADAS ---
+  const advanced = ADVANCED_CHARTS.filter((id) => selection[id] && images[id]);
+  if (advanced.length > 0) {
+    sectionsChildren.push(...sectionHeading(9, isEn ? 'Advanced Visual Analyses' : 'Análises Visuais Avançadas'));
+    advanced.forEach(chart);
   }
 
   // Monta o arquivo Docx com margens e dimensões A4 exatas
