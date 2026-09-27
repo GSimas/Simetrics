@@ -11,11 +11,18 @@ import { useDataset } from './dataset.store';
  * um termo — clicar numa barra, num nó, numa palavra da nuvem. E, por ser global, a
  * busca sobrevive à troca de abas.
  */
+/** Escopo do seletor de tipo: um tipo de entidade ou todos juntos. */
+export type SearchScope = SearchEntityType | 'Todos';
+
 interface NavigationState {
   activeTab: string;
+  searchScope: SearchScope;
+  /** Tipo concreto do termo aberto — em "Todos", vem do item escolhido. */
   searchType: SearchEntityType;
   searchTerm: string | null;
   setActiveTab: (tab: string) => void;
+  /** Abre um termo; o escopo vira "Todos" se o atual não comportar o tipo do termo. */
+  selectEntity: (type: SearchEntityType, term: string) => void;
   /**
    * Abre no Motor de Busca o perfil do termo, se ele existir no acervo sob algum dos
    * tipos dados (na ordem de preferência). Devolve `false` e não navega quando não há
@@ -24,15 +31,23 @@ interface NavigationState {
   openInSearch: (term: unknown, types: readonly SearchEntityType[]) => boolean;
 }
 
-export const useNavigation = create<NavigationState>()((set) => ({
+export const useNavigation = create<NavigationState>()((set, get) => ({
   activeTab: 'overview',
+  searchScope: 'Todos',
   searchType: 'Autor',
   searchTerm: null,
   setActiveTab: (activeTab) => set({ activeTab }),
+  selectEntity: (type, term) =>
+    set((state) => ({
+      searchScope: state.searchScope === type ? type : 'Todos',
+      searchType: type,
+      searchTerm: term,
+    })),
   openInSearch(term, types) {
     const match = resolveEntity(term, types);
     if (!match) return false;
-    set({ activeTab: 'search', searchType: match.type, searchTerm: match.term });
+    get().selectEntity(match.type, match.term);
+    set({ activeTab: 'search' });
     window.scrollTo({ top: 0, behavior: 'smooth' });
     return true;
   },

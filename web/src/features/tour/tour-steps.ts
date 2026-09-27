@@ -68,10 +68,8 @@ function openTopAuthor(): void {
   const candidate =
     tables?.authors[0]?.entity ?? (searchOptions ? optionsForType(searchOptions, 'Autor')[0] : undefined);
   const match = resolveEntity(candidate, ['Autor']);
-  useNavigation.setState({
-    activeTab: 'search',
-    ...(match ? { searchType: match.type, searchTerm: match.term } : {}),
-  });
+  if (match) navigation.selectEntity(match.type, match.term);
+  useNavigation.setState({ activeTab: 'search' });
 }
 
 export const TOUR_STEPS: TourStep[] = [

@@ -10,7 +10,8 @@ import type { Locale } from './translations';
  * e de navegação; só o que aparece na tela passa por aqui.
  */
 
-const ENTITY_TYPE_EN: Record<SearchEntityType | NodeKind | 'Outro', string> = {
+const ENTITY_TYPE_EN: Record<SearchEntityType | NodeKind | 'Outro' | 'Todos', string> = {
+  Todos: 'All',
   Documento: 'Document',
   Autor: 'Author',
   País: 'Country',

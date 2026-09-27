@@ -14,7 +14,7 @@ import TimeSeriesChart from '@/components/charts/TimeSeriesChart';
 
 import { SectionTitle } from '@/components/InfoTip';
 import { KpiCard } from '@/components/KpiCard';
-import { SearchableSelect } from '@/components/SearchableSelect';
+import { SearchableSelect, type SelectOption } from '@/components/SearchableSelect';
 import { Badge } from '@/components/ui/badge';
 import {
   Card,
@@ -50,7 +50,7 @@ import type { SearchEntityType } from '@/lib/types';
 import { collectColumns, isNullLike, pickColumn, splitTokens, toNumeric } from '@/core/text';
 import { useDataset } from '@/state/dataset.store';
 import { useLocale } from '@/state/locale.store';
-import { openInSearch, resolveEntity, useNavigation } from '@/state/navigation.store';
+import { openInSearch, resolveEntity, useNavigation, type SearchScope } from '@/state/navigation.store';
 import { EmptyState } from '@/features/EmptyState';
 import { collaborationNetwork } from '@/core/viz/collaboration';
 import { cn } from '@/lib/utils';
@@ -63,6 +63,10 @@ import { DossierDocuments } from './DossierDocuments';
 const WordCloud = lazy(() => import('@/components/charts/WordCloud'));
 const WorldMap = lazy(() => import('@/components/charts/WorldMap'));
 
+/** Separa tipo e termo no valor dos itens em "Todos"; não aparece em textos da base. */
+const SCOPED_SEPARATOR = '\u0000';
+const ENTITY_COLLATOR = new Intl.Collator('pt-BR');
+
 /** Coautores à vista antes do "ver todos". */
 const VISIBLE_COAUTHORS = 12;
 
@@ -73,11 +77,18 @@ export default function SearchTab() {
 
   // Tipo e termo vivem no store de navegação: gráficos de outras abas abrem perfis aqui,
   // e a busca continua no lugar ao voltar para esta aba.
+  const scope = useNavigation((state) => state.searchScope);
   const type = useNavigation((state) => state.searchType);
   const term = useNavigation((state) => state.searchTerm);
+  const selectEntity = useNavigation((state) => state.selectEntity);
   const typeLabel = entityTypeLabel(type, locale);
-  const setType = (searchType: SearchEntityType): void => useNavigation.setState({ searchType });
   const setTerm = (searchTerm: string | null): void => useNavigation.setState({ searchTerm });
+  const setScope = (searchScope: SearchScope): void =>
+    useNavigation.setState({
+      searchScope,
+      searchTerm: null,
+      ...(searchScope !== 'Todos' ? { searchType: searchScope } : {}),
+    });
   const [showAllCoauthors, setShowAllCoauthors] = useState(false);
 
   const renderAuthorChip = ({ author, count }: { author: string; count: number }) => (
@@ -85,8 +96,7 @@ export default function SearchTab() {
       key={author}
       type="button"
       onClick={() => {
-        setType('Autor');
-        setTerm(author);
+        selectEntity('Autor', author);
         setShowAllCoauthors(false);
       }}
       className="inline-flex cursor-pointer items-center gap-1 border border-border px-2 py-0.5 text-xs text-foreground transition-colors hover:border-highlight hover:text-highlight"
@@ -103,10 +113,24 @@ export default function SearchTab() {
     [searchOptions],
   );
 
-  const rawOptions = useMemo(
-    () => (searchOptions ? optionsForType(searchOptions, type) : []),
-    [searchOptions, type],
-  );
+  // Em "Todos", cada item leva o tipo no valor (o mesmo termo pode ser país e palavra-chave)
+  // e um selo com o tipo na lista.
+  const pickerOptions = useMemo((): (string | SelectOption)[] => {
+    if (!searchOptions) return [];
+    if (scope !== 'Todos') return optionsForType(searchOptions, scope);
+    return types
+      .flatMap((entityType) =>
+        optionsForType(searchOptions, entityType).map((entity) => ({
+          value: `${entityType}${SCOPED_SEPARATOR}${entity}`,
+          label: entity,
+          // Selo curto: o rótulo completo de venue ocupava metade da linha.
+          tag: entityType === 'Local de Publicação (Venue)' ? 'Venue' : entityTypeLabel(entityType, locale),
+        })),
+      )
+      .sort((a, b) => ENTITY_COLLATOR.compare(a.label, b.label));
+  }, [searchOptions, scope, types, locale]);
+  const pickerValue = scope === 'Todos' && term ? `${type}${SCOPED_SEPARATOR}${term}` : term;
+  const scopeLabel = scope === 'Todos' ? null : entityTypeLabel(scope, locale);
 
   const documents = useMemo(
     () => (active && term ? filterByEntity(active, term, type) : []),
@@ -267,18 +291,12 @@ export default function SearchTab() {
           <div className="grid gap-3 sm:grid-cols-[200px_1fr]">
             <div className="space-y-1.5">
               <Label htmlFor="search-type">{t('search_type_label')}</Label>
-              <Select
-                value={type}
-                onValueChange={(value) => {
-                  setType(value as SearchEntityType);
-                  setTerm(null);
-                }}
-              >
+              <Select value={scope} onValueChange={(value) => setScope(value as SearchScope)}>
                 <SelectTrigger id="search-type" className="h-10 rounded-xl">
-                  <SelectValue>{typeLabel}</SelectValue>
+                  <SelectValue>{entityTypeLabel(scope, locale)}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {types.map((option) => (
+                  {(['Todos', ...types] as const).map((option) => (
                     <SelectItem key={option} value={option}>
                       {entityTypeLabel(option, locale)}
                     </SelectItem>
@@ -288,22 +306,31 @@ export default function SearchTab() {
             </div>
 
             <div className="space-y-1.5">
-              <Label>{locale === 'en' ? `Select ${typeLabel}` : `Selecionar ${typeLabel}`}</Label>
+              <Label>
+                {locale === 'en'
+                  ? `Select ${scopeLabel ?? 'item'}`
+                  : `Selecionar ${scopeLabel ?? 'item'}`}
+              </Label>
               <SearchableSelect
-                options={rawOptions}
-                value={term}
+                options={pickerOptions}
+                value={pickerValue}
                 onChange={(val) => {
-                  setTerm(val);
+                  if (val === null || scope !== 'Todos') {
+                    setTerm(val);
+                    return;
+                  }
+                  const [entityType, ...rest] = val.split(SCOPED_SEPARATOR);
+                  selectEntity(entityType as SearchEntityType, rest.join(SCOPED_SEPARATOR));
                 }}
                 placeholder={
                   locale === 'en'
-                    ? `Click to select ${typeLabel.toLowerCase()}...`
-                    : `Clique para selecionar ${typeLabel.toLowerCase()}...`
+                    ? `Click to select ${scopeLabel?.toLowerCase() ?? 'an author, country, venue…'}`
+                    : `Clique para selecionar ${scopeLabel?.toLowerCase() ?? 'autor, país, venue…'}`
                 }
                 searchPlaceholder={
                   locale === 'en'
-                    ? `Type to filter ${typeLabel.toLowerCase()}...`
-                    : `Digite para filtrar ${typeLabel.toLowerCase()}...`
+                    ? `Type to filter ${scopeLabel?.toLowerCase() ?? 'all items'}...`
+                    : `Digite para filtrar ${scopeLabel?.toLowerCase() ?? 'todos os itens'}...`
                 }
                 emptyText={
                   locale === 'en'
@@ -344,8 +371,7 @@ export default function SearchTab() {
                       key={country}
                       type="button"
                       onClick={() => {
-                        setType('País');
-                        setTerm(country);
+                        selectEntity('País', country);
                       }}
                       className="inline-flex cursor-pointer items-center gap-1 border border-border px-2 py-0.5 text-xs text-foreground transition-colors hover:border-highlight hover:text-highlight"
                       title={locale === 'en' ? `View dossier for ${country}` : `Ver dossiê de ${country}`}
@@ -515,8 +541,7 @@ export default function SearchTab() {
                                 key={kw}
                                 type="button"
                                 onClick={() => {
-                                  setType('Palavra-chave');
-                                  setTerm(kw);
+                                  selectEntity('Palavra-chave', kw);
                                 }}
                                 className="inline-flex cursor-pointer items-center border border-border px-2 py-0.5 text-xs text-foreground transition-colors hover:border-highlight hover:text-highlight"
                                 title={locale === 'en' ? `Search keyword: ${kw}` : `Buscar palavra-chave: ${kw}`}
@@ -577,8 +602,7 @@ export default function SearchTab() {
                                   className="max-w-56 truncate text-left font-medium hover:underline text-primary cursor-pointer flex items-center gap-1.5"
                                   title={author}
                                   onClick={() => {
-                                    setType('Autor');
-                                    setTerm(author);
+                                    selectEntity('Autor', author);
                                   }}
                                 >
                                   <User className="size-3.5 text-muted-foreground shrink-0" />
@@ -778,12 +802,10 @@ export default function SearchTab() {
                   documents={documents}
                   columns={{ title: titleColumn, keywords: keywordsColumn, abstract: abstractColumn, doi: doiColumn }}
                   onOpenDocument={(title) => {
-                    setType('Documento');
-                    setTerm(title);
+                    selectEntity('Documento', title);
                   }}
                   onOpenKeyword={(keyword) => {
-                    setType('Palavra-chave');
-                    setTerm(keyword);
+                    selectEntity('Palavra-chave', keyword);
                   }}
                 />
               </CardContent>

@@ -5,8 +5,15 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useLocale } from '@/state/locale.store';
 
+/** Opção com rótulo próprio e um selo opcional (ex.: o tipo da entidade). */
+export interface SelectOption {
+  value: string;
+  label: string;
+  tag?: string;
+}
+
 export interface SearchableSelectProps {
-  options: readonly string[];
+  options: readonly (string | SelectOption)[];
   value: string | null;
   onChange: (value: string | null) => void;
   placeholder?: string;
@@ -60,11 +67,20 @@ export function SearchableSelect({
     }
   }, [isOpen]);
 
+  const normalized = useMemo(
+    () => options.map((opt): SelectOption => (typeof opt === 'string' ? { value: opt, label: opt } : opt)),
+    [options],
+  );
+  const selectedLabel = useMemo(
+    () => (value === null ? null : (normalized.find((opt) => opt.value === value)?.label ?? value)),
+    [normalized, value],
+  );
+
   const filteredOptions = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return options.slice(0, 150);
-    return options.filter((opt) => opt.toLowerCase().includes(q)).slice(0, 150);
-  }, [options, search]);
+    if (!q) return normalized.slice(0, 150);
+    return normalized.filter((opt) => opt.label.toLowerCase().includes(q)).slice(0, 150);
+  }, [normalized, search]);
 
   const handleSelect = (item: string) => {
     onChange(item);
@@ -111,7 +127,7 @@ export function SearchableSelect({
         )}
       >
         <span className={cn('truncate', !value && 'text-muted-foreground')}>
-          {value || placeholderText}
+          {selectedLabel || placeholderText}
         </span>
         <div className="flex items-center gap-1.5 pl-2 text-muted-foreground">
           {/* Reserva o lugar do botão de limpar, que fica fora do seletor (abaixo): um
@@ -160,24 +176,36 @@ export function SearchableSelect({
               <p className="p-3 text-center text-xs text-muted-foreground">{emptyMessage}</p>
             ) : (
               filteredOptions.map((option) => {
-                const isSelected = value === option;
+                const isSelected = value === option.value;
                 return (
                   <button
-                    key={option}
+                    key={option.value}
                     type="button"
                     role="option"
                     aria-selected={isSelected}
-                    onClick={() => handleSelect(option)}
+                    onClick={() => handleSelect(option.value)}
                     className={cn(
                       'flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-xs font-medium transition-colors',
                       isSelected
                         ? 'bg-primary text-primary-foreground font-semibold'
                         : 'text-foreground hover:bg-muted/80',
                     )}
-                    title={option}
+                    title={option.tag ? `${option.label} · ${option.tag}` : option.label}
                   >
-                    <span className="truncate pr-2">{option}</span>
-                    {isSelected && <Check className="size-3.5 shrink-0" aria-hidden />}
+                    <span className="truncate pr-2">{option.label}</span>
+                    <span className="flex shrink-0 items-center gap-1.5">
+                      {option.tag && (
+                        <span
+                          className={cn(
+                            'rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                            isSelected ? 'bg-primary-foreground/15' : 'bg-muted text-muted-foreground',
+                          )}
+                        >
+                          {option.tag}
+                        </span>
+                      )}
+                      {isSelected && <Check className="size-3.5" aria-hidden />}
+                    </span>
                   </button>
                 );
               })
