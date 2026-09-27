@@ -222,8 +222,11 @@ function parseMarkdownBlocks(raw: string): Block[] {
       continue;
     }
 
-    // Parágrafo Normal
-    const paragraphLines: string[] = [];
+    // Parágrafo Normal. A linha atual entra sempre: marcas incompletas no meio do streaming
+    // ("##", "- ", "1. ", "  # x") não casam com nenhum bloco acima e, sem consumi-la aqui,
+    // `i` não avançava e o laço travava a página inteira.
+    const paragraphLines: string[] = [line];
+    i++;
     while (
       i < lines.length &&
       lines[i]?.trim() &&
@@ -237,12 +240,10 @@ function parseMarkdownBlocks(raw: string): Block[] {
       i++;
     }
 
-    if (paragraphLines.length > 0) {
-      blocks.push({
-        type: 'paragraph',
-        text: paragraphLines.join(' '),
-      });
-    }
+    blocks.push({
+      type: 'paragraph',
+      text: paragraphLines.join(' '),
+    });
   }
 
   return blocks;
