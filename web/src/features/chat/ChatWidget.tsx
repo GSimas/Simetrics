@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, Database, KeyRound, MessageSquare, Send, Sparkles, Square, Trash2, User, X } from 'lucide-react';
+import { Bot, Database, KeyRound, MessageSquare, Send, Square, Trash2, User, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -63,6 +63,8 @@ export function ChatWidget() {
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const fabRef = useRef<HTMLDivElement>(null);
 
   const displayedMessages: ChatTurn[] = useMemo(() => {
     return [{ role: 'assistant', content: t('chat_greeting') }, ...messages];
@@ -81,6 +83,20 @@ export function ChatWidget() {
     const timer = setTimeout(() => inputRef.current?.focus(), 100);
     return () => clearTimeout(timer);
   }, [isOpen]);
+
+  // Clique fora fecha a janela. Não contam como "fora": o botão flutuante (que já alterna
+  // sozinho) e o que a própria Simi abre em portal — o modal da chave e menus suspensos.
+  useEffect(() => {
+    if (!isOpen || aiModalOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Element | null;
+      if (!target || panelRef.current?.contains(target) || fabRef.current?.contains(target)) return;
+      if (target.closest('[role="dialog"], [data-radix-popper-content-wrapper]')) return;
+      setIsOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => document.removeEventListener('pointerdown', onPointerDown);
+  }, [isOpen, aiModalOpen]);
 
   // Uma resposta em andamento não sobrevive à troca de base nem à saída do workspace:
   // continuaria gastando a chave de API e rodando ferramentas sobre a base antiga.
@@ -172,7 +188,7 @@ export function ChatWidget() {
   return (
     <>
       {/* Botão de Ação Flutuante (FAB) no Canto Inferior Direito (acima do café) */}
-      <div data-tour="chat" className="fixed bottom-[60px] right-5 z-50 flex items-center justify-end gap-2">
+      <div ref={fabRef} data-tour="chat" className="fixed bottom-[60px] right-5 z-50 flex items-center justify-end gap-2">
         <button
           type="button"
           onClick={() => setIsOpen((prev) => !prev)}
@@ -198,11 +214,10 @@ export function ChatWidget() {
                 </span>
               </div>
               <span className="grid grid-cols-[0fr] group-hover:grid-cols-[1fr] transition-[grid-template-columns] duration-300 ease-out">
-                <span className="flex items-center gap-1.5 overflow-hidden">
+                <span className="flex items-center overflow-hidden">
                   <span className="text-xs font-bold tracking-wide whitespace-nowrap">
                     {t('chat_title')}
                   </span>
-                  <Sparkles className="size-3.5 shrink-0 text-amber-300 animate-pulse" />
                 </span>
               </span>
             </>
@@ -213,6 +228,7 @@ export function ChatWidget() {
       {/* Janela Flutuante do Widget de Chat */}
       {panel.mounted && (
         <div
+          ref={panelRef}
           className={cn(
             'fixed bottom-[116px] right-4 sm:right-6 z-50 flex h-[540px] max-h-[72vh] w-[94vw] sm:w-[440px] origin-bottom-right flex-col overflow-hidden rounded-2xl border border-border/90 bg-card/95 shadow-2xl backdrop-blur-md duration-200',
             panel.closing
