@@ -1,5 +1,6 @@
 import { HelpCircle } from 'lucide-react';
 
+import { ICON_BUTTON } from '@/components/HeaderActions';
 import { useLocale } from '@/state/locale.store';
 
 /**
@@ -14,12 +15,12 @@ export function TutorialTriggerButton({ onClick }: { onClick: () => void }) {
       type="button"
       data-tour="tutorial"
       onClick={onClick}
-      // No celular o texto some; o nome acessível não pode sumir junto.
+      // Só o ícone, no traço dos botões redondos do cabeçalho; o nome fica no rótulo.
       aria-label={t('tutorial_btn')}
-      className="header-chip cursor-pointer"
+      title={t('tutorial_btn')}
+      className={ICON_BUTTON}
     >
-      <HelpCircle className="size-3.5" aria-hidden />
-      <span className="hidden sm:inline">{t('tutorial_btn')}</span>
+      <HelpCircle className="size-4" aria-hidden />
     </button>
   );
 }

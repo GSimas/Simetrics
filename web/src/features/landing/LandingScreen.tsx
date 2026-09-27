@@ -8,7 +8,7 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
-import { GithubButton, SettingsButton } from '@/components/HeaderActions';
+import { SettingsButton } from '@/components/HeaderActions';
 import { EmptyState } from '@/features/EmptyState';
 import { ProjectCard } from '@/features/landing/ProjectCard';
 import type { TranslationKey } from '@/lib/i18n/translations';
@@ -264,7 +264,6 @@ export function LandingScreen({ navigate, onOpenTutorial }: LandingScreenProps) 
               <ArrowUpRight className="size-3.5 text-highlight" aria-hidden />
             </a>
             <SettingsButton />
-            <GithubButton />
           </div>
         </div>
       </header>

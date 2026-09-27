@@ -2,7 +2,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { BarChart3, FileText, FolderOpen, Network, Search } from 'lucide-react';
 
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { GithubButton, SettingsButton } from '@/components/HeaderActions';
+import { SettingsButton } from '@/components/HeaderActions';
 import { KpiTicker } from '@/components/KpiTicker';
 import { TutorialTriggerButton } from '@/components/TutorialTriggerButton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -165,6 +165,16 @@ export default function App() {
             </button>
 
             <div className="flex flex-wrap items-center gap-2">
+              {documentCount > 0 && (
+                <div className="eyebrow flex h-9 items-center gap-2 px-2 text-foreground">
+                  <span className="size-1.5 rounded-full bg-highlight shadow-[0_0_10px_var(--highlight)]" />
+                  <span className="tabular-nums">{documentCount.toLocaleString(numberLocale(locale))}</span>
+                  <span className="hidden text-muted-foreground xl:inline">{t('active_docs')}</span>
+                </div>
+              )}
+
+              <SaveStatus />
+
               <button
                 type="button"
                 data-tour="projects"
@@ -177,19 +187,8 @@ export default function App() {
                 <span className="hidden sm:inline">{t('nav_projects_btn')}</span>
               </button>
 
-              {documentCount > 0 && (
-                <div className="eyebrow flex h-9 items-center gap-2 px-2 text-foreground">
-                  <span className="size-1.5 rounded-full bg-highlight shadow-[0_0_10px_var(--highlight)]" />
-                  <span className="tabular-nums">{documentCount.toLocaleString(numberLocale(locale))}</span>
-                  <span className="hidden text-muted-foreground xl:inline">{t('active_docs')}</span>
-                </div>
-              )}
-
-              <SaveStatus />
-
               <TutorialTriggerButton onClick={openTutorial} />
               <SettingsButton />
-              <GithubButton />
             </div>
           </div>
           <div data-tour="ticker">

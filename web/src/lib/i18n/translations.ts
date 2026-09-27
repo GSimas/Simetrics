@@ -384,7 +384,6 @@ export const TRANSLATIONS = {
     radial_aria: 'Grafo radial com {count} nós',
     radial_communities: 'Comunidade',
     radial_documents: 'documentos',
-    github_label: 'Repositório no GitHub',
     ticker_label: 'Indicadores do projeto',
     ticker_project: 'Projeto',
     ticker_unsaved: 'Projeto sem nome',
@@ -409,10 +408,10 @@ export const TRANSLATIONS = {
     // Tela Inicial (Landing)
     landing_eyebrow: 'Bibliometria · Cientometria · Redes',
     landing_family: 'Uma aplicação Scientata',
-    landing_hero_a: 'Da literatura',
-    landing_hero_em: 'científica',
-    landing_hero_b: 'ao',
-    landing_hero_signal: 'conhecimento mapeado.',
+    landing_hero_a: 'Análise',
+    landing_hero_em: 'bibliométrica',
+    landing_hero_b: 'com',
+    landing_hero_signal: 'inteligência',
     landing_projects_eyebrow: 'Seus projetos · salvos neste navegador',
     landing_faq_eyebrow: 'Dúvidas',
     landing_pitch:
@@ -458,6 +457,7 @@ export const TRANSLATIONS = {
     // Cartão de Projeto
     project_card_open: 'Abrir',
     project_card_rename: 'Renomear',
+    project_card_rename_hint: 'Clique duas vezes para renomear',
     project_card_rename_save: 'Salvar nome',
     project_card_rename_cancel: 'Cancelar renomeação',
     project_card_duplicate: 'Duplicar',
@@ -862,7 +862,6 @@ export const TRANSLATIONS = {
     radial_aria: 'Radial graph with {count} nodes',
     radial_communities: 'Community',
     radial_documents: 'documents',
-    github_label: 'GitHub repository',
     ticker_label: 'Project indicators',
     ticker_project: 'Project',
     ticker_unsaved: 'Untitled project',
@@ -886,10 +885,10 @@ export const TRANSLATIONS = {
 
     landing_eyebrow: 'Bibliometrics · Scientometrics · Networks',
     landing_family: 'A Scientata application',
-    landing_hero_a: 'From',
-    landing_hero_em: 'scientific literature',
-    landing_hero_b: 'to',
-    landing_hero_signal: 'mapped knowledge.',
+    landing_hero_a: 'Bibliometric',
+    landing_hero_em: 'analysis',
+    landing_hero_b: 'with',
+    landing_hero_signal: 'intelligence',
     landing_projects_eyebrow: 'Your projects · saved in this browser',
     landing_faq_eyebrow: 'Questions',
     landing_pitch:
@@ -935,6 +934,7 @@ export const TRANSLATIONS = {
     // Project Card
     project_card_open: 'Open',
     project_card_rename: 'Rename',
+    project_card_rename_hint: 'Double-click to rename',
     project_card_rename_save: 'Save name',
     project_card_rename_cancel: 'Cancel rename',
     project_card_duplicate: 'Duplicate',

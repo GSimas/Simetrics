@@ -54,7 +54,20 @@ export function ProjectCard({
   };
 
   return (
-    <Card className="flex flex-col transition-colors hover:border-highlight/60">
+    <Card
+      className="flex flex-col transition-colors hover:border-highlight/60"
+      // Duplo clique no bloco renomeia; nos botões e no campo de edição, cada um faz o seu.
+      // O mousedown do segundo clique não seleciona palavra do card junto.
+      onMouseDown={(event) => {
+        if (event.detail > 1 && !(event.target as HTMLElement).closest('button, input, a')) event.preventDefault();
+      }}
+      onDoubleClick={(event) => {
+        if ((event.target as HTMLElement).closest('button, input, a')) return;
+        setDraftName(project.name);
+        setIsEditing(true);
+      }}
+      title={isEditing ? undefined : t('project_card_rename_hint')}
+    >
       <CardHeader className="pb-3">
         {isEditing ? (
           <div className="flex items-center gap-1.5">
