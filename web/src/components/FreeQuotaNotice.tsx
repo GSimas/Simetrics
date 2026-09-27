@@ -1,6 +1,7 @@
-import { Gift, KeyRound } from 'lucide-react';
+import { Gift, KeyRound, LogIn } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { startOpenRouterLogin } from '@/lib/openrouter-oauth';
 import { cn } from '@/lib/utils';
 import { useAiConfig } from '@/state/ai-config.store';
 import { useFreeTier } from '@/state/free-tier.store';
@@ -31,6 +32,31 @@ export function FreeQuotaNotice({ onConfigure, compact = false }: FreeQuotaNotic
       : t('chat_free_remaining').replace('{remaining}', String(free.remaining)).replace('{limit}', String(free.limit));
   const Icon = free && !exhausted ? Gift : KeyRound;
 
+  // Login com OpenRouter em destaque: é o caminho mais curto para usar a Simi sem colar chave.
+  const actions = (
+    <div className={cn('flex flex-wrap items-center gap-2', compact && 'mt-2')}>
+      <Button
+        variant="ai"
+        size="sm"
+        onClick={() => void startOpenRouterLogin()}
+        title={t('ai_openrouter_free_hint')}
+        className={cn('font-bold', compact ? 'h-7 text-[11px]' : 'h-8 text-xs')}
+      >
+        <LogIn className="size-3.5" aria-hidden />
+        {t('ai_openrouter_login')}
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={onConfigure}
+        className={cn('font-semibold', compact ? 'h-7 text-[10px]' : 'h-8 text-xs')}
+      >
+        <KeyRound className="size-3.5" aria-hidden />
+        {t('ai_settings_btn')}
+      </Button>
+    </div>
+  );
+
   return (
     <div
       role={exhausted ? 'alert' : 'status'}
@@ -43,18 +69,10 @@ export function FreeQuotaNotice({ onConfigure, compact = false }: FreeQuotaNotic
         <Icon className="mt-0.5 size-4 shrink-0 text-purple-600" aria-hidden />
         <div className="flex-1">
           <p className="font-medium leading-snug">{message}</p>
-          {compact && (
-            <Button variant="ai" size="sm" onClick={onConfigure} className="mt-2 h-6 text-[10px] font-bold">
-              {t('ai_settings_btn')}
-            </Button>
-          )}
+          {compact && actions}
         </div>
       </div>
-      {!compact && (
-        <Button variant="ai" size="sm" onClick={onConfigure} className="h-7 text-xs font-bold">
-          {t('ai_settings_btn')}
-        </Button>
-      )}
+      {!compact && actions}
     </div>
   );
 }

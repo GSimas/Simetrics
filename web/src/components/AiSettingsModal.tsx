@@ -6,9 +6,11 @@ import {
   EyeOff,
   KeyRound,
   Loader2,
+  LogIn,
   ShieldCheck,
   Sparkles,
   Trash2,
+  Zap,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -29,6 +31,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { testAiConnection } from '@/lib/ai-client';
+import { startOpenRouterLogin } from '@/lib/openrouter-oauth';
 import {
   DEFAULT_MODELS,
   PROVIDER_MODELS,
@@ -58,6 +61,8 @@ export function AiSettingsModal({ open, onOpenChange }: AiSettingsModalProps) {
   const [testing, setTesting] = useState(false);
   const [isCustomModel, setIsCustomModel] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  const openRouterConnected = globalConfig.provider === 'openrouter' && Boolean(globalConfig.apiKey);
 
   const selectedProviderOption =
     PROVIDER_OPTIONS.find((opt) => opt.id === form.provider) ?? PROVIDER_OPTIONS[0]!;
@@ -118,7 +123,7 @@ export function AiSettingsModal({ open, onOpenChange }: AiSettingsModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl overflow-hidden p-0 border-border/80 bg-card shadow-2xl rounded-2xl">
+      <DialogContent className="max-w-xl max-h-[92vh] overflow-y-auto p-0 border-border/80 bg-card shadow-2xl rounded-2xl">
         <div className="h-0.5 w-full bg-highlight" />
 
         <div className="p-6 space-y-5">
@@ -134,6 +139,49 @@ export function AiSettingsModal({ open, onOpenChange }: AiSettingsModalProps) {
               {t('ai_modal_subtitle')}
             </DialogDescription>
           </DialogHeader>
+
+          {/* Login OAuth PKCE em destaque: dispensa copiar a chave e já usa o roteador de modelos gratuitos. */}
+          <section
+            aria-labelledby="openrouter-login-title"
+            className="rounded-xl border border-primary/40 bg-primary/5 p-4 space-y-3"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1">
+                <h3 id="openrouter-login-title" className="flex items-center gap-1.5 text-sm font-bold text-foreground">
+                  <Zap className="size-4 text-primary" aria-hidden />
+                  {isEn ? 'Quickest way: OpenRouter' : 'Jeito mais rápido: OpenRouter'}
+                </h3>
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  {isEn
+                    ? 'Sign in with your OpenRouter account and Simi is ready to go: a key is created for you and the free models router is selected. No copying keys, no cost.'
+                    : 'Entre com sua conta OpenRouter e a Simi fica pronta: a chave é criada para você e o roteador de modelos gratuitos é selecionado. Sem copiar chave, sem custo.'}
+                </p>
+              </div>
+              {openRouterConnected && (
+                <span className="flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
+                  <Check className="size-3" aria-hidden />
+                  {isEn ? 'Connected' : 'Conectado'}
+                </span>
+              )}
+            </div>
+            <Button
+              type="button"
+              variant="gradient"
+              onClick={() => void startOpenRouterLogin()}
+              className="h-10 w-full rounded-xl text-xs font-semibold"
+            >
+              <LogIn className="size-4" aria-hidden />
+              {openRouterConnected
+                ? isEn ? 'Sign in with OpenRouter again' : 'Entrar novamente com OpenRouter'
+                : isEn ? 'Sign in with OpenRouter' : 'Entrar com OpenRouter'}
+            </Button>
+          </section>
+
+          <div className="flex items-center gap-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <span className="h-px flex-1 bg-border" />
+            {isEn ? 'or use your own key' : 'ou use sua própria chave'}
+            <span className="h-px flex-1 bg-border" />
+          </div>
 
           <div className="space-y-4">
             {/* 1. Provedor de IA */}

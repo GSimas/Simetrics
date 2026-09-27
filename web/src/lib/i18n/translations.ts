@@ -9,6 +9,8 @@ export const TRANSLATIONS = {
     active_docs: 'documentos ativos',
     tutorial_btn: 'Como Usar / Tutorial',
     ai_settings_btn: 'Chave de IA (BYOK)',
+    ai_openrouter_login: 'Entrar com OpenRouter',
+    ai_openrouter_free_hint: 'Modelos gratuitos, sem colar chave',
     ai_configured: 'IA Configurada',
     ai_not_configured: 'Configurar IA',
     developed_by: 'Desenvolvido por',
@@ -246,11 +248,11 @@ export const TRANSLATIONS = {
     chat_tools_executed_count: 'consultas analíticas locais realizadas',
     chat_tools_badge: 'Cálculo determinístico no navegador',
     chat_no_key_warning:
-      'Para conversar com a Simi, configure sua chave de API própria (BYOK) no botão acima.',
+      'Para conversar com a Simi, entre com sua conta OpenRouter (modelos gratuitos) ou configure sua própria chave de API.',
     chat_free_remaining:
-      'Simi gratuita: restam {remaining} de {limit} perguntas neste dispositivo. Para uso ilimitado, configure sua própria chave de API.',
+      'Simi gratuita: restam {remaining} de {limit} perguntas neste dispositivo. Para continuar sem limite, entre com o OpenRouter ou configure sua própria chave.',
     chat_free_exhausted:
-      'Você usou as {limit} perguntas gratuitas da Simi neste dispositivo. Configure sua própria chave de API para continuar.',
+      'Você usou as {limit} perguntas gratuitas da Simi neste dispositivo. Entre com o OpenRouter (grátis) ou configure sua própria chave para continuar.',
     chat_free_subtitle: 'DeepSeek grátis · {remaining}/{limit}',
 
     // Feedback Tab
@@ -483,6 +485,8 @@ export const TRANSLATIONS = {
     active_docs: 'active documents',
     tutorial_btn: 'How to Use / Tutorial',
     ai_settings_btn: 'AI API Key (BYOK)',
+    ai_openrouter_login: 'Sign in with OpenRouter',
+    ai_openrouter_free_hint: 'Free models, no key to paste',
     ai_configured: 'AI Configured',
     ai_not_configured: 'Setup AI Key',
     developed_by: 'Developed by',
@@ -719,11 +723,11 @@ export const TRANSLATIONS = {
     chat_tools_executed_count: 'local analytical queries executed',
     chat_tools_badge: 'Deterministic in-browser calculation',
     chat_no_key_warning:
-      'To chat with Simi, please configure your own API key (BYOK) using the button above.',
+      'To chat with Simi, sign in with your OpenRouter account (free models) or set your own API key.',
     chat_free_remaining:
-      'Free Simi: {remaining} of {limit} questions left on this device. For unlimited use, set your own API key.',
+      'Free Simi: {remaining} of {limit} questions left on this device. To keep going without limits, sign in with OpenRouter or set your own key.',
     chat_free_exhausted:
-      'You have used the {limit} free Simi questions on this device. Set your own API key to continue.',
+      'You have used the {limit} free Simi questions on this device. Sign in with OpenRouter (free) or set your own key to continue.',
     chat_free_subtitle: 'Free DeepSeek · {remaining}/{limit}',
 
     // Feedback Tab

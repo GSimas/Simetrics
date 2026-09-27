@@ -94,7 +94,8 @@ export const DEFAULT_MODELS: Record<AiProvider, string> = {
   zhipu: 'glm-5.3',
   cohere: 'command-a-plus-05-2026',
   huggingface: 'deepseek-ai/DeepSeek-V4.1-Flash',
-  openrouter: 'google/gemini-3.8-flash',
+  // Roteador dos modelos gratuitos: funciona com a chave obtida no login, sem créditos.
+  openrouter: 'openrouter/free',
   custom: 'gpt-oss:20b',
 };
 
@@ -190,7 +191,8 @@ export const PROVIDER_MODELS: Record<AiProvider, ModelOption[]> = {
     { id: 'google/gemma-4-31B-it', name: 'Gemma 4 31B', badge: 'Pesos abertos' },
   ],
   openrouter: [
-    { id: 'google/gemini-3.8-flash', name: 'Gemini 3.8 Flash (Google)', badge: 'Recomendado' },
+    { id: 'openrouter/free', name: 'Free Models Router', badge: 'Recomendado · Gratuito' },
+    { id: 'google/gemini-3.8-flash', name: 'Gemini 3.8 Flash (Google)', badge: 'Rápido' },
     { id: 'anthropic/claude-sonnet-5', name: 'Claude Sonnet 5 (Anthropic)', badge: 'Equilíbrio' },
     { id: 'anthropic/claude-opus-5.5', name: 'Claude Opus 5.5 (Anthropic)', badge: 'Mais capaz' },
     { id: 'openai/gpt-6-sol', name: 'GPT-6 Sol (OpenAI)', badge: 'Topo de linha' },
