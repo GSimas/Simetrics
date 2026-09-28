@@ -1,24 +1,22 @@
-import { useMemo, useState } from 'react';
-import { BarChart3, ClipboardList, Filter, GitBranch, ShieldCheck, TableProperties } from 'lucide-react';
+import { useMemo } from 'react';
+import { BarChart3, ClipboardList, Eye, Filter, GitBranch, ShieldCheck, TableProperties } from 'lucide-react';
 
+import { DemoCopyButton } from '@/components/DemoBanner';
 import { createReview } from '@/core/review/state';
 import { getDeviceId } from '@/lib/device-id';
 import { cn } from '@/lib/utils';
-import { DemoCopyButton } from '@/components/DemoBanner';
-import { useDataset } from '@/state/dataset.store';
 import { useLocale } from '@/state/locale.store';
-import { useReview } from '@/state/review.store';
+import { useReview, useReviewNav, useReviewReadOnly, type ReviewStep } from '@/state/review.store';
 import { REVIEW_COPY } from './copy';
 import { ExtractionPanel } from './ExtractionPanel';
+import { PANEL_ENTER, PRESS } from './motion';
 import { PrismaPanel } from './PrismaPanel';
 import { ProtocolPanel } from './ProtocolPanel';
 import { QualityPanel } from './QualityPanel';
 import { ScreeningPanel } from './ScreeningPanel';
 import { SynthesisPanel } from './SynthesisPanel';
 
-type Step = 'protocol' | 'screening' | 'quality' | 'extraction' | 'synthesis' | 'prisma';
-
-const STEPS: { value: Step; Icon: typeof ClipboardList }[] = [
+const STEPS: { value: ReviewStep; Icon: typeof ClipboardList }[] = [
   { value: 'protocol', Icon: ClipboardList },
   { value: 'screening', Icon: Filter },
   { value: 'quality', Icon: ShieldCheck },
@@ -40,19 +38,10 @@ export default function ReviewTab() {
   // Sem revisão ainda, mostra um protocolo em branco; a primeira edição o cria no store.
   const blank = useMemo(() => createReview(getDeviceId()), []);
   const review = stored ?? blank;
-  const [step, setStep] = useState<Step>('protocol');
-  const isDemo = useDataset((state) => state.isDemo);
-
-  // O exemplo é só visualização: uma revisão precisa de um projeto salvo onde viver.
-  if (isDemo) {
-    return (
-      <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-border p-10 text-center">
-        <p className="eyebrow text-highlight">{copy.eyebrow}</p>
-        <p className="max-w-xl text-sm text-muted-foreground">{copy.demoReadOnly}</p>
-        <DemoCopyButton size="default" />
-      </div>
-    );
-  }
+  const step = useReviewNav((state) => state.step);
+  const setStep = useReviewNav((state) => state.setStep);
+  const readOnly = useReviewReadOnly();
+  const editProtocol = () => setStep('protocol');
 
   return (
     <div className="space-y-5">
@@ -61,33 +50,59 @@ export default function ReviewTab() {
         <p className="max-w-3xl text-sm leading-relaxed text-muted-foreground">{copy.intro}</p>
       </div>
 
-      <nav className="flex flex-wrap gap-2" aria-label={copy.eyebrow}>
-        {STEPS.map(({ value, Icon }, index) => (
-          <button
-            key={value}
-            type="button"
-            aria-current={step === value ? 'step' : undefined}
-            onClick={() => setStep(value)}
-            className={cn(
-              'flex items-center gap-2 rounded-md border px-3 py-2 text-xs font-medium transition-colors sm:text-sm',
-              step === value
-                ? 'border-highlight text-foreground'
-                : 'border-border text-muted-foreground hover:text-foreground',
-            )}
-          >
-            <span className={cn('font-mono text-[10px]', step === value && 'text-highlight')}>{index + 1}</span>
-            <Icon className={cn('size-4', step === value && 'text-highlight')} aria-hidden />
-            {copy.steps[value]}
-          </button>
-        ))}
+      {readOnly && (
+        <div
+          role="status"
+          className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-highlight/40 bg-highlight/5 px-4 py-3 shadow-[0_0_32px_-16px_var(--highlight)] animate-in fade-in-0 slide-in-from-top-1 duration-300"
+        >
+          <Eye className="size-4 shrink-0 text-highlight" aria-hidden />
+          <p className="min-w-[14rem] flex-1 text-xs leading-relaxed text-muted-foreground sm:text-sm">{copy.demoReadOnly}</p>
+          <DemoCopyButton />
+        </div>
+      )}
+
+      <nav className="flex flex-wrap gap-2" aria-label={copy.eyebrow} data-tour="review-steps">
+        {STEPS.map(({ value, Icon }, index) => {
+          const active = step === value;
+          return (
+            <button
+              key={value}
+              type="button"
+              aria-current={active ? 'step' : undefined}
+              onClick={() => setStep(value)}
+              className={cn(
+                'group flex items-center gap-2 rounded-md border px-3 py-2 text-xs font-medium sm:text-sm',
+                PRESS,
+                active
+                  ? 'border-highlight bg-highlight/5 text-foreground shadow-[0_0_24px_-10px_var(--highlight)]'
+                  : 'border-border text-muted-foreground hover:border-highlight/50 hover:text-foreground',
+              )}
+            >
+              <span className={cn('font-mono text-[10px] transition-colors duration-200', active && 'text-highlight')}>
+                {index + 1}
+              </span>
+              <Icon
+                className={cn(
+                  'size-4 transition-[color,transform] duration-200 group-hover:scale-110 motion-reduce:transform-none',
+                  active && 'text-highlight',
+                )}
+                aria-hidden
+              />
+              {copy.steps[value]}
+            </button>
+          );
+        })}
       </nav>
 
-      {step === 'protocol' && <ProtocolPanel review={review} copy={copy} />}
-      {step === 'screening' && <ScreeningPanel review={review} copy={copy} />}
-      {step === 'quality' && <QualityPanel review={review} copy={copy} onEditProtocol={() => setStep('protocol')} />}
-      {step === 'extraction' && <ExtractionPanel review={review} copy={copy} onEditProtocol={() => setStep('protocol')} />}
-      {step === 'synthesis' && <SynthesisPanel review={review} copy={copy} />}
-      {step === 'prisma' && <PrismaPanel review={review} copy={copy} />}
+      {/* A chave nova a cada etapa refaz a entrada: a troca desliza em vez de piscar. */}
+      <div key={step} className={PANEL_ENTER} data-tour={`review-step-${step}`}>
+        {step === 'protocol' && <ProtocolPanel review={review} copy={copy} />}
+        {step === 'screening' && <ScreeningPanel review={review} copy={copy} />}
+        {step === 'quality' && <QualityPanel review={review} copy={copy} onEditProtocol={editProtocol} />}
+        {step === 'extraction' && <ExtractionPanel review={review} copy={copy} onEditProtocol={editProtocol} />}
+        {step === 'synthesis' && <SynthesisPanel review={review} copy={copy} />}
+        {step === 'prisma' && <PrismaPanel review={review} copy={copy} />}
+      </div>
     </div>
   );
 }

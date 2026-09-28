@@ -1,5 +1,8 @@
-import { useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { X } from 'lucide-react';
+
+import { cn } from '@/lib/utils';
+import { ENTER, EXIT, PRESS, useExitRemove } from './motion';
 
 function splitItems(value: string): string[] {
   return value
@@ -29,6 +32,12 @@ export function ChipInput({
   separator?: string;
 }) {
   const [draft, setDraft] = useState('');
+  const { isLeaving, remove } = useExitRemove();
+  // A remoção só acontece ao fim da animação de saída: ela filtra a lista de então.
+  const latest = useRef({ items, onChange });
+  useEffect(() => {
+    latest.current = { items, onChange };
+  }, [items, onChange]);
 
   const commit = (value: string): void => {
     const incoming = splitItems(value).filter((item, index, all) => !items.includes(item) && all.indexOf(item) === index);
@@ -50,15 +59,18 @@ export function ChipInput({
       {items.map((item, index) => (
         <span
           key={item}
-          className="inline-flex items-center gap-1 rounded-md border border-border bg-secondary px-2 py-0.5 font-mono text-xs"
+          className={cn(
+            'inline-flex items-center gap-1 rounded-md border border-border bg-secondary px-2 py-0.5 font-mono text-xs transition-[border-color,box-shadow] duration-200 hover:border-highlight/50 hover:shadow-[0_0_14px_-8px_var(--highlight)]',
+            isLeaving(item) ? EXIT : cn(ENTER, 'zoom-in-95'),
+          )}
         >
           {separator && index > 0 && <span className="text-[10px] text-muted-foreground">{separator}</span>}
           {item}
           <button
             type="button"
-            onClick={() => onChange(items.filter((other) => other !== item))}
+            onClick={() => remove(item, () => latest.current.onChange(latest.current.items.filter((other) => other !== item)))}
             aria-label={`${removeLabel}: ${item}`}
-            className="text-muted-foreground hover:text-foreground"
+            className={cn('rounded-sm text-muted-foreground hover:text-exclude', PRESS)}
           >
             <X className="size-3" aria-hidden />
           </button>

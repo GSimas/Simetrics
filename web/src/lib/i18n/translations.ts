@@ -24,7 +24,7 @@ export const TRANSLATIONS = {
     tab_search: 'Motor de Busca',
     tab_chat: 'Assistente Científica',
     tab_report: 'Relatório',
-    tab_review: 'Revisão Sistemática',
+    tab_review: 'Revisão Sistematizada',
     tab_feedback: 'Feedback',
 
     // Upload Panel
@@ -510,7 +510,7 @@ export const TRANSLATIONS = {
     tab_search: 'Search Engine',
     tab_chat: 'Scientific Assistant',
     tab_report: 'Report',
-    tab_review: 'Systematic Review',
+    tab_review: 'Systematized Review',
     tab_feedback: 'Feedback',
 
     // Upload Panel

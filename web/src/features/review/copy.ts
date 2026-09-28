@@ -10,7 +10,7 @@ export const REVIEW_COPY = {
     intro:
       'Planeje o protocolo, faça a triagem da base importada em duas etapas, avalie a qualidade e extraia os dados dos estudos incluídos, e gere a síntese, o fluxo PRISMA e o relatório. Tudo fica salvo no projeto, no seu navegador.',
     demoReadOnly:
-      'O exemplo é só visualização. Para planejar e triar uma revisão sobre esta base, faça uma cópia editável: ela vira um projeto seu, salvo no navegador.',
+      'Revisão de escopo de amostra sobre a base de exemplo, só para visualização: navegue pelas etapas à vontade. Para editá-la ou começar a sua, faça uma cópia editável — ela vira um projeto seu, com esta revisão junto.',
     steps: {
       protocol: 'Protocolo',
       screening: 'Triagem',
@@ -245,7 +245,7 @@ export const REVIEW_COPY = {
     intro:
       'Plan the protocol, screen the imported dataset in two stages, assess quality and extract data from the included studies, then produce the synthesis, the PRISMA flow and the report. Everything is saved in the project, in your browser.',
     demoReadOnly:
-      'The demo is view only. To plan and screen a review on this dataset, make an editable copy: it becomes your own project, saved in the browser.',
+      'A sample scoping review on the demo dataset, view only: browse the stages freely. To edit it or start your own, make an editable copy — it becomes your own project, with this review included.',
     steps: {
       protocol: 'Protocol',
       screening: 'Screening',

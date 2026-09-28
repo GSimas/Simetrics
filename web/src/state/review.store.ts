@@ -54,6 +54,11 @@ interface ReviewStoreState {
   setExtractionDone: (key: string, done: boolean) => void;
 }
 
+/** O exemplo é só visualização: nenhuma ação altera a revisão dele. */
+function readOnly(): boolean {
+  return useDataset.getState().isDemo;
+}
+
 function current(review: ReviewState | null): ReviewState {
   return review ?? createReview(getDeviceId());
 }
@@ -83,9 +88,13 @@ export const useReview = create<ReviewStoreState>()(
 
     hydrate: (review) => set({ review }),
 
-    update: (patch) => set({ review: touch(current(get().review), patch) }),
+    update(patch) {
+      if (readOnly()) return;
+      set({ review: touch(current(get().review), patch) });
+    },
 
     setType(type) {
+      if (readOnly()) return;
       const review = current(get().review);
       // A estrutura acompanha o tipo enquanto o usuário não preencheu nenhum campo dela.
       const untouched = Object.values(review.frameworkValues).every((value) => !value.trim());
@@ -98,6 +107,7 @@ export const useReview = create<ReviewStoreState>()(
     },
 
     addQuestion() {
+      if (readOnly()) return '';
       const review = current(get().review);
       const id = crypto.randomUUID();
       set({ review: touch(review, { questions: [...review.questions, { id, text: '' }] }) });
@@ -105,6 +115,7 @@ export const useReview = create<ReviewStoreState>()(
     },
 
     addConcept() {
+      if (readOnly()) return '';
       const review = current(get().review);
       const id = crypto.randomUUID();
       set({ review: touch(review, { concepts: [...review.concepts, { id, label: '', terms: [] }] }) });
@@ -112,6 +123,7 @@ export const useReview = create<ReviewStoreState>()(
     },
 
     addCriterion(kind) {
+      if (readOnly()) return '';
       const review = current(get().review);
       const id = crypto.randomUUID();
       set({ review: touch(review, { criteria: [...review.criteria, { id, kind, text: '' }] }) });
@@ -119,6 +131,7 @@ export const useReview = create<ReviewStoreState>()(
     },
 
     addQualityQuestion(defaultAnswers) {
+      if (readOnly()) return '';
       const review = current(get().review);
       const id = crypto.randomUUID();
       set({
@@ -131,6 +144,7 @@ export const useReview = create<ReviewStoreState>()(
     },
 
     addQualityAnswer() {
+      if (readOnly()) return '';
       const review = current(get().review);
       const id = crypto.randomUUID();
       set({ review: touch(review, { qualityAnswers: [...review.qualityAnswers, { id, label: '', weight: 0 }] }) });
@@ -138,6 +152,7 @@ export const useReview = create<ReviewStoreState>()(
     },
 
     addExtractionField() {
+      if (readOnly()) return '';
       const review = current(get().review);
       const id = crypto.randomUUID();
       set({
@@ -149,12 +164,14 @@ export const useReview = create<ReviewStoreState>()(
     },
 
     removeItem(list, id) {
+      if (readOnly()) return;
       const review = current(get().review);
       const items = review[list] as { id: string }[];
       set({ review: touch(review, { [list]: items.filter((item) => item.id !== id) }) });
     },
 
     decideTitleAbstract(key, decision, reason) {
+      if (readOnly()) return;
       set({
         review: withScreening(current(get().review), key, (screening) => {
           if (decision) screening.ta = decision;
@@ -167,6 +184,7 @@ export const useReview = create<ReviewStoreState>()(
     },
 
     decideFullText(key, decision, reason) {
+      if (readOnly()) return;
       set({
         review: withScreening(current(get().review), key, (screening) => {
           if (decision) screening.ft = decision;
@@ -179,6 +197,7 @@ export const useReview = create<ReviewStoreState>()(
     },
 
     answerQuality(key, questionId, answerId) {
+      if (readOnly()) return;
       const review = current(get().review);
       const responses = { ...(review.quality[key] ?? {}) };
       if (answerId) responses[questionId] = answerId;
@@ -190,6 +209,7 @@ export const useReview = create<ReviewStoreState>()(
     },
 
     setExtractionValue(key, fieldId, value) {
+      if (readOnly()) return;
       const review = current(get().review);
       const study = review.extraction[key] ?? { values: {}, done: false };
       const values = { ...study.values };
@@ -199,12 +219,14 @@ export const useReview = create<ReviewStoreState>()(
     },
 
     setExtractionDone(key, done) {
+      if (readOnly()) return;
       const review = current(get().review);
       const study = review.extraction[key] ?? { values: {}, done: false };
       set({ review: touch(review, { extraction: { ...review.extraction, [key]: { ...study, done } } }) });
     },
 
     setNote(key, note) {
+      if (readOnly()) return;
       set({
         review: withScreening(current(get().review), key, (screening) => {
           if (note.trim()) screening.note = note;
@@ -233,3 +255,16 @@ export function screeningRecordsOf(active: Dataset | null): ScreeningRecord[] {
 export function useScreeningRecords(): ScreeningRecord[] {
   return screeningRecordsOf(useDataset((state) => state.active));
 }
+
+/** A revisão aberta é só para ver (a de amostra do exemplo). */
+export function useReviewReadOnly(): boolean {
+  return useDataset((state) => state.isDemo);
+}
+
+export type ReviewStep = 'protocol' | 'screening' | 'quality' | 'extraction' | 'synthesis' | 'prisma';
+
+/** Etapa aberta na aba da revisão — num store para o tour guiado poder trocá-la. */
+export const useReviewNav = create<{ step: ReviewStep; setStep: (step: ReviewStep) => void }>()((set) => ({
+  step: 'protocol',
+  setStep: (step) => set({ step }),
+}));

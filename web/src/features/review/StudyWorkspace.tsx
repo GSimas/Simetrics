@@ -1,5 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { ChevronLeft, ChevronRight, ExternalLink, SearchX } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, ExternalLink, SearchX } from 'lucide-react';
+
+import { Collapse } from '@/components/Collapse';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,6 +9,8 @@ import { Progress } from '@/components/ui/progress';
 import type { ScreeningRecord } from '@/core/review/records';
 import { cn } from '@/lib/utils';
 import type { ReviewCopy } from './copy';
+import { chipClass, PRESS, type FlashKind } from './motion';
+import { DecisionFlash } from './motion-parts';
 
 type Filter = 'pending' | 'done' | 'all';
 
@@ -21,6 +25,7 @@ export function StudyWorkspace({
   badge,
   copy,
   label,
+  flash = null,
   children,
 }: {
   studies: ScreeningRecord[];
@@ -29,12 +34,15 @@ export function StudyWorkspace({
   copy: ReviewCopy;
   /** Nome acessível da lista. */
   label: string;
+  /** Lampejo de luz sobre o estudo aberto (concluir, passar ou não na nota de corte). */
+  flash?: { id: number; kind: FlashKind } | null;
   children: (study: ScreeningRecord) => ReactNode;
 }) {
   const [filter, setFilter] = useState<Filter>('pending');
   const [query, setQuery] = useState('');
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [anchor, setAnchor] = useState(0);
+  const [abstractOpen, setAbstractOpen] = useState(false);
 
   const done = studies.filter((study) => isDone(study.key)).length;
   const counts: Record<Filter, number> = { pending: studies.length - done, done, all: studies.length };
@@ -79,12 +87,12 @@ export function StudyWorkspace({
                 setSelectedKey(null);
                 setAnchor(0);
               }}
-              className={cn(
-                'rounded-md border px-2 py-1 text-[11px] transition-colors',
-                filter === value ? 'border-highlight text-highlight' : 'border-border text-muted-foreground hover:text-foreground',
-              )}
+              className={chipClass(filter === value, value === 'done' ? 'include' : 'highlight', 'sm')}
             >
-              {copy.studyFilters[value]} <span className="tabular-nums">{counts[value].toLocaleString()}</span>
+              {copy.studyFilters[value]}{' '}
+              <span key={counts[value]} className="inline-block tabular-nums animate-in fade-in-0 zoom-in-90 duration-200">
+                {counts[value].toLocaleString()}
+              </span>
             </button>
           ))}
         </div>
@@ -95,9 +103,13 @@ export function StudyWorkspace({
           aria-label={copy.searchRecords}
           className="h-8 text-sm"
         />
-        <div className="max-h-[60vh] overflow-y-auto rounded-xl border border-border/80" role="listbox" aria-label={label}>
+        <div
+          className="max-h-[60vh] overflow-y-auto rounded-xl border border-border/80 transition-[border-color] duration-300 hover:border-highlight/30"
+          role="listbox"
+          aria-label={label}
+        >
           {visible.length === 0 ? (
-            <p className="flex flex-col items-center justify-center gap-2 p-6 text-center text-xs text-muted-foreground">
+            <p className="flex flex-col items-center justify-center gap-2 p-6 text-center text-xs text-muted-foreground animate-in fade-in-0 duration-300">
               <SearchX className="size-5" aria-hidden />
               {copy.emptyList}
             </p>
@@ -110,8 +122,8 @@ export function StudyWorkspace({
                 aria-selected={index === position}
                 onClick={() => select(index)}
                 className={cn(
-                  'flex w-full flex-col items-start gap-1 border-b border-border/60 px-3 py-2 text-left transition-colors last:border-b-0',
-                  index === position ? 'bg-secondary' : 'hover:bg-muted/40',
+                  'flex w-full flex-col items-start gap-1 border-b border-l-2 border-border/60 px-3 py-2 text-left transition-[background-color,border-color] duration-200 last:border-b-0',
+                  index === position ? 'border-l-highlight bg-secondary' : 'border-l-transparent hover:bg-muted/40',
                 )}
               >
                 <span className="line-clamp-2 text-xs font-medium leading-snug">{study.title || '—'}</span>
@@ -126,13 +138,26 @@ export function StudyWorkspace({
       </div>
 
       {selected ? (
-        <article className="space-y-4 rounded-xl border border-border/80 p-5">
+        // Fica montado entre um estudo e outro: o lampejo segue visível enquanto o próximo entra.
+        <div className="relative rounded-xl">
+        <DecisionFlash flash={flash} />
+        <article
+          key={selected.key}
+          className="space-y-4 rounded-xl border border-border/80 p-5 animate-in fade-in-0 slide-in-from-right-2 duration-200"
+        >
           <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
             <span className="tabular-nums">
               {copy.studyOf.replace('{n}', (position + 1).toLocaleString()).replace('{total}', visible.length.toLocaleString())}
             </span>
             <span className="ml-auto flex gap-1">
-              <Button type="button" variant="ghost" size="sm" onClick={() => select(position - 1)} disabled={position <= 0}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="active:scale-[0.97]"
+                onClick={() => select(position - 1)}
+                disabled={position <= 0}
+              >
                 <ChevronLeft aria-hidden />
                 {copy.previous}
               </Button>
@@ -140,6 +165,7 @@ export function StudyWorkspace({
                 type="button"
                 variant="ghost"
                 size="sm"
+                className="active:scale-[0.97]"
                 onClick={() => select(position + 1)}
                 disabled={position >= visible.length - 1}
               >
@@ -166,16 +192,30 @@ export function StudyWorkspace({
               )}
             </p>
             {selected.abstract && (
-              <details className="text-sm">
-                <summary className="cursor-pointer select-none text-xs text-muted-foreground">{copy.abstractLabel}</summary>
-                <p className="mt-2 max-h-[24vh] overflow-y-auto whitespace-pre-line leading-relaxed">{selected.abstract}</p>
-              </details>
+              <div className="text-sm">
+                <button
+                  type="button"
+                  aria-expanded={abstractOpen}
+                  onClick={() => setAbstractOpen((open) => !open)}
+                  className={cn('inline-flex items-center gap-1 rounded-sm text-xs text-muted-foreground hover:text-foreground', PRESS)}
+                >
+                  <ChevronDown
+                    className={cn('size-3.5 transition-transform duration-300', abstractOpen && 'rotate-180')}
+                    aria-hidden
+                  />
+                  {copy.abstractLabel}
+                </button>
+                <Collapse open={abstractOpen} delayOpen={false}>
+                  <p className="mt-2 max-h-[24vh] overflow-y-auto whitespace-pre-line leading-relaxed">{selected.abstract}</p>
+                </Collapse>
+              </div>
             )}
           </div>
           <div className="border-t border-border/80 pt-4">{children(selected)}</div>
         </article>
+        </div>
       ) : (
-        <div className="flex items-center justify-center rounded-xl border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
+        <div className="flex items-center justify-center rounded-xl border border-dashed border-border p-10 text-center text-sm text-muted-foreground animate-in fade-in-0 duration-300">
           {copy.emptyList}
         </div>
       )}
@@ -186,10 +226,10 @@ export function StudyWorkspace({
 /** Aviso de etapa vazia, com atalho opcional para o protocolo. */
 export function EmptyStep({ message, action }: { message: string; action?: { label: string; onClick: () => void } }) {
   return (
-    <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-border p-10 text-center">
+    <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-border p-10 text-center animate-in fade-in-0 duration-300">
       <p className="max-w-xl text-sm text-muted-foreground">{message}</p>
       {action && (
-        <Button type="button" variant="outline" onClick={action.onClick}>
+        <Button type="button" variant="outline" className="active:scale-[0.97]" onClick={action.onClick}>
           {action.label}
         </Button>
       )}

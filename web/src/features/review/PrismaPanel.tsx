@@ -13,19 +13,37 @@ import { useDataset } from '@/state/dataset.store';
 import { useLocale } from '@/state/locale.store';
 import { useProjectStore } from '@/state/project.store';
 import { useScreeningRecords } from '@/state/review.store';
+import { cn } from '@/lib/utils';
 import type { ReviewCopy } from './copy';
+import { ADD_BUTTON, BLOCK } from './motion';
 
-function FlowBox({ label, value, tone = 'main', children }: {
+/**
+ * Caixa do fluxo. As de exclusão têm a luz vermelha da revisão; a dos incluídos, a verde.
+ * Entram em cascata, de cima para baixo, como o próprio fluxo.
+ */
+function FlowBox({ label, value, tone = 'main', order = 0, children }: {
   label: string;
   value: number;
-  tone?: 'main' | 'side';
+  tone?: 'main' | 'side' | 'included';
+  order?: number;
   children?: React.ReactNode;
 }) {
   const locale = useLocale((state) => state.locale);
   return (
-    <div className={tone === 'main' ? 'rounded-lg border border-border p-3' : 'rounded-lg border border-dashed border-border/80 p-3'}>
+    <div
+      className={cn(
+        'rounded-lg p-3 transition-[border-color,box-shadow] duration-300 animate-in fade-in-0 slide-in-from-top-2 fill-mode-both',
+        tone === 'main' && 'border border-border hover:border-highlight/50 hover:shadow-[0_0_28px_-14px_var(--highlight)]',
+        tone === 'side' &&
+          'border border-dashed border-exclude/40 bg-exclude/5 hover:border-exclude/70 hover:shadow-[0_0_28px_-14px_var(--glow-exclude)]',
+        tone === 'included' && 'border border-include/60 bg-include/10 shadow-[0_0_32px_-14px_var(--glow-include)]',
+      )}
+      style={{ animationDelay: `${order * 70}ms` }}
+    >
       <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="text-xl font-bold tabular-nums">n = {value.toLocaleString(numberLocale(locale))}</p>
+      <p key={value} className={cn('text-xl font-bold tabular-nums animate-in fade-in-0 duration-300', tone === 'included' && 'text-include')}>
+        n = {value.toLocaleString(numberLocale(locale))}
+      </p>
       {children}
     </div>
   );
@@ -56,7 +74,7 @@ function FlowSummary({ flow, copy }: { flow: ReviewFlow; copy: ReviewCopy }) {
       <Row
         phase={copy.identification}
         main={
-          <FlowBox label={copy.identifiedFrom} value={flow.identified}>
+          <FlowBox label={copy.identifiedFrom} value={flow.identified} order={0}>
             <ul className="mt-1 space-y-0.5 text-[11px] text-muted-foreground">
               {flow.identifiedBySource.map((source) => (
                 <li key={source.name}>
@@ -66,26 +84,26 @@ function FlowSummary({ flow, copy }: { flow: ReviewFlow; copy: ReviewCopy }) {
             </ul>
           </FlowBox>
         }
-        side={<FlowBox label={copy.duplicatesRemoved} value={flow.duplicatesRemoved} tone="side" />}
+        side={<FlowBox label={copy.duplicatesRemoved} value={flow.duplicatesRemoved} tone="side" order={1} />}
       />
       {arrow}
       <Row
         phase={copy.screening}
-        main={<FlowBox label={copy.recordsScreened} value={flow.screened} />}
-        side={<FlowBox label={copy.recordsExcluded} value={flow.titleAbstract.exclude} tone="side" />}
+        main={<FlowBox label={copy.recordsScreened} value={flow.screened} order={2} />}
+        side={<FlowBox label={copy.recordsExcluded} value={flow.titleAbstract.exclude} tone="side" order={3} />}
       />
       {arrow}
       <Row
         phase=""
-        main={<FlowBox label={copy.reportsSought} value={flow.fullText.eligible} />}
-        side={<FlowBox label={copy.reportsNotRetrieved} value={flow.fullText.notRetrieved} tone="side" />}
+        main={<FlowBox label={copy.reportsSought} value={flow.fullText.eligible} order={4} />}
+        side={<FlowBox label={copy.reportsNotRetrieved} value={flow.fullText.notRetrieved} tone="side" order={5} />}
       />
       {arrow}
       <Row
         phase=""
-        main={<FlowBox label={copy.reportsAssessed} value={flow.fullText.eligible - flow.fullText.notRetrieved} />}
+        main={<FlowBox label={copy.reportsAssessed} value={flow.fullText.eligible - flow.fullText.notRetrieved} order={6} />}
         side={
-          <FlowBox label={copy.reportsExcluded} value={flow.fullText.exclude} tone="side">
+          <FlowBox label={copy.reportsExcluded} value={flow.fullText.exclude} tone="side" order={7}>
             <ul className="mt-1 space-y-0.5 text-[11px] text-muted-foreground">
               {flow.fullTextExclusions.map((reason) => (
                 <li key={reason.id}>
@@ -97,7 +115,10 @@ function FlowSummary({ flow, copy }: { flow: ReviewFlow; copy: ReviewCopy }) {
         }
       />
       {arrow}
-      <Row phase={copy.included} main={<FlowBox label={copy.studiesIncluded} value={flow.included} />} />
+      <Row
+        phase={copy.included}
+        main={<FlowBox label={copy.studiesIncluded} value={flow.included} tone="included" order={8} />}
+      />
     </div>
   );
 }
@@ -141,10 +162,10 @@ export function PrismaPanel({ review, copy }: { review: ReviewState; copy: Revie
 
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-      <section className="space-y-4 rounded-xl border border-border/80 p-4">
+      <section className={cn('space-y-4 p-4', BLOCK)}>
         <h3 className="text-sm font-semibold">{copy.flowTitle}</h3>
         {!complete && flow.screened > 0 && (
-          <p className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/50 dark:text-amber-200">
+          <p className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 animate-in fade-in-0 slide-in-from-top-1 duration-300 dark:border-amber-900/60 dark:bg-amber-950/50 dark:text-amber-200">
             <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
             {copy.pendingWarning
               .replace('{ta}', flow.titleAbstract.pending.toLocaleString(numberLocale(locale)))
@@ -155,7 +176,7 @@ export function PrismaPanel({ review, copy }: { review: ReviewState; copy: Revie
         <p className="text-[11px] leading-relaxed text-muted-foreground">{copy.dedupHint}</p>
       </section>
 
-      <section className="space-y-4 rounded-xl border border-border/80 p-4">
+      <section className={cn('space-y-4 p-4', BLOCK)} data-tour="review-export">
         <h3 className="text-sm font-semibold">{copy.exportTitle}</h3>
         <div className="space-y-2">
           <div className="flex flex-wrap gap-2">
@@ -163,10 +184,13 @@ export function PrismaPanel({ review, copy }: { review: ReviewState; copy: Revie
               <Download aria-hidden />
               {copy.exportPrisma}
             </Button>
-            <Button type="button" variant="outline" asChild>
+            <Button type="button" variant="outline" className={cn(ADD_BUTTON, 'group')} asChild>
               <a href={PRISMALAB_URL} target="_blank" rel="noopener noreferrer">
                 {copy.openPrismaLab}
-                <ExternalLink aria-hidden />
+                <ExternalLink
+                  className="transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
+                  aria-hidden
+                />
               </a>
             </Button>
           </div>
@@ -174,11 +198,23 @@ export function PrismaPanel({ review, copy }: { review: ReviewState; copy: Revie
         </div>
         <div className="space-y-2 border-t border-border/80 pt-4">
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" onClick={() => exportDecisions(false)} disabled={records.length === 0}>
+            <Button
+              type="button"
+              variant="outline"
+              className={ADD_BUTTON}
+              onClick={() => exportDecisions(false)}
+              disabled={records.length === 0}
+            >
               <FileSpreadsheet aria-hidden />
               {copy.exportDecisions}
             </Button>
-            <Button type="button" variant="outline" onClick={() => exportDecisions(true)} disabled={flow.included === 0}>
+            <Button
+              type="button"
+              variant="outline"
+              className={ADD_BUTTON}
+              onClick={() => exportDecisions(true)}
+              disabled={flow.included === 0}
+            >
               <FileSpreadsheet aria-hidden />
               {copy.exportIncluded}
             </Button>
@@ -190,6 +226,7 @@ export function PrismaPanel({ review, copy }: { review: ReviewState; copy: Revie
           <Button
             type="button"
             variant="outline"
+            className={ADD_BUTTON}
             disabled={generating || flow.screened === 0}
             onClick={() => {
               setGenerating(true);

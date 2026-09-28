@@ -7,6 +7,7 @@ import {
   BookOpen,
   Bot,
   CheckCircle2,
+  ClipboardList,
   Compass,
   Copy,
   Cpu,
@@ -15,7 +16,9 @@ import {
   FileSpreadsheet,
   FileText,
   FileUp,
+  Filter,
   FolderOpen,
+  GitBranch,
   Globe2,
   KeyRound,
   Network,
@@ -29,6 +32,7 @@ import {
   TrendingUp,
   Upload,
   Users,
+  X,
   Zap,
   type LucideIcon,
 } from 'lucide-react';
@@ -52,7 +56,7 @@ interface TutorialStep {
   subtitle: string;
   description: string;
   highlights: { icon: typeof Zap; label: string; text: string }[];
-  previewType: 'overview' | 'upload' | 'kpis' | 'networks' | 'byok' | 'search-ai';
+  previewType: 'overview' | 'upload' | 'kpis' | 'networks' | 'byok' | 'search-ai' | 'review';
 }
 
 const TUTORIAL_STEPS_PT: TutorialStep[] = [
@@ -225,11 +229,36 @@ const TUTORIAL_STEPS_PT: TutorialStep[] = [
       },
       {
         icon: CheckCircle2,
-        label: 'Pronto para Começar!',
-        text: 'Reabra este tutorial a qualquer momento pelo botão no cabeçalho. Boa pesquisa!',
+        label: 'Prévia ao Vivo',
+        text: 'O documento é montado ao lado da seleção e atualizado a cada item marcado: o que você vê é o que vai para o arquivo.',
       },
     ],
     previewType: 'overview',
+  },
+  {
+    title: '7. Revisão Sistematizada',
+    badge: 'Protocolo ao PRISMA',
+    subtitle: 'Revisão sistemática, de escopo, integrativa e outras sobre a mesma base',
+    description:
+      'Planeje o protocolo, faça a triagem em duas etapas, avalie a qualidade, extraia os dados e gere a síntese, o fluxo PRISMA e o relatório — no fluxo de ferramentas como o Parsifal, sem sair do Simetrics.',
+    highlights: [
+      {
+        icon: ClipboardList,
+        label: 'Protocolo e String de Busca',
+        text: 'PICO, PICOC, PCC ou SPIDER, critérios de elegibilidade e conceitos que viram a string pronta para Scopus, WoS, PubMed e Cochrane.',
+      },
+      {
+        icon: Filter,
+        label: 'Triagem com Luz',
+        text: 'Incluir acende em verde, excluir em vermelho; atalhos de teclado, termos destacados e motivo de exclusão no texto completo.',
+      },
+      {
+        icon: CheckCircle2,
+        label: 'Pronto para Começar!',
+        text: 'O exemplo traz uma revisão de amostra; faça uma cópia editável para usá-la. Reabra este guia pelo botão no cabeçalho. Boa pesquisa!',
+      },
+    ],
+    previewType: 'review',
   },
 ];
 
@@ -403,11 +432,36 @@ const TUTORIAL_STEPS_EN: TutorialStep[] = [
       },
       {
         icon: CheckCircle2,
-        label: 'Ready to Explore!',
-        text: 'You can reopen this guide anytime from the header button. Happy researching!',
+        label: 'Live Preview',
+        text: 'The document is built next to the selection and updated with every ticked item: what you see is what goes into the file.',
       },
     ],
     previewType: 'overview',
+  },
+  {
+    title: '7. Systematized Review',
+    badge: 'Protocol to PRISMA',
+    subtitle: 'Systematic, scoping, integrative and other reviews over the same dataset',
+    description:
+      'Plan the protocol, screen in two stages, assess quality, extract data and produce the synthesis, the PRISMA flow and the report — following tools like Parsifal, without leaving Simetrics.',
+    highlights: [
+      {
+        icon: ClipboardList,
+        label: 'Protocol & Search String',
+        text: 'PICO, PICOC, PCC or SPIDER, eligibility criteria and concepts that become a string ready for Scopus, WoS, PubMed and Cochrane.',
+      },
+      {
+        icon: Filter,
+        label: 'Screening with Light',
+        text: 'Including lights up green, excluding red; keyboard shortcuts, highlighted terms and exclusion reasons at full text.',
+      },
+      {
+        icon: CheckCircle2,
+        label: 'Ready to Explore!',
+        text: 'The demo ships a sample review; make an editable copy to use it. Reopen this guide from the header button. Happy researching!',
+      },
+    ],
+    previewType: 'review',
   },
 ];
 
@@ -759,6 +813,40 @@ function TutorialStepPreview({
           <Tag Icon={Users}>{isEn ? 'Co-authorship' : 'Coautoria'}</Tag>
           <Tag Icon={Globe2}>{isEn ? 'International collab' : 'Parcerias internacionais'}</Tag>
           <Tag Icon={Orbit}>{isEn ? '2D/3D concept PCA' : 'Mapa conceitual PCA'}</Tag>
+        </div>
+      </PreviewFrame>
+    );
+  }
+
+  if (type === 'review') {
+    const stages = isEn
+      ? ['Protocol', 'Screening', 'Quality', 'Extraction', 'Synthesis', 'PRISMA']
+      : ['Protocolo', 'Triagem', 'Qualidade', 'Extração', 'Síntese', 'PRISMA'];
+    return (
+      <PreviewFrame
+        Icon={ClipboardList}
+        title={isEn ? 'Systematized review, stage by stage' : 'Revisão sistematizada, etapa a etapa'}
+        aside={<Tag Icon={GitBranch}>PRISMA 2020</Tag>}
+      >
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-1">
+            {stages.map((stage, index) => (
+              <span key={stage} className="flex items-center gap-1">
+                {index > 0 && <ArrowRight className="size-3 text-muted-foreground" aria-hidden />}
+                <span className="eyebrow border border-border px-1.5 py-0.5 text-[9.5px]">{stage}</span>
+              </span>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <span className="inline-flex items-center gap-1.5 border border-include bg-include/10 px-3 py-1 text-xs font-semibold text-include shadow-[0_0_20px_-6px_var(--glow-include)]">
+              <CheckCircle2 className="size-3.5" aria-hidden />
+              {isEn ? 'Include' : 'Incluir'}
+            </span>
+            <span className="inline-flex items-center gap-1.5 border border-exclude bg-exclude/10 px-3 py-1 text-xs font-semibold text-exclude shadow-[0_0_20px_-6px_var(--glow-exclude)]">
+              <X className="size-3.5" aria-hidden />
+              {isEn ? 'Exclude' : 'Excluir'}
+            </span>
+          </div>
         </div>
       </PreviewFrame>
     );

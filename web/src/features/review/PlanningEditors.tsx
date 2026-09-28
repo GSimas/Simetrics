@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,15 +11,10 @@ import { useLocale } from '@/state/locale.store';
 import { useReview } from '@/state/review.store';
 import { ChipInput } from './ChipInput';
 import type { ReviewCopy } from './copy';
-import { Block } from './parts';
-
-function RemoveButton({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
-    <Button type="button" variant="ghost" size="icon" onClick={onClick} aria-label={label} title={label}>
-      <Trash2 aria-hidden />
-    </Button>
-  );
-}
+import { ADD_BUTTON, ENTER, useExitRemove } from './motion';
+import { AnimatedItem } from './motion-parts';
+import { Block, RemoveButton } from './parts';
+import { cn } from '@/lib/utils';
 
 export function QualityChecklistEditor({ review, copy }: { review: ReviewState; copy: ReviewCopy }) {
   const locale = useLocale((state) => state.locale);
@@ -28,6 +23,8 @@ export function QualityChecklistEditor({ review, copy }: { review: ReviewState; 
   const addQualityAnswer = useReview((state) => state.addQualityAnswer);
   const removeItem = useReview((state) => state.removeItem);
   const [focusId, setFocusId] = useState<string | null>(null);
+  const questions = useExitRemove();
+  const answers = useExitRemove();
   const max = maxQualityScore(review);
 
   return (
@@ -36,7 +33,7 @@ export function QualityChecklistEditor({ review, copy }: { review: ReviewState; 
       hint={`${copy.qualityChecklistHint}${review.type === 'scoping' ? ` ${copy.qualityOptional}` : ''}`}
     >
       {review.qualityQuestions.map((question, index) => (
-        <div key={question.id} className="flex items-center gap-2">
+        <AnimatedItem key={question.id} leaving={questions.isLeaving(question.id)} className="flex items-center gap-2">
           <span className="w-8 shrink-0 font-mono text-xs text-muted-foreground">Q{index + 1}</span>
           <Input
             value={question.text}
@@ -52,13 +49,17 @@ export function QualityChecklistEditor({ review, copy }: { review: ReviewState; 
             autoFocus={question.id === focusId}
             className="h-8 text-sm"
           />
-          <RemoveButton label={copy.remove} onClick={() => removeItem('qualityQuestions', question.id)} />
-        </div>
+          <RemoveButton
+            label={copy.remove}
+            onClick={() => questions.remove(question.id, () => removeItem('qualityQuestions', question.id))}
+          />
+        </AnimatedItem>
       ))}
       <Button
         type="button"
         variant="outline"
         size="sm"
+        className={ADD_BUTTON}
         onClick={() => setFocusId(addQualityQuestion(() => defaultQualityAnswers(locale)))}
       >
         <Plus aria-hidden />
@@ -66,10 +67,10 @@ export function QualityChecklistEditor({ review, copy }: { review: ReviewState; 
       </Button>
 
       {review.qualityQuestions.length > 0 && (
-        <div className="space-y-3 border-t border-border/80 pt-3">
+        <div className={cn('space-y-3 border-t border-border/80 pt-3', ENTER)}>
           <p className="eyebrow">{copy.answersLabel}</p>
           {review.qualityAnswers.map((answer) => (
-            <div key={answer.id} className="flex items-center gap-2">
+            <AnimatedItem key={answer.id} leaving={answers.isLeaving(answer.id)} className="flex items-center gap-2">
               <Input
                 value={answer.label}
                 onChange={(event) =>
@@ -99,10 +100,13 @@ export function QualityChecklistEditor({ review, copy }: { review: ReviewState; 
                 title={copy.weight}
                 className="h-8 w-20 shrink-0 text-sm tabular-nums"
               />
-              <RemoveButton label={copy.remove} onClick={() => removeItem('qualityAnswers', answer.id)} />
-            </div>
+              <RemoveButton
+                label={copy.remove}
+                onClick={() => answers.remove(answer.id, () => removeItem('qualityAnswers', answer.id))}
+              />
+            </AnimatedItem>
           ))}
-          <Button type="button" variant="outline" size="sm" onClick={() => setFocusId(addQualityAnswer())}>
+          <Button type="button" variant="outline" size="sm" className={ADD_BUTTON} onClick={() => setFocusId(addQualityAnswer())}>
             <Plus aria-hidden />
             {copy.addAnswer}
           </Button>
@@ -130,13 +134,18 @@ export function QualityChecklistEditor({ review, copy }: { review: ReviewState; 
               </p>
             </div>
           </div>
-          <label className="flex items-center gap-2 text-xs">
+          <label
+            className={cn(
+              'flex items-center gap-2 rounded-md px-1 py-0.5 text-xs transition-colors duration-200',
+              review.excludeBelowCutoff && 'text-exclude',
+            )}
+          >
             <input
               type="checkbox"
               checked={review.excludeBelowCutoff}
               disabled={review.qualityCutoff === null}
               onChange={(event) => update({ excludeBelowCutoff: event.target.checked })}
-              className="size-4 accent-[var(--highlight)]"
+              className="size-4 accent-[var(--glow-exclude)] transition-transform duration-200 active:scale-90"
             />
             {copy.excludeBelowCutoff}
           </label>
@@ -153,6 +162,7 @@ export function ExtractionFormEditor({ review, copy }: { review: ReviewState; co
   const addExtractionField = useReview((state) => state.addExtractionField);
   const removeItem = useReview((state) => state.removeItem);
   const [focusId, setFocusId] = useState<string | null>(null);
+  const fields = useExitRemove();
 
   const patchField = (id: string, patch: Partial<ReviewState['extractionFields'][number]>): void =>
     update({ extractionFields: review.extractionFields.map((field) => (field.id === id ? { ...field, ...patch } : field)) });
@@ -160,7 +170,8 @@ export function ExtractionFormEditor({ review, copy }: { review: ReviewState; co
   return (
     <Block title={copy.extractionForm} hint={copy.extractionFormHint}>
       {review.extractionFields.map((field) => (
-        <div key={field.id} className="space-y-2 rounded-lg border border-border/60 p-3">
+        <AnimatedItem key={field.id} leaving={fields.isLeaving(field.id)}>
+        <div className="space-y-2 rounded-lg border border-border/60 p-3 transition-[border-color,box-shadow] duration-300 focus-within:border-highlight/50 focus-within:shadow-[0_0_24px_-14px_var(--highlight)]">
           <div className="flex flex-wrap items-center gap-2">
             <Input
               value={field.label}
@@ -182,9 +193,13 @@ export function ExtractionFormEditor({ review, copy }: { review: ReviewState; co
                 ))}
               </SelectContent>
             </Select>
-            <RemoveButton label={copy.remove} onClick={() => removeItem('extractionFields', field.id)} />
+            <RemoveButton
+              label={copy.remove}
+              onClick={() => fields.remove(field.id, () => removeItem('extractionFields', field.id))}
+            />
           </div>
           {WITH_OPTIONS.includes(field.type) && (
+            <div className={ENTER}>
             <ChipInput
               items={field.options}
               onChange={(options) => patchField(field.id, { options })}
@@ -192,10 +207,12 @@ export function ExtractionFormEditor({ review, copy }: { review: ReviewState; co
               label={`${copy.optionsPlaceholder} — ${field.label}`}
               removeLabel={copy.remove}
             />
+            </div>
           )}
         </div>
+        </AnimatedItem>
       ))}
-      <Button type="button" variant="outline" size="sm" onClick={() => setFocusId(addExtractionField())}>
+      <Button type="button" variant="outline" size="sm" className={ADD_BUTTON} onClick={() => setFocusId(addExtractionField())}>
         <Plus aria-hidden />
         {copy.addField}
       </Button>

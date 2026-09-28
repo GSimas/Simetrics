@@ -8,21 +8,25 @@ import { Textarea } from '@/components/ui/textarea';
 import { finalSelection } from '@/core/review/quality';
 import type { ExtractionField, ExtractionValue, ReviewState } from '@/core/review/types';
 import { cn } from '@/lib/utils';
-import { useReview, useScreeningRecords } from '@/state/review.store';
+import { useReview, useReviewReadOnly, useScreeningRecords } from '@/state/review.store';
 import type { ReviewCopy } from './copy';
+import { chipClass, useFlash, type Tone } from './motion';
+import { ReadOnlyScope } from './parts';
 import { EmptyStep, StudyWorkspace } from './StudyWorkspace';
 
-function Choice({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function Choice({
+  active,
+  onClick,
+  tone = 'highlight',
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  tone?: Tone;
+  children: React.ReactNode;
+}) {
   return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      className={cn(
-        'rounded-md border px-3 py-1 text-xs transition-colors',
-        active ? 'border-highlight text-highlight' : 'border-border text-muted-foreground hover:text-foreground',
-      )}
-    >
+    <button type="button" aria-pressed={active} onClick={onClick} className={chipClass(active, tone)}>
       {children}
     </button>
   );
@@ -67,10 +71,10 @@ function FieldInput({
     case 'boolean':
       return (
         <div className="flex gap-1.5" role="group" aria-labelledby={`${id}-label`}>
-          <Choice active={value === true} onClick={() => onChange(value === true ? null : true)}>
+          <Choice active={value === true} tone="include" onClick={() => onChange(value === true ? null : true)}>
             {copy.yes}
           </Choice>
-          <Choice active={value === false} onClick={() => onChange(value === false ? null : false)}>
+          <Choice active={value === false} tone="exclude" onClick={() => onChange(value === false ? null : false)}>
             {copy.no}
           </Choice>
         </div>
@@ -110,6 +114,8 @@ export function ExtractionPanel({ review, copy, onEditProtocol }: { review: Revi
   const records = useScreeningRecords();
   const setExtractionValue = useReview((state) => state.setExtractionValue);
   const setExtractionDone = useReview((state) => state.setExtractionDone);
+  const readOnly = useReviewReadOnly();
+  const [flash, triggerFlash] = useFlash();
   const studies = useMemo(() => finalSelection(records, review), [records, review]);
   const isDone = useCallback((key: string) => review.extraction[key]?.done === true, [review]);
 
@@ -124,21 +130,28 @@ export function ExtractionPanel({ review, copy, onEditProtocol }: { review: Revi
       isDone={isDone}
       badge={(study) =>
         isDone(study.key) ? (
-          <Badge variant="success" className="px-1.5 py-0 text-[9.5px]">
+          <Badge
+            variant="success"
+            className="px-1.5 py-0 text-[9.5px] shadow-[0_0_10px_-3px_var(--glow-include)] animate-in fade-in-0 zoom-in-90 duration-200"
+          >
             {copy.markedDone}
           </Badge>
         ) : null
       }
       copy={copy}
       label={copy.steps.extraction}
+      flash={flash}
     >
       {(study) => {
         const extraction = review.extraction[study.key];
         const done = extraction?.done === true;
         return (
-          <div className="space-y-4">
+          <ReadOnlyScope readOnly={readOnly} className="space-y-4">
             {review.extractionFields.map((field) => (
-              <div key={field.id} className="space-y-1.5">
+              <div
+                key={field.id}
+                className="space-y-1.5 rounded-lg p-1 transition-[box-shadow] duration-300 focus-within:shadow-[0_0_24px_-14px_var(--highlight)]"
+              >
                 <label id={`extraction-${field.id}-label`} htmlFor={`extraction-${field.id}`} className="text-xs font-medium">
                   {field.label || '—'}
                 </label>
@@ -152,18 +165,37 @@ export function ExtractionPanel({ review, copy, onEditProtocol }: { review: Revi
             ))}
             <div className="border-t border-border/80 pt-3">
               {done ? (
-                <Button type="button" variant="outline" onClick={() => setExtractionDone(study.key, false)}>
-                  <RotateCcw aria-hidden />
-                  {copy.reopen}
-                </Button>
+                <div className="flex flex-wrap items-center gap-3 animate-in fade-in-0 duration-300">
+                  <Badge variant="success" className="shadow-[0_0_14px_-4px_var(--glow-include)]">
+                    <Check className="mr-1 size-3" aria-hidden />
+                    {copy.markedDone}
+                  </Badge>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="active:scale-[0.97]"
+                    onClick={() => setExtractionDone(study.key, false)}
+                  >
+                    <RotateCcw aria-hidden />
+                    {copy.reopen}
+                  </Button>
+                </div>
               ) : (
-                <Button type="button" onClick={() => setExtractionDone(study.key, true)}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setExtractionDone(study.key, true);
+                    triggerFlash('include');
+                  }}
+                  className={cn(chipClass(false, 'include'), 'inline-flex h-9 items-center gap-2 px-4 text-sm font-semibold [&_svg]:size-4')}
+                >
                   <Check aria-hidden />
                   {copy.markDone}
-                </Button>
+                </button>
               )}
             </div>
-          </div>
+          </ReadOnlyScope>
         );
       }}
     </StudyWorkspace>

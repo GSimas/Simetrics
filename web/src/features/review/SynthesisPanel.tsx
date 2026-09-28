@@ -12,13 +12,17 @@ import { numberLocale } from '@/lib/i18n/labels';
 import { useLocale } from '@/state/locale.store';
 import { useScreeningRecords } from '@/state/review.store';
 import type { ReviewCopy } from './copy';
+import { ADD_BUTTON } from './motion';
 import { Block } from './parts';
 import { ScoreBadge } from './QualityPanel';
 import { EmptyStep } from './StudyWorkspace';
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, index = 0 }: { label: string; value: string; index?: number }) {
   return (
-    <div className="rounded-xl border border-border/80 px-3 py-2">
+    <div
+      className="rounded-xl border border-border/80 px-3 py-2 transition-[border-color,box-shadow] duration-300 animate-in fade-in-0 slide-in-from-bottom-2 fill-mode-both hover:border-highlight/50 hover:shadow-[0_0_28px_-14px_var(--highlight)]"
+      style={{ animationDelay: `${index * 60}ms` }}
+    >
       <p className="text-[10.5px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{label}</p>
       <p className="text-lg font-bold tabular-nums">{value}</p>
     </div>
@@ -30,14 +34,14 @@ function BarList({ items, nf }: { items: { label: string; count: number }[]; nf:
   const max = Math.max(0, ...items.map((item) => item.count));
   return (
     <ol className="space-y-1.5">
-      {items.map((item) => (
+      {items.map((item, index) => (
         <li key={item.label} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2">
           <span className="min-w-0">
             <span className="block truncate text-xs">{item.label}</span>
             <span className="mt-1 block h-1.5 w-full overflow-hidden rounded-full bg-muted">
               <span
-                className="block h-full rounded-full bg-highlight"
-                style={{ width: `${max > 0 ? (item.count / max) * 100 : 0}%` }}
+                className="bar-grow block h-full rounded-full bg-highlight shadow-[0_0_8px_-2px_var(--highlight)] transition-[width] duration-500"
+                style={{ width: `${max > 0 ? (item.count / max) * 100 : 0}%`, animationDelay: `${index * 40}ms` }}
               />
             </span>
           </span>
@@ -112,19 +116,28 @@ export function SynthesisPanel({ review, copy }: { review: ReviewState; copy: Re
       <p className="max-w-3xl text-sm text-muted-foreground">{copy.synthesisIntro}</p>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-        <Stat label={copy.finalSelection} value={studies.length.toLocaleString(nf)} />
+        <Stat label={copy.finalSelection} value={studies.length.toLocaleString(nf)} index={0} />
         {withChecklist && (
           <>
-            <Stat label={copy.assessed} value={`${quality.assessed.toLocaleString(nf)} / ${included.length.toLocaleString(nf)}`} />
             <Stat
+              label={copy.assessed}
+              value={`${quality.assessed.toLocaleString(nf)} / ${included.length.toLocaleString(nf)}`}
+              index={1}
+            />
+            <Stat
+              index={2}
               label={copy.meanScore}
               value={quality.mean === null ? '—' : quality.mean.toLocaleString(nf, { maximumFractionDigits: 2 })}
             />
-            {review.qualityCutoff !== null && <Stat label={copy.passing} value={quality.passing.toLocaleString(nf)} />}
+            {review.qualityCutoff !== null && <Stat label={copy.passing} value={quality.passing.toLocaleString(nf)} index={3} />}
           </>
         )}
         {review.extractionFields.length > 0 && (
-          <Stat label={copy.extracted} value={`${extractedCount.toLocaleString(nf)} / ${studies.length.toLocaleString(nf)}`} />
+          <Stat
+            label={copy.extracted}
+            value={`${extractedCount.toLocaleString(nf)} / ${studies.length.toLocaleString(nf)}`}
+            index={4}
+          />
         )}
       </div>
 
@@ -149,7 +162,13 @@ export function SynthesisPanel({ review, copy }: { review: ReviewState; copy: Re
       {review.extractionFields.length > 0 && (
         <Block title={copy.characteristicsTable}>
           <div className="flex justify-end">
-            <Button type="button" variant="outline" size="sm" onClick={() => exportCsv(extractionRows(studies, review, labels), 'caracteristicas')}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className={ADD_BUTTON}
+              onClick={() => exportCsv(extractionRows(studies, review, labels), 'caracteristicas')}
+            >
               <FileSpreadsheet aria-hidden />
               {copy.exportCsv}
             </Button>
@@ -186,7 +205,13 @@ export function SynthesisPanel({ review, copy }: { review: ReviewState; copy: Re
       {withChecklist && (
         <Block title={copy.qualityTable}>
           <div className="flex justify-end">
-            <Button type="button" variant="outline" size="sm" onClick={() => exportCsv(qualityRows(included, review), 'qualidade')}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className={ADD_BUTTON}
+              onClick={() => exportCsv(qualityRows(included, review), 'qualidade')}
+            >
               <FileSpreadsheet aria-hidden />
               {copy.exportCsv}
             </Button>

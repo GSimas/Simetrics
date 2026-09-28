@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { buildDemoReview } from '@/core/review/demo';
 import { computeReviewFlow, isScreeningComplete, NO_REASON_ID, QUALITY_REASON_ID } from '@/core/review/flow';
 import { PRISMALAB_COUNT_KEYS, toPrismaLabProject } from '@/core/review/prismalab';
 import {
@@ -336,5 +337,38 @@ describe('quality assessment and extraction', () => {
     expect(normalized.extractionFields).toHaveLength(3);
     expect(normalized.extraction).toEqual({ k: { values: { f1: 'ok' }, done: false } });
     expect(normalized.quality['doi:10.1/a']).toEqual({ q1: yes, q2: partial });
+  });
+});
+
+describe('demo review', () => {
+  const rows = Array.from({ length: 40 }, (_, i) =>
+    doc({
+      TITLE: i % 2 === 0 ? `Memetic model ${i} of cultural evolution` : `Unrelated study ${i}`,
+      DOI: `10.9/${i}`,
+      'YEAR CLEAN': 2000 + i,
+    }),
+  );
+  const records = toScreeningRecords(rows);
+
+  it('is deterministic and survives normalization', () => {
+    const a = buildDemoReview(records, 'pt', 'device');
+    const b = buildDemoReview(records, 'pt', 'device');
+    expect({ ...a, createdAt: '', updatedAt: '' }).toEqual({ ...b, createdAt: '', updatedAt: '' });
+    expect(normalizeReview(JSON.parse(JSON.stringify(a)))).toEqual(a);
+    expect(a.type).toBe('scoping');
+  });
+
+  it('fills every stage with consistent data', () => {
+    const review = buildDemoReview(records, 'en', 'device');
+    const included = includedStudies(records, review);
+    expect(included.length).toBeGreaterThan(0);
+    // Quality and extraction only reference included studies.
+    for (const key of [...Object.keys(review.quality), ...Object.keys(review.extraction)]) {
+      expect(review.decisions[key]?.ft).toBe('include');
+    }
+    const flow = computeReviewFlow(rows, records, review.decisions, review.criteria, 'none');
+    expect(flow.titleAbstract.pending).toBeGreaterThan(0);
+    expect(flow.included).toBe(included.length);
+    expect(review.title).toMatch(/scoping review/);
   });
 });

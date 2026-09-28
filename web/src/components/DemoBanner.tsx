@@ -35,7 +35,7 @@ export function DemoBanner() {
   if (!isDemo) return null;
 
   return (
-    <div role="status" className="border-b border-highlight/40 bg-highlight/10">
+    <div role="status" className="border-b border-highlight/40 bg-highlight/10 animate-in fade-in-0 slide-in-from-top-2 duration-300">
       <div className="container flex flex-wrap items-center gap-x-4 gap-y-2 py-2.5">
         <Eye className="size-4 shrink-0 text-highlight" aria-hidden />
         <p className="min-w-[14rem] flex-1 text-xs leading-relaxed sm:text-sm">

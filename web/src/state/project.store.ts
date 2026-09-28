@@ -14,10 +14,12 @@ import {
   getProject,
   putProject,
 } from '@/lib/project-db';
+import { buildDemoReview } from '@/core/review/demo';
 import { hasReviewContent, normalizeReview } from '@/core/review/state';
+import { getDeviceId } from '@/lib/device-id';
 import { useLocale } from './locale.store';
 import { DERIVED_RESET, useDataset, type DatasetSourceFile } from './dataset.store';
-import { useReview } from './review.store';
+import { screeningRecordsOf, useReview } from './review.store';
 
 /**
  * Camada de "Projetos" sobre o `dataset.store`: lista leve de projetos salvos + o
@@ -116,7 +118,8 @@ async function checkpoint(nameOverride?: string): Promise<void> {
   const name =
     nameOverride ??
     (followsTitle && reviewTitle ? reviewTitle : (existingMeta?.name ?? deriveDefaultName(ds.sourceFiles)));
-  if (followsTitle && reviewTitle) autoNames.set(id, name);
+  // Um nome dado de propósito (a cópia do exemplo) não passa a seguir o título.
+  if (!nameOverride && followsTitle && reviewTitle) autoNames.set(id, name);
 
   const record: ProjectRecord = {
     id,
@@ -348,7 +351,9 @@ useDataset.subscribe(
     // Abrir o exemplo desliga o workspace do projeto que estava aberto: o que vier depois
     // (arquivos próprios, cópia editável) vira um projeto novo, sem sobrescrever aquele.
     if (active && useDataset.getState().isDemo) {
-      useReview.getState().hydrate(null);
+      // O exemplo vem com uma revisão de amostra, só para visualização.
+      const locale = useLocale.getState().locale;
+      useReview.getState().hydrate(buildDemoReview(screeningRecordsOf(active), locale, getDeviceId()));
       useProjectStore.setState({ activeProjectId: null, saveStatus: 'idle', lastSavedAt: null });
       return;
     }

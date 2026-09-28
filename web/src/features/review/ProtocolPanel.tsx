@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, Copy, Plus, Trash2 } from 'lucide-react';
+import { Check, Copy, Plus } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,11 +19,13 @@ import {
   type SearchConcept,
 } from '@/core/review/types';
 import { cn } from '@/lib/utils';
-import { useReview } from '@/state/review.store';
+import { useReview, useReviewReadOnly } from '@/state/review.store';
 import { ChipInput } from './ChipInput';
-import { Block } from './parts';
-import { ExtractionFormEditor, QualityChecklistEditor } from './PlanningEditors';
 import type { ReviewCopy } from './copy';
+import { ADD_BUTTON, chipClass, ENTER, useExitRemove } from './motion';
+import { AnimatedItem } from './motion-parts';
+import { Block, ReadOnlyScope, RemoveButton } from './parts';
+import { ExtractionFormEditor, QualityChecklistEditor } from './PlanningEditors';
 
 export function CopyButton({ text, copy }: { text: string; copy: ReviewCopy }) {
   const [copied, setCopied] = useState(false);
@@ -33,6 +35,10 @@ export function CopyButton({ text, copy }: { text: string; copy: ReviewCopy }) {
       variant="outline"
       size="sm"
       disabled={!text}
+      className={cn(
+        ADD_BUTTON,
+        copied && 'border-include text-include shadow-[0_0_18px_-6px_var(--glow-include)] hover:border-include hover:text-include',
+      )}
       onClick={() => {
         void navigator.clipboard.writeText(text).then(() => {
           setCopied(true);
@@ -40,7 +46,11 @@ export function CopyButton({ text, copy }: { text: string; copy: ReviewCopy }) {
         });
       }}
     >
-      {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
+      {copied ? (
+        <Check key="done" className="animate-in zoom-in-50 duration-200" aria-hidden />
+      ) : (
+        <Copy key="copy" className="animate-in fade-in-0 duration-200" aria-hidden />
+      )}
       {copied ? copy.copied : copy.copy}
     </Button>
   );
@@ -60,7 +70,7 @@ function ConceptEditor({
   onRemove: () => void;
 }) {
   return (
-    <div className="space-y-2 rounded-lg border border-border/60 p-3">
+    <div className="space-y-2 rounded-lg border border-border/60 p-3 transition-[border-color,box-shadow] duration-300 focus-within:border-highlight/50 focus-within:shadow-[0_0_24px_-14px_var(--highlight)]">
       <div className="flex items-center gap-2">
         <Input
           value={concept.label}
@@ -70,9 +80,7 @@ function ConceptEditor({
           autoFocus={autoFocus}
           className="h-8 text-sm font-medium"
         />
-        <Button type="button" variant="ghost" size="icon" onClick={onRemove} aria-label={copy.remove} title={copy.remove}>
-          <Trash2 aria-hidden />
-        </Button>
+        <RemoveButton label={copy.remove} onClick={onRemove} />
       </div>
       <ChipInput
         items={concept.terms}
@@ -102,14 +110,17 @@ function CriteriaList({
   const update = useReview((state) => state.update);
   const addCriterion = useReview((state) => state.addCriterion);
   const removeItem = useReview((state) => state.removeItem);
+  const { isLeaving, remove } = useExitRemove();
   const items = review.criteria.filter((criterion) => criterion.kind === kind);
   const prefix = kind === 'inclusion' ? 'I' : 'E';
 
   return (
     <div className="space-y-2">
-      <p className="eyebrow">{kind === 'inclusion' ? copy.inclusion : copy.exclusion}</p>
+      <p className={cn('eyebrow', kind === 'inclusion' ? 'text-include' : 'text-exclude')}>
+        {kind === 'inclusion' ? copy.inclusion : copy.exclusion}
+      </p>
       {items.map((criterion, index) => (
-        <div key={criterion.id} className="flex items-center gap-2">
+        <AnimatedItem key={criterion.id} leaving={isLeaving(criterion.id)} className="flex items-center gap-2">
           <span className="w-8 shrink-0 font-mono text-xs text-muted-foreground">
             {prefix}
             {index + 1}
@@ -128,19 +139,10 @@ function CriteriaList({
             autoFocus={criterion.id === focusId}
             className="h-8 text-sm"
           />
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={() => removeItem('criteria', criterion.id)}
-            aria-label={copy.remove}
-            title={copy.remove}
-          >
-            <Trash2 aria-hidden />
-          </Button>
-        </div>
+          <RemoveButton label={copy.remove} onClick={() => remove(criterion.id, () => removeItem('criteria', criterion.id))} />
+        </AnimatedItem>
       ))}
-      <Button type="button" variant="outline" size="sm" onClick={() => onAdded(addCriterion(kind))}>
+      <Button type="button" variant="outline" size="sm" className={ADD_BUTTON} onClick={() => onAdded(addCriterion(kind))}>
         <Plus aria-hidden />
         {kind === 'inclusion' ? copy.addInclusion : copy.addExclusion}
       </Button>
@@ -154,6 +156,9 @@ export function ProtocolPanel({ review, copy }: { review: ReviewState; copy: Rev
   const addQuestion = useReview((state) => state.addQuestion);
   const addConcept = useReview((state) => state.addConcept);
   const removeItem = useReview((state) => state.removeItem);
+  const readOnly = useReviewReadOnly();
+  const questions = useExitRemove();
+  const concepts = useExitRemove();
   // Item recém-adicionado: o campo dele nasce com o foco.
   const [focusId, setFocusId] = useState<string | null>(null);
 
@@ -167,15 +172,15 @@ export function ProtocolPanel({ review, copy }: { review: ReviewState; copy: Rev
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <div className="space-y-4">
-        <Block title={copy.typeLabel} hint={copy.typeHints[review.type]}>
+      <ReadOnlyScope readOnly={readOnly} className="space-y-4">
+        <Block title={copy.typeLabel} hint={copy.typeHints[review.type]} tour="review-protocol">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
               <Label htmlFor="review-type" className="text-xs">
                 {copy.typeLabel}
               </Label>
               <Select value={review.type} onValueChange={(value) => setType(value as ReviewType)}>
-                <SelectTrigger id="review-type" className="h-9">
+                <SelectTrigger id="review-type" className="h-9 transition-[border-color,box-shadow] duration-200 hover:border-highlight/50">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -189,7 +194,7 @@ export function ProtocolPanel({ review, copy }: { review: ReviewState; copy: Rev
             </div>
             <div className="space-y-1">
               <p className="text-xs font-medium">{copy.guideline}</p>
-              <p className="flex h-9 items-center font-mono text-sm text-highlight">
+              <p key={review.type} className={cn('flex h-9 items-center font-mono text-sm text-highlight', ENTER)}>
                 {REVIEW_DEFAULTS[review.type].guideline}
               </p>
             </div>
@@ -230,18 +235,14 @@ export function ProtocolPanel({ review, copy }: { review: ReviewState; copy: Rev
                 role="radio"
                 aria-checked={review.framework === framework}
                 onClick={() => update({ framework })}
-                className={cn(
-                  'rounded-md border px-3 py-1 font-mono text-xs transition-colors',
-                  review.framework === framework
-                    ? 'border-highlight text-highlight'
-                    : 'border-border text-muted-foreground hover:text-foreground',
-                )}
+                className={cn(chipClass(review.framework === framework), 'font-mono')}
               >
                 {copy.frameworks[framework]}
               </button>
             ))}
           </div>
-          <div className="space-y-2">
+          {/* Trocar a estrutura troca os campos: eles entram de novo, sem saltar. */}
+          <div key={review.framework} className={cn('space-y-2', ENTER)}>
             {FRAMEWORK_FIELDS[review.framework].map((field) => (
               <div key={field} className="grid gap-1 sm:grid-cols-[10rem_1fr] sm:items-center sm:gap-3">
                 <Label htmlFor={`fw-${field}`} className="text-xs">
@@ -262,7 +263,7 @@ export function ProtocolPanel({ review, copy }: { review: ReviewState; copy: Rev
 
         <Block title={copy.questionsLabel}>
           {review.questions.map((question, index) => (
-            <div key={question.id} className="flex items-center gap-2">
+            <AnimatedItem key={question.id} leaving={questions.isLeaving(question.id)} className="flex items-center gap-2">
               <span className="w-8 shrink-0 font-mono text-xs text-muted-foreground">Q{index + 1}</span>
               <Input
                 value={question.text}
@@ -278,50 +279,47 @@ export function ProtocolPanel({ review, copy }: { review: ReviewState; copy: Rev
                 autoFocus={question.id === focusId}
                 className="h-8 text-sm"
               />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => removeItem('questions', question.id)}
-                aria-label={copy.remove}
-                title={copy.remove}
-              >
-                <Trash2 aria-hidden />
-              </Button>
-            </div>
+              <RemoveButton
+                label={copy.remove}
+                onClick={() => questions.remove(question.id, () => removeItem('questions', question.id))}
+              />
+            </AnimatedItem>
           ))}
-          <Button type="button" variant="outline" size="sm" onClick={() => setFocusId(addQuestion())}>
+          <Button type="button" variant="outline" size="sm" className={ADD_BUTTON} onClick={() => setFocusId(addQuestion())}>
             <Plus aria-hidden />
             {copy.addQuestion}
           </Button>
         </Block>
 
         <QualityChecklistEditor review={review} copy={copy} />
-      </div>
+      </ReadOnlyScope>
 
       <div className="space-y-4">
-        <Block title={copy.conceptsLabel} hint={copy.conceptsHint}>
-          {review.concepts.map((concept, index) => (
-            <div key={concept.id} className="space-y-2">
-              {index > 0 && <p className="text-center font-mono text-[10px] text-muted-foreground">AND</p>}
-              <ConceptEditor
-                concept={concept}
-                copy={copy}
-                autoFocus={concept.id === focusId}
-                onChange={(next) =>
-                  update({ concepts: review.concepts.map((item) => (item.id === next.id ? next : item)) })
-                }
-                onRemove={() => removeItem('concepts', concept.id)}
-              />
-            </div>
-          ))}
-          <Button type="button" variant="outline" size="sm" onClick={() => setFocusId(addConcept())}>
-            <Plus aria-hidden />
-            {copy.addConcept}
-          </Button>
-        </Block>
+        <ReadOnlyScope readOnly={readOnly}>
+          <Block title={copy.conceptsLabel} hint={copy.conceptsHint}>
+            {review.concepts.map((concept, index) => (
+              <AnimatedItem key={concept.id} leaving={concepts.isLeaving(concept.id)} className="space-y-2">
+                {index > 0 && <p className="text-center font-mono text-[10px] text-muted-foreground">AND</p>}
+                <ConceptEditor
+                  concept={concept}
+                  copy={copy}
+                  autoFocus={concept.id === focusId}
+                  onChange={(next) =>
+                    update({ concepts: review.concepts.map((item) => (item.id === next.id ? next : item)) })
+                  }
+                  onRemove={() => concepts.remove(concept.id, () => removeItem('concepts', concept.id))}
+                />
+              </AnimatedItem>
+            ))}
+            <Button type="button" variant="outline" size="sm" className={ADD_BUTTON} onClick={() => setFocusId(addConcept())}>
+              <Plus aria-hidden />
+              {copy.addConcept}
+            </Button>
+          </Block>
+        </ReadOnlyScope>
 
-        <Block title={copy.searchStringLabel}>
+        {/* Fora do escopo travado: no exemplo as strings continuam copiáveis. */}
+        <Block title={copy.searchStringLabel} tour="review-search">
           <div className="flex flex-wrap gap-1.5">
             {SEARCH_TARGETS.map((target) => {
               const active = review.searchTargets.includes(target.id);
@@ -330,11 +328,9 @@ export function ProtocolPanel({ review, copy }: { review: ReviewState; copy: Rev
                   key={target.id}
                   type="button"
                   aria-pressed={active}
+                  disabled={readOnly}
                   onClick={() => toggleTarget(target.id)}
-                  className={cn(
-                    'rounded-md border px-2.5 py-1 text-xs transition-colors',
-                    active ? 'border-highlight text-highlight' : 'border-border text-muted-foreground hover:text-foreground',
-                  )}
+                  className={chipClass(active)}
                 >
                   {targetName(target.id, target.name)}
                 </button>
@@ -344,12 +340,15 @@ export function ProtocolPanel({ review, copy }: { review: ReviewState; copy: Rev
           {SEARCH_TARGETS.filter((target) => review.searchTargets.includes(target.id)).map((target) => {
             const query = buildSearchString(review.concepts, target.id);
             return (
-              <div key={target.id} className="space-y-1.5">
+              <div key={target.id} className={cn('space-y-1.5', ENTER)}>
                 <div className="flex items-center justify-between gap-2">
                   <p className="eyebrow">{targetName(target.id, target.name)}</p>
                   <CopyButton text={query} copy={copy} />
                 </div>
-                <pre className="whitespace-pre-wrap break-words rounded-lg border border-border/60 bg-muted/30 p-3 font-mono text-xs leading-relaxed">
+                <pre
+                  key={query}
+                  className="whitespace-pre-wrap break-words rounded-lg border border-border/60 bg-muted/30 p-3 font-mono text-xs leading-relaxed animate-in fade-in-0 duration-300"
+                >
                   {query || <span className="text-muted-foreground">{copy.searchStringEmpty}</span>}
                 </pre>
               </div>
@@ -357,12 +356,14 @@ export function ProtocolPanel({ review, copy }: { review: ReviewState; copy: Rev
           })}
         </Block>
 
-        <Block title={copy.criteriaLabel} hint={copy.exclusionHint}>
-          <CriteriaList kind="inclusion" review={review} copy={copy} focusId={focusId} onAdded={setFocusId} />
-          <CriteriaList kind="exclusion" review={review} copy={copy} focusId={focusId} onAdded={setFocusId} />
-        </Block>
+        <ReadOnlyScope readOnly={readOnly} className="space-y-4">
+          <Block title={copy.criteriaLabel} hint={copy.exclusionHint}>
+            <CriteriaList kind="inclusion" review={review} copy={copy} focusId={focusId} onAdded={setFocusId} />
+            <CriteriaList kind="exclusion" review={review} copy={copy} focusId={focusId} onAdded={setFocusId} />
+          </Block>
 
-        <ExtractionFormEditor review={review} copy={copy} />
+          <ExtractionFormEditor review={review} copy={copy} />
+        </ReadOnlyScope>
       </div>
     </div>
   );
