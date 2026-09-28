@@ -483,6 +483,7 @@ export const useHybrid = create<HybridState>((set, get) => {
     error: null,
 
     async start(focus) {
+      if (useDataset.getState().isDemo) return;
       const dataset = useDataset.getState().active;
       if (!dataset || dataset.length === 0) return;
       const target = newSession(dataset);
@@ -565,6 +566,7 @@ export const useHybrid = create<HybridState>((set, get) => {
     },
 
     startManual() {
+      if (useDataset.getState().isDemo) return;
       const dataset = useDataset.getState().active;
       if (!dataset || dataset.length === 0) return;
       const manualConfig = useHybridConfig.getState().config;

@@ -69,6 +69,8 @@ export function SvgLegend({
           key={item.key}
           transform={`translate(${ix} ${iy})`}
           opacity={item.muted ? 0.35 : 1}
+          // Nome inteiro na dica do app (o texto da legenda pode vir encurtado).
+          data-tip={item.label}
           className={onToggle ? 'cursor-pointer outline-none' : undefined}
           onClick={onToggle ? () => onToggle(item.key) : undefined}
           {...(onToggle
@@ -87,7 +89,6 @@ export function SvgLegend({
               }
             : {})}
         >
-          <title>{item.label}</title>
           {/* Anel de foco: SVG não desenha o outline do navegador em <g>. */}
           {focused === item.key && (
             <rect

@@ -27,6 +27,7 @@ export function KpiTicker() {
   const projectName = useProjectStore(
     (state) => state.projects.find((project) => project.id === state.activeProjectId)?.name,
   );
+  const isDemo = useDataset((state) => state.isDemo);
 
   if (!overview) return null;
 
@@ -37,7 +38,7 @@ export function KpiTicker() {
   const metrics = summary.bibliometrix;
 
   const items: [string, string][] = [
-    [t('ticker_project'), projectName ?? t('ticker_unsaved')],
+    [t('ticker_project'), projectName ?? (isDemo ? t('ticker_demo') : t('ticker_unsaved'))],
     [t('kpi_docs'), format(summary.totalDocs)],
     [t('kpi_docs_sub'), summary.timespan],
     [t('kpi_authors'), format(summary.authorsCount)],

@@ -42,6 +42,10 @@
   /* Destaque da marca: pinho no papel, sinal na tinta */
   --highlight: #236e5e;
 
+  /* Luz das decisões da revisão: verde para incluir, vermelho para excluir */
+  --glow-include: #16a34a;
+  --glow-exclude: #dc2626;
+
   --secondary: #e6e3d8;
   --secondary-foreground: #07110f;
 
@@ -75,6 +79,9 @@
   --primary-foreground: #07110f;
 
   --highlight: #b8ff4a;
+
+  --glow-include: #4ade80;
+  --glow-exclude: #f87171;
 
   --secondary: #13241f;
   --secondary-foreground: #f0eee6;
@@ -114,6 +121,8 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-highlight: var(--highlight);
+  --color-include: var(--glow-include);
+  --color-exclude: var(--glow-exclude);
 
   --color-ink: var(--ink);
   --color-paper: var(--paper);
@@ -710,4 +719,71 @@ html[data-contrast='high'] :focus-visible {
     transform: translate(var(--dx, 6px), var(--dy, -14px)) scale(1.15);
     opacity: 1;
   }
+}
+
+/* Revisão sistematizada: a cada decisão, um lampejo de luz no cartão do registro —
+   verde ao incluir, vermelho ao excluir, o destaque da marca nas demais. Só opacity
+   anima; a sombra e o gradiente ficam parados. Com movimento reduzido, a regra global
+   zera a duração e o lampejo não aparece. */
+.decision-flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: 0;
+  --flash: var(--highlight);
+  box-shadow:
+    0 0 0 1px var(--flash),
+    0 0 48px -8px var(--flash),
+    inset 0 0 72px -36px var(--flash);
+  background: radial-gradient(ellipse 80% 60% at 50% 0%, color-mix(in oklab, var(--flash) 16%, transparent), transparent 70%);
+  animation: decision-flash 0.9s ease-out;
+}
+.decision-flash--include {
+  --flash: var(--glow-include);
+}
+.decision-flash--exclude {
+  --flash: var(--glow-exclude);
+}
+@keyframes decision-flash {
+  0% {
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Barras da síntese da revisão: crescem da esquerda ao aparecer (só transform). */
+.bar-grow {
+  transform-origin: left center;
+  animation: bar-grow 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes bar-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+/* Controles com a cara do Simetrics, e não do sistema: sem as setinhas nativas dos
+   campos numéricos (NumberInput desenha as suas) nem o "olho"/"x" que o Edge põe nos
+   campos de senha e de texto (os campos de chave de API já têm o próprio botão). */
+input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
+}
+input[type='search']::-webkit-search-cancel-button {
+  -webkit-appearance: none;
 }

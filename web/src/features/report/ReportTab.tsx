@@ -4,6 +4,7 @@ import { CheckSquare, Download, FileText, FileType, Loader2, Square } from 'luci
 import { SectionTitle } from '@/components/InfoTip';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -246,12 +247,7 @@ export default function ReportTab() {
                   key={item.id}
                   className="flex cursor-pointer items-center gap-2.5 rounded-md px-1.5 py-1.5 text-sm transition-colors hover:bg-muted/60"
                 >
-                  <input
-                    type="checkbox"
-                    checked={selection[item.id]}
-                    onChange={() => toggle(item.id)}
-                    className="size-4 shrink-0 cursor-pointer accent-[var(--highlight)]"
-                  />
+                  <Checkbox checked={selection[item.id]} onCheckedChange={() => toggle(item.id)} />
                   <span className={cn('min-w-0 flex-1', !selection[item.id] && 'text-muted-foreground')}>{item.label[locale]}</span>
                   {counts[item.id] && (
                     <span className="shrink-0 tabular-nums text-[11px] text-muted-foreground">{counts[item.id]}</span>

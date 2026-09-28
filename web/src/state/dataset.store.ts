@@ -53,6 +53,12 @@ interface DatasetState {
   /** Arquivos de origem da base ativa — preenchido por `loadFiles`/`loadDemo`, os únicos
    * dois pontos de entrada de dados no app. Usado pela camada de Projetos. */
   sourceFiles: DatasetSourceFile[];
+  /**
+   * Base de exemplo aberta: só visualização. Nada é salvo como projeto e as ações que
+   * alteram a base ficam bloqueadas até o usuário fazer uma cópia editável
+   * (`project.store.saveDemoCopy`).
+   */
+  isDemo: boolean;
 
   overview: AnalyticsBundle | null;
   tables: EntityTables | null;
@@ -117,6 +123,7 @@ export const useDataset = create<DatasetState>()(subscribeWithSelector((set, get
   dedupStrategy: 'none',
   dedupThreshold: null,
   sourceFiles: [],
+  isDemo: false,
   ...DERIVED_RESET,
   isIngesting: false,
   isDeduplicating: false,
@@ -128,7 +135,8 @@ export const useDataset = create<DatasetState>()(subscribeWithSelector((set, get
   async loadFiles(files, mode = 'replace') {
     set({ isIngesting: true, progress: { phase: 'Lendo arquivos', ratio: 0 }, error: null });
     const previous = get();
-    const append = mode === 'append' && previous.original !== null;
+    // Arquivos próprios nunca se somam ao exemplo: ele é só visualização.
+    const append = mode === 'append' && previous.original !== null && !previous.isDemo;
     let redo: { strategy: DedupStrategy; threshold: number | null } | null = null;
 
     try {
@@ -152,6 +160,7 @@ export const useDataset = create<DatasetState>()(subscribeWithSelector((set, get
         duplicates: [],
         dedupStrategy: 'none',
         dedupThreshold: null,
+        isDemo: false,
         sourceFiles: [
           ...(append ? previous.sourceFiles : []),
           ...files.map(({ name, database }) => ({ name, database })),
@@ -211,6 +220,7 @@ export const useDataset = create<DatasetState>()(subscribeWithSelector((set, get
         dedupStrategy: 'none',
         dedupThreshold: null,
         sourceFiles: DEMO_FILES.map(({ name, database }) => ({ name, database })),
+        isDemo: true,
         ...DERIVED_RESET,
         searchOptions: buildSearchOptions(dataset),
       });
@@ -222,8 +232,8 @@ export const useDataset = create<DatasetState>()(subscribeWithSelector((set, get
   },
 
   async applyDedup(strategy, threshold = 0.9) {
-    const { original, active } = get();
-    if (!original) return;
+    const { original, active, isDemo } = get();
+    if (!original || isDemo) return;
 
     // Voltar à base completa quando ela já é a ativa não muda nada. Sem este atalho, o
     // reset abaixo apagaria as análises derivadas, mas `active` manteria a mesma
@@ -343,8 +353,8 @@ export const useDataset = create<DatasetState>()(subscribeWithSelector((set, get
    * custar o agrupamento inteiro, que é a parte cara.
    */
   async categorizeThemes(maxClusters = 10) {
-    const { active } = get();
-    if (!active) return;
+    const { active, isDemo } = get();
+    if (!active || isDemo) return;
 
     set({ isCategorizingThemes: true, progress: { phase: 'Agrupando documentos', ratio: 0 }, error: null });
 
@@ -433,6 +443,7 @@ export const useDataset = create<DatasetState>()(subscribeWithSelector((set, get
       dedupStrategy: 'none',
       dedupThreshold: null,
       sourceFiles: [],
+      isDemo: false,
       isIngesting: false,
       isDeduplicating: false,
       isCategorizingThemes: false,

@@ -13,7 +13,6 @@ import { EmptyState } from '@/features/EmptyState';
 import { ProjectCard } from '@/features/landing/ProjectCard';
 import type { TranslationKey } from '@/lib/i18n/translations';
 import type { AppView } from '@/lib/use-hash-route';
-import { useDataset } from '@/state/dataset.store';
 import { useLocale } from '@/state/locale.store';
 import { useProjectStore } from '@/state/project.store';
 
@@ -219,7 +218,7 @@ export function LandingScreen({ navigate, onOpenTutorial }: LandingScreenProps) 
   const deleteProject = useProjectStore((state) => state.remove);
   const importFromFile = useProjectStore((state) => state.importFromFile);
   const clearError = useProjectStore((state) => state.clearError);
-  const resetDataset = useDataset((state) => state.reset);
+  const startBlank = useProjectStore((state) => state.startBlank);
 
   useEffect(() => {
     void refreshList();
@@ -236,7 +235,7 @@ export function LandingScreen({ navigate, onOpenTutorial }: LandingScreenProps) 
   };
 
   const handleNewBlank = (): void => {
-    resetDataset();
+    startBlank();
     navigate('workspace');
   };
 
@@ -281,7 +280,8 @@ export function LandingScreen({ navigate, onOpenTutorial }: LandingScreenProps) 
 
           <h1 className="max-w-5xl text-[clamp(2.75rem,7.5vw,6.25rem)] font-medium leading-[0.9] tracking-[-0.06em]">
             {t('landing_hero_a')} <em className="accent-serif text-foreground">{t('landing_hero_em')}</em>{' '}
-            {t('landing_hero_b')}{' '}
+            {t('landing_hero_and')} {t('landing_hero_a2')}{' '}
+            <em className="accent-serif text-foreground">{t('landing_hero_em2')}</em> {t('landing_hero_b')}{' '}
             <span className="text-highlight dark:[text-shadow:0_0_40px_rgb(184_255_74/0.45)]">
               {t('landing_hero_signal')}
             </span>

@@ -19,11 +19,13 @@ export const TRANSLATIONS = {
     buy_me_coffee_tooltip: 'Apoie o Simetrics pagando um café! ☕',
 
     // Tabs
+    tab_bibliometrics: 'Análise Bibliométrica',
     tab_overview: 'Informações Principais',
     tab_networks: 'Redes',
     tab_search: 'Motor de Busca',
     tab_chat: 'Assistente Científica',
     tab_report: 'Relatório',
+    tab_review: 'Revisão Sistematizada',
     tab_feedback: 'Feedback',
 
     // Upload Panel
@@ -387,6 +389,13 @@ export const TRANSLATIONS = {
     ticker_label: 'Indicadores do projeto',
     ticker_project: 'Projeto',
     ticker_unsaved: 'Projeto sem nome',
+    ticker_demo: 'Exemplo (só visualização)',
+    demo_banner_title: 'Exemplo do Simetrics — somente visualização',
+    demo_banner_desc:
+      'Explore à vontade: nada é salvo. Para deduplicar, identificar temas, fazer uma revisão ou guardar este exemplo como projeto, faça uma cópia editável.',
+    demo_copy_btn: 'Fazer cópia editável',
+    demo_copy_name: 'Exemplo do Simetrics (cópia)',
+    demo_readonly_hint: 'Indisponível no exemplo. Faça uma cópia editável.',
     ticker_paused: 'Pausado',
     ticker_toggle: 'Clique para pausar ou retomar a rolagem',
     open_profile: 'Abrir perfil no Motor de Busca',
@@ -409,7 +418,10 @@ export const TRANSLATIONS = {
     landing_eyebrow: 'Bibliometria · Cientometria · Redes',
     landing_family: 'Uma aplicação Scientata',
     landing_hero_a: 'Análise',
-    landing_hero_em: 'bibliométrica',
+    landing_hero_em: 'Bibliométrica',
+    landing_hero_and: 'e',
+    landing_hero_a2: 'Revisão',
+    landing_hero_em2: 'Sistematizada',
     landing_hero_b: 'com',
     landing_hero_signal: 'inteligência',
     landing_projects_eyebrow: 'Seus projetos · salvos neste navegador',
@@ -497,11 +509,13 @@ export const TRANSLATIONS = {
     buy_me_coffee_tooltip: 'Support Simetrics by buying me a coffee! ☕',
 
     // Tabs
+    tab_bibliometrics: 'Bibliometric Analysis',
     tab_overview: 'Overview & Metrics',
     tab_networks: 'Networks',
     tab_search: 'Search Engine',
     tab_chat: 'Scientific Assistant',
     tab_report: 'Report',
+    tab_review: 'Systematized Review',
     tab_feedback: 'Feedback',
 
     // Upload Panel
@@ -865,6 +879,13 @@ export const TRANSLATIONS = {
     ticker_label: 'Project indicators',
     ticker_project: 'Project',
     ticker_unsaved: 'Untitled project',
+    ticker_demo: 'Demo (view only)',
+    demo_banner_title: 'Simetrics demo — view only',
+    demo_banner_desc:
+      'Explore freely: nothing is saved. To deduplicate, identify themes, run a review or keep this demo as a project, make an editable copy.',
+    demo_copy_btn: 'Make an editable copy',
+    demo_copy_name: 'Simetrics demo (copy)',
+    demo_readonly_hint: 'Not available in the demo. Make an editable copy.',
     ticker_paused: 'Paused',
     ticker_toggle: 'Click to pause or resume scrolling',
     open_profile: 'Open profile in the Search Engine',
@@ -886,7 +907,10 @@ export const TRANSLATIONS = {
     landing_eyebrow: 'Bibliometrics · Scientometrics · Networks',
     landing_family: 'A Scientata application',
     landing_hero_a: 'Bibliometric',
-    landing_hero_em: 'analysis',
+    landing_hero_em: 'Analysis',
+    landing_hero_and: 'and',
+    landing_hero_a2: 'Systematized',
+    landing_hero_em2: 'Review',
     landing_hero_b: 'with',
     landing_hero_signal: 'intelligence',
     landing_projects_eyebrow: 'Your projects · saved in this browser',

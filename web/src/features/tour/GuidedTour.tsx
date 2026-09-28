@@ -150,9 +150,8 @@ export function GuidedTour() {
       return;
     }
 
-    if (step.tab && useNavigation.getState().activeTab !== step.tab) {
-      useNavigation.getState().setActiveTab(step.tab);
-    }
+    // Idempotente: abre a aba (e, na Análise Bibliométrica, a vista) do passo.
+    if (step.tab) useNavigation.getState().setActiveTab(step.tab);
     step.prepare?.();
 
     if (!step.target) return;

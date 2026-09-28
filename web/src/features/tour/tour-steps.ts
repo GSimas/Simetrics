@@ -2,12 +2,15 @@ import {
   BarChart3,
   Bot,
   CircleCheckBig,
+  ClipboardList,
   Compass,
   Copy,
   Database,
   FileText,
+  Filter,
   FolderOpen,
   Gauge,
+  GitBranch,
   Globe2,
   HelpCircle,
   LayoutGrid,
@@ -31,8 +34,14 @@ import {
 import { optionsForType } from '@/core/search';
 import { useDataset } from '@/state/dataset.store';
 import { resolveEntity, useNavigation } from '@/state/navigation.store';
+import { useReviewNav, type ReviewStep } from '@/state/review.store';
 
-export type TourTab = 'overview' | 'networks' | 'search' | 'report';
+export type TourTab = 'overview' | 'networks' | 'search' | 'report' | 'review';
+
+/** Abre uma etapa da revisão sistematizada antes de procurar o alvo. */
+function openReviewStep(step: ReviewStep): () => void {
+  return () => useReviewNav.getState().setStep(step);
+}
 
 interface TourCopy {
   title: string;
@@ -78,7 +87,7 @@ export const TOUR_STEPS: TourStep[] = [
     Icon: Compass,
     pt: {
       title: 'Tour guiado pelo Simetrics',
-      body: 'Vamos percorrer o Simetrics inteiro, bloco a bloco: importação, indicadores, gráficos, redes, Motor de Busca, relatório e a assistente de IA. Cada parada destaca uma parte da tela e explica como ler e usar.',
+      body: 'Vamos percorrer o Simetrics inteiro, bloco a bloco: importação, indicadores, gráficos, redes, Motor de Busca, relatório, revisão sistematizada e a assistente de IA. Cada parada destaca uma parte da tela e explica como ler e usar.',
       bullets: [
         'Sem base aberta, o tour carrega a base de exemplo (973 documentos reais).',
         'Navegue com os botões, com as setas ← → do teclado, ou saia com Esc.',
@@ -87,7 +96,7 @@ export const TOUR_STEPS: TourStep[] = [
     },
     en: {
       title: 'Guided tour of Simetrics',
-      body: 'We will walk through all of Simetrics, block by block: import, indicators, charts, networks, Search Engine, report and the AI assistant. Each stop highlights part of the screen and explains how to read and use it.',
+      body: 'We will walk through all of Simetrics, block by block: import, indicators, charts, networks, Search Engine, report, systematized review and the AI assistant. Each stop highlights part of the screen and explains how to read and use it.',
       bullets: [
         'With no dataset open, the tour loads the demo dataset (973 real documents).',
         'Move with the buttons or the ← → keys, and leave with Esc.',
@@ -101,23 +110,45 @@ export const TOUR_STEPS: TourStep[] = [
     target: 'tabs',
     tab: 'overview',
     pt: {
-      title: 'As quatro áreas',
-      body: 'O trabalho se divide em quatro abas, na ordem natural de uma análise bibliométrica.',
+      title: 'As três áreas',
+      body: 'O trabalho se divide em três abas: a análise bibliométrica, o Motor de Busca e a revisão sistematizada, todas sobre a mesma base.',
       bullets: [
-        '01 Informações Principais — importação, indicadores, rankings e análises visuais.',
-        '02 Redes — coocorrência, comunidades e colaboração internacional.',
-        '03 Motor de Busca — o dossiê de qualquer autor, país, venue, termo ou documento.',
-        '04 Relatório — um documento PDF ou Word com o que você escolher.',
+        '01 Análise Bibliométrica — Informações Principais, Redes e Relatório, na ordem natural de uma análise.',
+        '02 Motor de Busca — o dossiê de qualquer autor, país, venue, termo ou documento.',
+        '03 Revisão Sistematizada — protocolo, triagem, qualidade, extração, síntese e PRISMA.',
       ],
     },
     en: {
-      title: 'The four areas',
-      body: 'Work is split into four tabs, in the natural order of a bibliometric analysis.',
+      title: 'The three areas',
+      body: 'Work is split into three tabs: the bibliometric analysis, the Search Engine and the systematized review, all over the same dataset.',
       bullets: [
-        '01 Main Information — import, indicators, rankings and visual analyses.',
-        '02 Networks — co-occurrence, communities and international collaboration.',
-        '03 Search Engine — the dossier of any author, country, venue, term or document.',
-        '04 Report — a PDF or Word document with whatever you select.',
+        '01 Bibliometric Analysis — Main Information, Networks and Report, in the natural order of an analysis.',
+        '02 Search Engine — the dossier of any author, country, venue, term or document.',
+        '03 Systematized Review — protocol, screening, quality, extraction, synthesis and PRISMA.',
+      ],
+    },
+  },
+  {
+    id: 'bibliometric-views',
+    Icon: BarChart3,
+    target: 'bibliometric-views',
+    tab: 'overview',
+    pt: {
+      title: 'Análise Bibliométrica',
+      body: 'A primeira aba reúne a análise bibliométrica em três vistas, que você alterna por estes botões.',
+      bullets: [
+        '1 Informações Principais — importação, indicadores, rankings e análises visuais.',
+        '2 Redes — coocorrência, comunidades e colaboração internacional.',
+        '3 Relatório — um documento PDF ou Word com o que você escolher.',
+      ],
+    },
+    en: {
+      title: 'Bibliometric Analysis',
+      body: 'The first tab gathers the bibliometric analysis in three views, which you switch with these buttons.',
+      bullets: [
+        '1 Main Information — import, indicators, rankings and visual analyses.',
+        '2 Networks — co-occurrence, communities and international collaboration.',
+        '3 Report — a PDF or Word document with whatever you select.',
       ],
     },
   },
@@ -566,6 +597,120 @@ export const TOUR_STEPS: TourStep[] = [
     en: {
       title: 'Preview',
       body: 'A live preview of the document, next to the selection, updated whenever you tick or untick an item. What you see here is what goes into the file.',
+    },
+  },
+  {
+    id: 'review-overview',
+    Icon: ClipboardList,
+    target: 'review-steps',
+    tab: 'review',
+    needsData: true,
+    prepare: openReviewStep('protocol'),
+    pt: {
+      title: 'Revisão sistematizada',
+      body: 'Revisão sistemática, de escopo, integrativa, rápida, guarda-chuva ou mapeamento sistemático, sobre a mesma base da análise bibliométrica. São seis etapas, da pergunta ao PRISMA, no fluxo de ferramentas como o Parsifal.',
+      bullets: [
+        'O exemplo traz uma revisão de escopo de amostra sobre memética, só para visualização.',
+        '"Fazer cópia editável" transforma o exemplo num projeto seu, com a revisão junto.',
+        'Tudo fica salvo no projeto, no seu navegador.',
+      ],
+    },
+    en: {
+      title: 'Systematized review',
+      body: 'Systematic, scoping, integrative, rapid, umbrella review or systematic mapping, over the same dataset as the bibliometric analysis. Six stages, from the question to PRISMA, following tools like Parsifal.',
+      bullets: [
+        'The demo ships a sample scoping review on memetics, view only.',
+        '"Make an editable copy" turns the demo into your own project, review included.',
+        'Everything is saved in the project, in your browser.',
+      ],
+    },
+  },
+  {
+    id: 'review-protocol',
+    Icon: ClipboardList,
+    target: 'review-search',
+    tab: 'review',
+    needsData: true,
+    prepare: openReviewStep('protocol'),
+    pt: {
+      title: 'Protocolo e string de busca',
+      body: 'Defina o tipo de revisão, a pergunta (PICO, PICOC, PCC ou SPIDER), os critérios de elegibilidade, o checklist de qualidade e o formulário de extração. Os conceitos e sinônimos viram a string de busca já na sintaxe de cada base — Scopus, Web of Science, PubMed, Cochrane — pronta para copiar.',
+    },
+    en: {
+      title: 'Protocol and search string',
+      body: 'Set the review type, the question (PICO, PICOC, PCC or SPIDER), eligibility criteria, quality checklist and extraction form. Concepts and synonyms become the search string already in each database syntax — Scopus, Web of Science, PubMed, Cochrane — ready to copy.',
+    },
+  },
+  {
+    id: 'review-screening',
+    Icon: Filter,
+    target: 'review-screening',
+    tab: 'review',
+    needsData: true,
+    prepare: openReviewStep('screening'),
+    pt: {
+      title: 'Triagem em duas etapas',
+      body: 'Primeiro título e resumo, depois texto completo. Incluir acende em verde e excluir em vermelho; no texto completo, a exclusão pede o motivo, que vai para o diagrama PRISMA.',
+      bullets: [
+        'Atalhos: I incluir, E excluir, T talvez, N não recuperado, J/K para navegar, U para desfazer.',
+        'Os termos da string de busca aparecem destacados no título e no resumo.',
+      ],
+    },
+    en: {
+      title: 'Two-stage screening',
+      body: 'Title and abstract first, then full text. Including lights up green and excluding red; at full text, exclusion asks for the reason, which goes into the PRISMA diagram.',
+      bullets: [
+        'Shortcuts: I include, E exclude, T maybe, N not retrieved, J/K to navigate, U to undo.',
+        'The search string terms are highlighted in the title and abstract.',
+      ],
+    },
+  },
+  {
+    id: 'review-quality',
+    Icon: ShieldCheck,
+    target: 'review-step-quality',
+    tab: 'review',
+    needsData: true,
+    prepare: openReviewStep('quality'),
+    pt: {
+      title: 'Qualidade e extração',
+      body: 'Cada estudo incluído passa pelo checklist: as respostas têm peso, e a nota é comparada à nota de corte — verde passa, vermelho fica abaixo. Na etapa seguinte, o formulário de extração registra as características de cada estudo da seleção final.',
+    },
+    en: {
+      title: 'Quality and extraction',
+      body: 'Each included study goes through the checklist: answers carry weights, and the score is compared with the cutoff — green meets it, red falls below. In the next stage, the extraction form records the characteristics of each study in the final selection.',
+    },
+  },
+  {
+    id: 'review-synthesis',
+    Icon: BarChart3,
+    target: 'review-step-synthesis',
+    tab: 'review',
+    needsData: true,
+    prepare: openReviewStep('synthesis'),
+    pt: {
+      title: 'Síntese',
+      body: 'Indicadores da seleção final, estudos por ano, o resumo de cada campo extraído e as tabelas de características e de qualidade, exportáveis em CSV.',
+    },
+    en: {
+      title: 'Synthesis',
+      body: 'Final selection indicators, studies per year, a summary of each extracted field and the characteristics and quality tables, exportable as CSV.',
+    },
+  },
+  {
+    id: 'review-prisma',
+    Icon: GitBranch,
+    target: 'review-export',
+    tab: 'review',
+    needsData: true,
+    prepare: openReviewStep('prisma'),
+    pt: {
+      title: 'PRISMA e relatório',
+      body: 'O fluxo PRISMA 2020 sai das próprias decisões. Exporte o arquivo para o PRISMALab (prisma.scientata.com) desenhar o diagrama, as planilhas de decisões e o relatório Word da revisão.',
+    },
+    en: {
+      title: 'PRISMA and report',
+      body: 'The PRISMA 2020 flow comes straight from the decisions. Export the file for PRISMALab (prisma.scientata.com) to draw the diagram, the decision spreadsheets and the review Word report.',
     },
   },
   {

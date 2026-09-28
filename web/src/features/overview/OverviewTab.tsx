@@ -102,6 +102,7 @@ export default function OverviewTab() {
   const applyDedup = useDataset((state) => state.applyDedup);
   const isDeduplicating = useDataset((state) => state.isDeduplicating);
   const isIngesting = useDataset((state) => state.isIngesting);
+  const isDemo = useDataset((state) => state.isDemo);
   const busy = isDeduplicating || isIngesting;
   const t = useLocale((state) => state.t);
   const locale = useLocale((state) => state.locale);
@@ -161,7 +162,7 @@ export default function OverviewTab() {
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="w-72 sm:w-80">
+          <div className="w-72 sm:w-80" title={isDemo ? t('demo_readonly_hint') : undefined}>
             <Select
               value={selectedStrategy}
               onValueChange={(val) => {
@@ -170,7 +171,7 @@ export default function OverviewTab() {
                 // "Base completa" não tem o que executar: escolhê-la já desfaz a deduplicação.
                 if (strategy === 'none' && dedupStrategy !== 'none') void applyDedup('none');
               }}
-              disabled={busy}
+              disabled={busy || isDemo}
             >
               <SelectTrigger className="h-9" aria-label={t('dedup_strategy_aria')}>
                 <SelectValue placeholder={t('dedup_strategy_label')} />
