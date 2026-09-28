@@ -40,6 +40,8 @@ interface ProjectState {
   open: (id: string) => Promise<void>;
   /** Workspace em branco: sem base, sem revisão, desligado de qualquer projeto salvo. */
   startBlank: () => void;
+  /** Transforma o exemplo aberto (só visualização) num projeto salvo e editável. */
+  saveDemoCopy: () => Promise<void>;
   rename: (id: string, name: string) => Promise<void>;
   duplicate: (id: string) => Promise<void>;
   remove: (id: string) => Promise<void>;
@@ -84,24 +86,36 @@ const autoNames = new Map<string, string>();
  * `name`/`createdAt` do projeto já existente lendo `projects` (a lista leve já reflete
  * o último checkpoint, não precisa reler o registro completo do IndexedDB).
  */
-async function checkpoint(): Promise<void> {
+async function checkpoint(nameOverride?: string): Promise<void> {
   const ds = useDataset.getState();
+  // O exemplo é só visualização: abri-lo não cria projeto — só a cópia editável cria.
+  if (ds.isDemo) return;
   const review = useReview.getState().review;
   const hasDataset = Boolean(ds.active && ds.original);
   // Um projeto nasce da base carregada ou de um protocolo de revisão — o que vier primeiro.
   if (!hasDataset && !hasReviewContent(review)) return;
 
-  const { activeProjectId, projects } = useProjectStore.getState();
-  const existingMeta = activeProjectId ? projects.find((p) => p.id === activeProjectId) : undefined;
+  const { activeProjectId } = useProjectStore.getState();
   const now = new Date().toISOString();
   const id = activeProjectId ?? crypto.randomUUID();
-  // O id vale já, antes do `await`: um segundo checkpoint (base e revisão mudando juntas)
-  // precisa gravar no mesmo projeto, e não criar outro.
+  // O id vale já, antes de qualquer `await`: um segundo checkpoint (base e revisão mudando
+  // juntas) precisa gravar no mesmo projeto, e não criar outro.
   if (!activeProjectId) useProjectStore.setState({ activeProjectId: id });
+
+  const findMeta = () => useProjectStore.getState().projects.find((p) => p.id === activeProjectId);
+  let existingMeta = activeProjectId ? findMeta() : undefined;
+  // Aberto pelo endereço (recarregar a página), o projeto ainda não está na lista leve —
+  // sem ela, este salvamento o trataria como novo e perderia o nome e a data de criação.
+  if (activeProjectId && !existingMeta) {
+    await useProjectStore.getState().refreshList();
+    existingMeta = findMeta();
+  }
 
   const reviewTitle = review?.title.trim() ?? '';
   const followsTitle = !existingMeta || existingMeta.name === autoNames.get(id);
-  const name = followsTitle && reviewTitle ? reviewTitle : (existingMeta?.name ?? deriveDefaultName(ds.sourceFiles));
+  const name =
+    nameOverride ??
+    (followsTitle && reviewTitle ? reviewTitle : (existingMeta?.name ?? deriveDefaultName(ds.sourceFiles)));
   if (followsTitle && reviewTitle) autoNames.set(id, name);
 
   const record: ProjectRecord = {
@@ -192,6 +206,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     try {
       useReview.getState().hydrate(normalizeReview(record.review));
       useDataset.setState({
+        isDemo: false,
         original: hasDataset ? record.original : null,
         active: hasDataset ? record.active : null,
         duplicates: record.duplicates,
@@ -218,6 +233,13 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       hydrating = false;
     }
     set({ activeProjectId: null, saveStatus: 'idle', lastSavedAt: null });
+  },
+
+  async saveDemoCopy() {
+    if (!useDataset.getState().isDemo) return;
+    useDataset.setState({ isDemo: false });
+    set({ activeProjectId: null });
+    await checkpoint(useLocale.getState().t('demo_copy_name'));
   },
 
   async rename(id, name) {
@@ -323,6 +345,13 @@ useDataset.subscribe(
   (state) => state.active,
   (active, prevActive) => {
     if (hydrating) return;
+    // Abrir o exemplo desliga o workspace do projeto que estava aberto: o que vier depois
+    // (arquivos próprios, cópia editável) vira um projeto novo, sem sobrescrever aquele.
+    if (active && useDataset.getState().isDemo) {
+      useReview.getState().hydrate(null);
+      useProjectStore.setState({ activeProjectId: null, saveStatus: 'idle', lastSavedAt: null });
+      return;
+    }
     if (active && active !== prevActive) void checkpoint();
     if (!active) {
       // Limpar a base desliga o workspace do projeto salvo — a revisão vai junto.

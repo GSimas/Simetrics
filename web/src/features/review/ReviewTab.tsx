@@ -4,6 +4,8 @@ import { BarChart3, ClipboardList, Filter, GitBranch, ShieldCheck, TableProperti
 import { createReview } from '@/core/review/state';
 import { getDeviceId } from '@/lib/device-id';
 import { cn } from '@/lib/utils';
+import { DemoCopyButton } from '@/components/DemoBanner';
+import { useDataset } from '@/state/dataset.store';
 import { useLocale } from '@/state/locale.store';
 import { useReview } from '@/state/review.store';
 import { REVIEW_COPY } from './copy';
@@ -39,6 +41,18 @@ export default function ReviewTab() {
   const blank = useMemo(() => createReview(getDeviceId()), []);
   const review = stored ?? blank;
   const [step, setStep] = useState<Step>('protocol');
+  const isDemo = useDataset((state) => state.isDemo);
+
+  // O exemplo é só visualização: uma revisão precisa de um projeto salvo onde viver.
+  if (isDemo) {
+    return (
+      <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-border p-10 text-center">
+        <p className="eyebrow text-highlight">{copy.eyebrow}</p>
+        <p className="max-w-xl text-sm text-muted-foreground">{copy.demoReadOnly}</p>
+        <DemoCopyButton size="default" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">

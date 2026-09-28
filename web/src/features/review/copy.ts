@@ -9,6 +9,8 @@ export const REVIEW_COPY = {
     eyebrow: 'Revisão sistematizada',
     intro:
       'Planeje o protocolo, faça a triagem da base importada em duas etapas, avalie a qualidade e extraia os dados dos estudos incluídos, e gere a síntese, o fluxo PRISMA e o relatório. Tudo fica salvo no projeto, no seu navegador.',
+    demoReadOnly:
+      'O exemplo é só visualização. Para planejar e triar uma revisão sobre esta base, faça uma cópia editável: ela vira um projeto seu, salvo no navegador.',
     steps: {
       protocol: 'Protocolo',
       screening: 'Triagem',
@@ -242,6 +244,8 @@ export const REVIEW_COPY = {
     eyebrow: 'Systematized review',
     intro:
       'Plan the protocol, screen the imported dataset in two stages, assess quality and extract data from the included studies, then produce the synthesis, the PRISMA flow and the report. Everything is saved in the project, in your browser.',
+    demoReadOnly:
+      'The demo is view only. To plan and screen a review on this dataset, make an editable copy: it becomes your own project, saved in the browser.',
     steps: {
       protocol: 'Protocol',
       screening: 'Screening',

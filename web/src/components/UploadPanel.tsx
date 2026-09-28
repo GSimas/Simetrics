@@ -49,6 +49,7 @@ export function UploadPanel() {
   const progress = useDataset((state) => state.progress);
   const error = useDataset((state) => state.error);
   const active = useDataset((state) => state.active);
+  const isDemo = useDataset((state) => state.isDemo);
   const t = useLocale((state) => state.t);
   const locale = useLocale((state) => state.locale);
 
@@ -182,7 +183,7 @@ export function UploadPanel() {
 
               <Button
                 variant="gradient"
-                onClick={() => (active ? setAskMerge(true) : void handleProcess('replace'))}
+                onClick={() => (active && !isDemo ? setAskMerge(true) : void handleProcess('replace'))}
                 disabled={busy}
                 className="w-full font-semibold shadow-xs"
               >

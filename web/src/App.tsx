@@ -7,6 +7,7 @@ import { KpiTicker } from '@/components/KpiTicker';
 import { TutorialTriggerButton } from '@/components/TutorialTriggerButton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BuyMeCoffeeButton } from '@/components/BuyMeCoffeeButton';
+import { DemoBanner } from '@/components/DemoBanner';
 import { LandingScreen } from '@/features/landing/LandingScreen';
 import { numberLocale } from '@/lib/i18n/labels';
 import { type TranslationKey } from '@/lib/i18n/translations';
@@ -204,6 +205,8 @@ export default function App() {
             <KpiTicker />
           </div>
         </header>
+
+        <DemoBanner />
 
         <main className="container py-6">
           <Tabs value={activeTab} onValueChange={setActiveTab}>

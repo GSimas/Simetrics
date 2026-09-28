@@ -28,6 +28,7 @@ export function ThemePanel() {
   const hasThemes = clustering !== null || hybridRun !== null;
   const categorize = useDataset((state) => state.categorizeThemes);
   const isCategorizingThemes = useDataset((state) => state.isCategorizingThemes);
+  const isDemo = useDataset((state) => state.isDemo);
   const busy = isCategorizingThemes;
   const t = useLocale((state) => state.t);
   const locale = useLocale((state) => state.locale);
@@ -82,7 +83,8 @@ export function ThemePanel() {
             <Button
               variant="ai"
               onClick={() => void categorize()}
-              disabled={busy}
+              disabled={busy || isDemo}
+              title={isDemo ? t('demo_readonly_hint') : undefined}
               className="font-semibold shadow-xs"
             >
               <Sparkles className="size-4" aria-hidden />

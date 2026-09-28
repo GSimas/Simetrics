@@ -165,6 +165,9 @@ export function HybridPanel() {
   const config = useHybridConfig((state) => state.config);
   const hybridRun = useDataset((state) => state.hybridRun);
   const kmeansBusy = useDataset((state) => state.isCategorizingThemes);
+  const isDemo = useDataset((state) => state.isDemo);
+  const t = useLocale((state) => state.t);
+  const demoHint = isDemo ? t('demo_readonly_hint') : undefined;
   const { stage, progress: rawProgress, draft, draftSupport, isManual, error, start, startManual, updateDraft, confirm, cancel, dismiss } =
     useHybrid();
   // As fases do k-means chegam do worker em português; as do fluxo híbrido já vêm no idioma.
@@ -258,11 +261,22 @@ export function HybridPanel() {
             />
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button type="button" onClick={() => void start(focus)} disabled={!canDiscover || !jevAvailable || kmeansBusy || Boolean(discoverTooLarge)}>
+            <Button
+              type="button"
+              onClick={() => void start(focus)}
+              disabled={isDemo || !canDiscover || !jevAvailable || kmeansBusy || Boolean(discoverTooLarge)}
+              title={demoHint}
+            >
               <Layers aria-hidden />
               {copy.discover}
             </Button>
-            <Button type="button" variant="outline" onClick={startManual} disabled={!jevAvailable || kmeansBusy || Boolean(manualTooLarge)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={startManual}
+              disabled={isDemo || !jevAvailable || kmeansBusy || Boolean(manualTooLarge)}
+              title={demoHint}
+            >
               <ListChecks aria-hidden />
               {copy.manual}
             </Button>
