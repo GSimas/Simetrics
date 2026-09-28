@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useState } from 'react';
-import { BarChart3, FileText, FolderOpen, ListChecks, Network, Search } from 'lucide-react';
+import { BarChart3, FolderOpen, ListChecks, Search } from 'lucide-react';
 
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { SettingsButton } from '@/components/HeaderActions';
@@ -8,6 +8,7 @@ import { TutorialTriggerButton } from '@/components/TutorialTriggerButton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BuyMeCoffeeButton } from '@/components/BuyMeCoffeeButton';
 import { DemoBanner } from '@/components/DemoBanner';
+import { preloadBibliometricViews } from '@/features/bibliometrics/views';
 import { LandingScreen } from '@/features/landing/LandingScreen';
 import { numberLocale } from '@/lib/i18n/labels';
 import { type TranslationKey } from '@/lib/i18n/translations';
@@ -23,10 +24,9 @@ import { useTour } from '@/state/tour.store';
 // Cada aba é um chunk próprio: a landing (o primeiro paint) não baixa nem executa o
 // código do workspace. Ao entrar no workspace, as abas são pré-carregadas no ócio, então a
 // troca de aba não passa pelo fallback do Suspense.
-const OverviewTab = lazyWithPreload(() => import('@/features/overview/OverviewTab'));
-const NetworksTab = lazyWithPreload(() => import('@/features/networks/NetworksTab'));
+// Análise Bibliométrica: Informações Principais, Redes e Relatório, cada vista em seu chunk.
+const BibliometricsTab = lazyWithPreload(() => import('@/features/bibliometrics/BibliometricsTab'));
 const SearchTab = lazyWithPreload(() => import('@/features/search/SearchTab'));
-const ReportTab = lazyWithPreload(() => import('@/features/report/ReportTab'));
 const ReviewTab = lazyWithPreload(() => import('@/features/review/ReviewTab'));
 // Modal do tutorial e tour: só quando alguém os abre.
 const TutorialModal = lazyWithPreload(() =>
@@ -42,18 +42,11 @@ const GuidedTour = lazyWithPreload(() =>
 
 const TABS = [
   {
-    value: 'overview',
-    labelKey: 'tab_overview' as TranslationKey,
+    value: 'bibliometrics',
+    labelKey: 'tab_bibliometrics' as TranslationKey,
     Icon: BarChart3,
     iconColor: 'text-muted-foreground group-data-[state=active]:text-highlight',
-    Panel: OverviewTab,
-  },
-  {
-    value: 'networks',
-    labelKey: 'tab_networks' as TranslationKey,
-    Icon: Network,
-    iconColor: 'text-muted-foreground group-data-[state=active]:text-highlight',
-    Panel: NetworksTab,
+    Panel: BibliometricsTab,
   },
   {
     value: 'search',
@@ -61,13 +54,6 @@ const TABS = [
     Icon: Search,
     iconColor: 'text-muted-foreground group-data-[state=active]:text-highlight',
     Panel: SearchTab,
-  },
-  {
-    value: 'report',
-    labelKey: 'tab_report' as TranslationKey,
-    Icon: FileText,
-    iconColor: 'text-muted-foreground group-data-[state=active]:text-highlight',
-    Panel: ReportTab,
   },
   {
     value: 'review',
@@ -104,10 +90,9 @@ export default function App() {
   useEffect(() => {
     if (route.view !== 'workspace') return;
     return whenIdle(() => {
-      void OverviewTab.preload();
-      void NetworksTab.preload();
+      void BibliometricsTab.preload();
+      preloadBibliometricViews();
       void SearchTab.preload();
-      void ReportTab.preload();
       void ReviewTab.preload();
       void ChatWidget.preload();
     });

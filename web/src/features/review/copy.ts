@@ -92,7 +92,7 @@ export const REVIEW_COPY = {
 
     // Triagem
     noDataset:
-      'Importe na aba Informações Principais os arquivos exportados das bases com a sua string de busca. A triagem trabalha sobre a base ativa, já deduplicada.',
+      'Importe em Análise Bibliométrica › Informações Principais os arquivos exportados das bases com a sua string de busca. A triagem trabalha sobre a base ativa, já deduplicada.',
     goToImport: 'Ir para a importação',
     stageTitleAbstract: 'Título e resumo',
     stageFullText: 'Texto completo',
@@ -154,7 +154,7 @@ export const REVIEW_COPY = {
     pendingWarning:
       'A triagem não terminou: {ta} registro(s) pendente(s) em título e resumo e {ft} no texto completo. As contagens abaixo refletem o que já foi decidido.',
     dedupHint:
-      'As duplicatas vêm da deduplicação aplicada na aba Informações Principais. Sem deduplicação, registros repetidos entram na triagem.',
+      'As duplicatas vêm da deduplicação aplicada em Análise Bibliométrica › Informações Principais. Sem deduplicação, registros repetidos entram na triagem.',
     exportTitle: 'Exportar',
     exportPrisma: 'Arquivo para o PRISMALab (.json)',
     exportPrismaHint:
@@ -326,7 +326,7 @@ export const REVIEW_COPY = {
     remove: 'Remove',
 
     noDataset:
-      'Import, in the Main Information tab, the files exported from the databases with your search string. Screening works on the active, deduplicated dataset.',
+      'Import, under Bibliometric Analysis › Main Information, the files exported from the databases with your search string. Screening works on the active, deduplicated dataset.',
     goToImport: 'Go to import',
     stageTitleAbstract: 'Title & abstract',
     stageFullText: 'Full text',
@@ -387,7 +387,7 @@ export const REVIEW_COPY = {
     pendingWarning:
       'Screening is not finished: {ta} pending record(s) in title and abstract and {ft} in full text. The counts below reflect what has been decided so far.',
     dedupHint:
-      'Duplicates come from the deduplication applied in the Main Information tab. Without deduplication, repeated records go to screening.',
+      'Duplicates come from the deduplication applied under Bibliometric Analysis › Main Information. Without deduplication, repeated records go to screening.',
     exportTitle: 'Export',
     exportPrisma: 'File for PRISMALab (.json)',
     exportPrismaHint:

@@ -19,6 +19,7 @@ export const TRANSLATIONS = {
     buy_me_coffee_tooltip: 'Apoie o Simetrics pagando um café! ☕',
 
     // Tabs
+    tab_bibliometrics: 'Análise Bibliométrica',
     tab_overview: 'Informações Principais',
     tab_networks: 'Redes',
     tab_search: 'Motor de Busca',
@@ -417,7 +418,10 @@ export const TRANSLATIONS = {
     landing_eyebrow: 'Bibliometria · Cientometria · Redes',
     landing_family: 'Uma aplicação Scientata',
     landing_hero_a: 'Análise',
-    landing_hero_em: 'bibliométrica',
+    landing_hero_em: 'Bibliométrica',
+    landing_hero_and: 'e',
+    landing_hero_a2: 'Revisão',
+    landing_hero_em2: 'Sistematizada',
     landing_hero_b: 'com',
     landing_hero_signal: 'inteligência',
     landing_projects_eyebrow: 'Seus projetos · salvos neste navegador',
@@ -505,6 +509,7 @@ export const TRANSLATIONS = {
     buy_me_coffee_tooltip: 'Support Simetrics by buying me a coffee! ☕',
 
     // Tabs
+    tab_bibliometrics: 'Bibliometric Analysis',
     tab_overview: 'Overview & Metrics',
     tab_networks: 'Networks',
     tab_search: 'Search Engine',
@@ -902,7 +907,10 @@ export const TRANSLATIONS = {
     landing_eyebrow: 'Bibliometrics · Scientometrics · Networks',
     landing_family: 'A Scientata application',
     landing_hero_a: 'Bibliometric',
-    landing_hero_em: 'analysis',
+    landing_hero_em: 'Analysis',
+    landing_hero_and: 'and',
+    landing_hero_a2: 'Systematized',
+    landing_hero_em2: 'Review',
     landing_hero_b: 'with',
     landing_hero_signal: 'intelligence',
     landing_projects_eyebrow: 'Your projects · saved in this browser',

@@ -5,21 +5,34 @@ import type { SearchEntityType } from '@/lib/types';
 import { useDataset } from './dataset.store';
 
 /**
- * Navegação do workspace: aba ativa e a entidade aberta no Motor de Busca.
+ * Navegação do workspace: aba ativa, a vista aberta na Análise Bibliométrica e a entidade
+ * aberta no Motor de Busca.
  *
  * Fica fora dos componentes porque qualquer gráfico pode mandar o usuário ao perfil de
  * um termo — clicar numa barra, num nó, numa palavra da nuvem. E, por ser global, a
  * busca sobrevive à troca de abas.
  */
+/** As três abas do workspace. */
+export type WorkspaceTab = 'bibliometrics' | 'search' | 'review';
+/** As vistas dentro da aba Análise Bibliométrica. */
+export type BibliometricView = 'overview' | 'networks' | 'report';
+
+const BIBLIOMETRIC_VIEWS: readonly string[] = ['overview', 'networks', 'report'] satisfies BibliometricView[];
+
 /** Escopo do seletor de tipo: um tipo de entidade ou todos juntos. */
 export type SearchScope = SearchEntityType | 'Todos';
 
 interface NavigationState {
-  activeTab: string;
+  activeTab: WorkspaceTab;
+  bibliometricView: BibliometricView;
   searchScope: SearchScope;
   /** Tipo concreto do termo aberto — em "Todos", vem do item escolhido. */
   searchType: SearchEntityType;
   searchTerm: string | null;
+  /**
+   * Abre uma aba — ou, com o nome de uma vista bibliométrica (`overview`, `networks`,
+   * `report`), a aba Análise Bibliométrica já nessa vista.
+   */
   setActiveTab: (tab: string) => void;
   /** Abre um termo; o escopo vira "Todos" se o atual não comportar o tipo do termo. */
   selectEntity: (type: SearchEntityType, term: string) => void;
@@ -32,11 +45,17 @@ interface NavigationState {
 }
 
 export const useNavigation = create<NavigationState>()((set, get) => ({
-  activeTab: 'overview',
+  activeTab: 'bibliometrics',
+  bibliometricView: 'overview',
   searchScope: 'Todos',
   searchType: 'Autor',
   searchTerm: null,
-  setActiveTab: (activeTab) => set({ activeTab }),
+  setActiveTab: (tab) =>
+    set(
+      BIBLIOMETRIC_VIEWS.includes(tab)
+        ? { activeTab: 'bibliometrics', bibliometricView: tab as BibliometricView }
+        : { activeTab: tab as WorkspaceTab },
+    ),
   selectEntity: (type, term) =>
     set((state) => ({
       searchScope: state.searchScope === type ? type : 'Todos',
