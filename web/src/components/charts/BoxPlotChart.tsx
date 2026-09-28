@@ -268,10 +268,12 @@ function BoxPlotChart(props: BoxPlotChartProps) {
                 textAnchor={rotate ? 'end' : 'middle'}
                 fontSize={11}
                 fill="var(--foreground)"
+                // Nome inteiro na dica do app (o rótulo pode vir encurtado).
+                data-tip={entry.name}
+                aria-label={entry.name}
                 className={onSeriesClick ? 'cursor-pointer' : undefined}
                 onClick={onSeriesClick ? () => onSeriesClick(entry.name) : undefined}
               >
-                <title>{entry.name}</title>
                 {label}
               </text>
             </g>

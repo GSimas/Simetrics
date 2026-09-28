@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { RootErrorActions } from './components/RootErrorActions';
+import { TooltipLayer } from './components/TooltipLayer';
 import { completeOpenRouterLogin } from './lib/openrouter-oauth';
 import './fonts.css';
 import './index.css';
@@ -21,5 +22,7 @@ createRoot(container).render(
     <ErrorBoundary variant="page" className="m-4 sm:m-8" extraAction={<RootErrorActions />}>
       <App />
     </ErrorBoundary>
+    {/* Dicas de texto no visual do app, para todo `title` da página. */}
+    <TooltipLayer />
   </StrictMode>,
 );

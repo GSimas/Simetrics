@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { Check, Eye, EyeOff, Loader2, ShieldCheck, Trash2, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { NumberInput } from '@/components/ui/number-input';
 import { chatJson } from '@/lib/deepseek-client';
 import { jevEvaluate } from '@/lib/jev-client';
 import { useFreeTier } from '@/state/free-tier.store';
@@ -81,16 +83,14 @@ function NumberField({ id, label, value, onChange, step = 1, min, max }: {
   return (
     <div className="space-y-1">
       <Label htmlFor={id} className="text-[11px] text-muted-foreground">{label}</Label>
-      <Input
+      <NumberInput
         id={id}
-        type="number"
-        inputMode="decimal"
-        value={Number.isFinite(value) ? value : ''}
+        value={Number.isFinite(value) ? value : null}
         step={step}
         min={min}
         max={max}
-        onChange={(event) => onChange(Number(event.target.value))}
-        className="h-8 text-xs tabular-nums"
+        onValueChange={(next) => onChange(next ?? Number.NaN)}
+        inputClassName="h-8 text-xs"
       />
     </div>
   );
@@ -291,11 +291,9 @@ function SettingsBody({ onClose }: { onClose: () => void }) {
             />
           </div>
           <label className="flex items-center gap-2 text-xs">
-            <input
-              type="checkbox"
+            <Checkbox
               checked={form.reviewBeforeClassify}
-              onChange={(event) => update({ reviewBeforeClassify: event.target.checked })}
-              className="size-4 accent-[var(--highlight)]"
+              onCheckedChange={(reviewBeforeClassify) => update({ reviewBeforeClassify })}
             />
             {copy.reviewBefore}
           </label>

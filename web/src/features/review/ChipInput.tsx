@@ -90,6 +90,7 @@ export function ChipInput({
         }}
         placeholder={placeholder}
         aria-label={label}
+        autoComplete="off"
         className="min-w-[10rem] flex-1 bg-transparent px-1 py-0.5 text-sm outline-none placeholder:text-muted-foreground"
       />
     </div>

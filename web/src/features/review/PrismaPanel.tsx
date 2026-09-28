@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { AlertTriangle, ArrowDown, Download, ExternalLink, FileSpreadsheet, FileText, Loader2 } from 'lucide-react';
+import { AlertTriangle, ArrowDown, Download, ExternalLink, FileDown, FileSpreadsheet, FileText, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { downloadBlob, downloadCsv, timestampedFilename, toCsv } from '@/core/export';
@@ -139,7 +139,7 @@ export function PrismaPanel({ review, copy }: { review: ReviewState; copy: Revie
       }),
     [original, records, review, copy.noReason, copy.qualityReason],
   );
-  const [generating, setGenerating] = useState(false);
+  const [generating, setGenerating] = useState<'docx' | 'pdf' | null>(null);
   const complete = isScreeningComplete(flow);
   const baseName = review.title.trim() || projectName || 'revisao';
 
@@ -223,22 +223,39 @@ export function PrismaPanel({ review, copy }: { review: ReviewState; copy: Revie
         </div>
         <div className="space-y-2 border-t border-border/80 pt-4">
           <h4 className="text-sm font-semibold">{copy.reportTitle}</h4>
-          <Button
-            type="button"
-            variant="outline"
-            className={ADD_BUTTON}
-            disabled={generating || flow.screened === 0}
-            onClick={() => {
-              setGenerating(true);
-              // O gerador (e a biblioteca docx) só baixam quando alguém pede o relatório.
-              void import('./report-docx')
-                .then(({ downloadReviewReport }) => downloadReviewReport({ review, flow, records, copy, locale }))
-                .finally(() => setGenerating(false));
-            }}
-          >
-            {generating ? <Loader2 className="animate-spin" aria-hidden /> : <FileText aria-hidden />}
-            {generating ? copy.generating : copy.downloadReport}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className={ADD_BUTTON}
+              disabled={generating !== null || flow.screened === 0}
+              onClick={() => {
+                setGenerating('docx');
+                // Os geradores (e as bibliotecas docx e jsPDF) só baixam quando alguém pede.
+                void import('./report-docx')
+                  .then(({ downloadReviewReport }) => downloadReviewReport({ review, flow, records, copy, locale }))
+                  .finally(() => setGenerating(null));
+              }}
+            >
+              {generating === 'docx' ? <Loader2 className="animate-spin" aria-hidden /> : <FileText aria-hidden />}
+              {generating === 'docx' ? copy.generating : copy.downloadReport}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className={ADD_BUTTON}
+              disabled={generating !== null || flow.screened === 0}
+              onClick={() => {
+                setGenerating('pdf');
+                void import('./report-pdf')
+                  .then(({ downloadReviewPdf }) => downloadReviewPdf({ review, flow, records, copy, locale }))
+                  .finally(() => setGenerating(null));
+              }}
+            >
+              {generating === 'pdf' ? <Loader2 className="animate-spin" aria-hidden /> : <FileDown aria-hidden />}
+              {generating === 'pdf' ? copy.generating : copy.downloadPdf}
+            </Button>
+          </div>
           <p className="text-xs leading-relaxed text-muted-foreground">{copy.reportHint}</p>
         </div>
       </section>

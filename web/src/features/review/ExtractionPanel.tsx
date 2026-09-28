@@ -3,7 +3,8 @@ import { Check, RotateCcw } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { DatePicker } from '@/components/ui/date-picker';
+import { NumberInput } from '@/components/ui/number-input';
 import { Textarea } from '@/components/ui/textarea';
 import { finalSelection } from '@/core/review/quality';
 import type { ExtractionField, ExtractionValue, ReviewState } from '@/core/review/types';
@@ -47,25 +48,23 @@ function FieldInput({
   switch (field.type) {
     case 'number':
       return (
-        <Input
+        <NumberInput
           id={id}
-          type="number"
-          value={typeof value === 'number' ? value : ''}
-          onChange={(event) => {
-            const parsed = Number(event.target.value);
-            onChange(event.target.value === '' || !Number.isFinite(parsed) ? null : parsed);
-          }}
-          className="h-8 w-40 text-sm tabular-nums"
+          value={typeof value === 'number' ? value : null}
+          onValueChange={onChange}
+          step={1}
+          className="w-full max-w-40"
+          inputClassName="h-8 text-sm"
         />
       );
     case 'date':
       return (
-        <Input
+        <DatePicker
           id={id}
-          type="date"
           value={typeof value === 'string' ? value : ''}
-          onChange={(event) => onChange(event.target.value || null)}
-          className="h-8 w-48 text-sm"
+          onValueChange={onChange}
+          aria-labelledby={`${id}-label`}
+          className="h-8 w-full max-w-60"
         />
       );
     case 'boolean':
@@ -152,7 +151,7 @@ export function ExtractionPanel({ review, copy, onEditProtocol }: { review: Revi
                 key={field.id}
                 className="space-y-1.5 rounded-lg p-1 transition-[box-shadow] duration-300 focus-within:shadow-[0_0_24px_-14px_var(--highlight)]"
               >
-                <label id={`extraction-${field.id}-label`} htmlFor={`extraction-${field.id}`} className="text-xs font-medium">
+                <label id={`extraction-${field.id}-label`} htmlFor={`extraction-${field.id}`} className="block text-xs font-medium">
                   {field.label || '—'}
                 </label>
                 <FieldInput

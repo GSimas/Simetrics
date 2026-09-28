@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { Plus } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
+import { NumberInput } from '@/components/ui/number-input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { defaultQualityAnswers, maxQualityScore } from '@/core/review/quality';
@@ -85,20 +87,19 @@ export function QualityChecklistEditor({ review, copy }: { review: ReviewState; 
                 autoFocus={answer.id === focusId}
                 className="h-8 text-sm"
               />
-              <Input
-                type="number"
-                step="0.5"
+              <NumberInput
+                step={0.5}
                 value={answer.weight}
-                onChange={(event) => {
-                  const weight = Number(event.target.value);
-                  if (!Number.isFinite(weight)) return;
+                onValueChange={(weight) => {
+                  if (weight === null) return;
                   update({
                     qualityAnswers: review.qualityAnswers.map((item) => (item.id === answer.id ? { ...item, weight } : item)),
                   });
                 }}
                 aria-label={`${copy.weight}: ${answer.label}`}
                 title={copy.weight}
-                className="h-8 w-20 shrink-0 text-sm tabular-nums"
+                className="w-24 shrink-0"
+                inputClassName="h-8 text-sm"
               />
               <RemoveButton
                 label={copy.remove}
@@ -116,18 +117,15 @@ export function QualityChecklistEditor({ review, copy }: { review: ReviewState; 
               {copy.cutoffLabel}
             </Label>
             <div className="space-y-1">
-              <Input
+              <NumberInput
                 id="quality-cutoff"
-                type="number"
-                step="0.5"
+                step={0.5}
                 min={0}
-                value={review.qualityCutoff ?? ''}
-                onChange={(event) => {
-                  const raw = event.target.value;
-                  const value = Number(raw);
-                  update({ qualityCutoff: raw === '' || !Number.isFinite(value) ? null : value });
-                }}
-                className="h-8 w-28 text-sm tabular-nums"
+                max={max || undefined}
+                value={review.qualityCutoff}
+                onValueChange={(qualityCutoff) => update({ qualityCutoff })}
+                className="w-28"
+                inputClassName="h-8 text-sm"
               />
               <p className="text-[11px] text-muted-foreground">
                 {copy.cutoffHint.replace('{max}', max.toLocaleString(locale === 'en' ? 'en' : 'pt-BR'))}
@@ -140,12 +138,11 @@ export function QualityChecklistEditor({ review, copy }: { review: ReviewState; 
               review.excludeBelowCutoff && 'text-exclude',
             )}
           >
-            <input
-              type="checkbox"
+            <Checkbox
               checked={review.excludeBelowCutoff}
               disabled={review.qualityCutoff === null}
-              onChange={(event) => update({ excludeBelowCutoff: event.target.checked })}
-              className="size-4 accent-[var(--glow-exclude)] transition-transform duration-200 active:scale-90"
+              onCheckedChange={(excludeBelowCutoff) => update({ excludeBelowCutoff })}
+              tone="exclude"
             />
             {copy.excludeBelowCutoff}
           </label>

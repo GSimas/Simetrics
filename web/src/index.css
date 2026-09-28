@@ -767,3 +767,23 @@ html[data-contrast='high'] :focus-visible {
     transform: scaleX(0);
   }
 }
+
+/* Controles com a cara do Simetrics, e não do sistema: sem as setinhas nativas dos
+   campos numéricos (NumberInput desenha as suas) nem o "olho"/"x" que o Edge põe nos
+   campos de senha e de texto (os campos de chave de API já têm o próprio botão). */
+input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
+}
+input[type='search']::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}

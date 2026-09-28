@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
-import { AlertTriangle, Check, Copy, Layers, ListChecks, Loader2, Settings2, X } from 'lucide-react';
+import { AlertTriangle, Check, ChevronDown, Copy, Layers, ListChecks, Loader2, Settings2, X } from 'lucide-react';
+
+import { Collapse } from '@/components/Collapse';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { hybridMethodsText } from '@/core/hybrid/report';
 import type { HybridRun } from '@/core/hybrid/types';
 import { localizeProgress } from '@/lib/i18n/progress';
+import { cn } from '@/lib/utils';
 import { useDataset } from '@/state/dataset.store';
 import { useFreeTier } from '@/state/free-tier.store';
 import { useHybridConfig } from '@/state/hybrid-config.store';
@@ -56,6 +59,7 @@ function CopyButton({ text, copy }: { text: string; copy: HybridCopy }) {
 function RunResult({ run, copy }: { run: HybridRun; copy: HybridCopy }) {
   const locale = useLocale((state) => state.locale);
   const methods = useMemo(() => hybridMethodsText(run, locale), [run, locale]);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const firstRound = run.validation[0];
   const lastRound = run.validation[run.validation.length - 1];
   const agreementById = new Map((lastRound?.perCategory ?? []).map((item) => [item.categoryId, item]));
@@ -132,10 +136,18 @@ function RunResult({ run, copy }: { run: HybridRun; copy: HybridCopy }) {
         <p className="text-xs leading-relaxed text-muted-foreground">{methods}</p>
       </div>
 
-      <details className="text-xs text-muted-foreground">
-        <summary className="cursor-pointer select-none font-medium text-foreground">
+      {/* Recolhível com a animação do app, no lugar do <details> e seu triângulo nativo. */}
+      <div className="text-xs text-muted-foreground">
+        <button
+          type="button"
+          aria-expanded={historyOpen}
+          onClick={() => setHistoryOpen((open) => !open)}
+          className="inline-flex items-center gap-1 rounded-sm font-medium text-foreground transition-colors duration-200 hover:text-highlight"
+        >
+          <ChevronDown className={cn('size-3.5 transition-transform duration-300', historyOpen && 'rotate-180')} aria-hidden />
           {copy.history} ({run.taxonomyVersions.length}) · {copy.usage}
-        </summary>
+        </button>
+        <Collapse open={historyOpen} delayOpen={false}>
         <ul className="mt-2 space-y-1">
           {run.taxonomyVersions.map((version) => (
             <li key={version.version}>
@@ -149,7 +161,8 @@ function RunResult({ run, copy }: { run: HybridRun; copy: HybridCopy }) {
           {copy.tokens} · {run.models.classifier}: {run.usage.classifierRequests.toLocaleString()} {copy.requests},{' '}
           {run.usage.classifierInputTokens.toLocaleString()} {copy.tokens}
         </p>
-      </details>
+        </Collapse>
+      </div>
     </div>
   );
 }

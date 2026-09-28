@@ -236,8 +236,9 @@ export const REVIEW_COPY = {
     qualityReason: 'Qualidade abaixo da nota de corte',
     reportTitle: 'Relatório da revisão',
     reportHint:
-      'Documento Word com o protocolo, a estratégia de busca, o fluxo PRISMA, a qualidade e as características dos estudos incluídos.',
-    downloadReport: 'Baixar relatório (.docx)',
+      'Protocolo, estratégia de busca, fluxo PRISMA, qualidade e características dos estudos incluídos. Em Word, para editar, ou em PDF, pronto para compartilhar, com o diagrama PRISMA desenhado.',
+    downloadReport: 'Word (.docx)',
+    downloadPdf: 'PDF',
     generating: 'Gerando…',
   },
   en: {
@@ -463,8 +464,9 @@ export const REVIEW_COPY = {
     qualityReason: 'Quality below the cutoff',
     reportTitle: 'Review report',
     reportHint:
-      'Word document with the protocol, search strategy, PRISMA flow, quality and characteristics of the included studies.',
-    downloadReport: 'Download report (.docx)',
+      'Protocol, search strategy, PRISMA flow, quality and characteristics of the included studies. In Word, to edit, or as a PDF, ready to share, with the PRISMA diagram drawn.',
+    downloadReport: 'Word (.docx)',
+    downloadPdf: 'PDF',
     generating: 'Generating…',
   },
 };

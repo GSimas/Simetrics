@@ -18,14 +18,12 @@ import {
 } from 'docx';
 
 import { downloadBlob, timestampedFilename } from '@/core/export';
-import type { ReviewFlow } from '@/core/review/flow';
 import { finalSelection, hasQualityChecklist, includedStudies, maxQualityScore, scoreStudy } from '@/core/review/quality';
-import type { ScreeningRecord } from '@/core/review/records';
 import { buildSearchString, SEARCH_TARGETS } from '@/core/review/search-string';
 import { formatExtractionValue } from '@/core/review/synthesis';
-import { FRAMEWORK_FIELDS, REVIEW_DEFAULTS, type ReviewState } from '@/core/review/types';
+import { FRAMEWORK_FIELDS, REVIEW_DEFAULTS } from '@/core/review/types';
 import { BRAND } from '@/features/report/chart-renderer';
-import type { ReviewCopy } from './copy';
+import { REPORT_TEXT, reference, shortLabel, type ReviewReportInput } from './report-shared';
 
 /**
  * Relatório da revisão em Word: protocolo, estratégia de busca, fluxo PRISMA, qualidade e
@@ -46,53 +44,6 @@ const TEXT_WIDTH = 9020;
 
 const hairline = { style: BorderStyle.SINGLE, size: 4, color: BORDER };
 const hairlines = { top: hairline, bottom: hairline, left: hairline, right: hairline };
-
-const REPORT_TEXT = {
-  pt: {
-    eyebrow: 'Relatório da revisão · Simetrics',
-    untitled: 'Revisão sem título',
-    generatedOn: 'Gerado em',
-    protocol: 'Protocolo',
-    search: 'Estratégia de busca',
-    selection: 'Seleção dos estudos (PRISMA 2020)',
-    quality: 'Avaliação da qualidade',
-    characteristics: 'Características dos estudos',
-    references: 'Estudos incluídos',
-    stage: 'Etapa',
-    count: 'n',
-    concept: 'Conceito',
-    terms: 'Termos',
-    database: 'Base',
-    records: 'Registros',
-    answers: 'Respostas (peso)',
-    cutoff: 'Nota de corte',
-    none: 'não definida',
-    excludedByQuality: 'Estudos abaixo da nota de corte excluídos da seleção final.',
-    maxScore: 'Nota máxima',
-  },
-  en: {
-    eyebrow: 'Review report · Simetrics',
-    untitled: 'Untitled review',
-    generatedOn: 'Generated on',
-    protocol: 'Protocol',
-    search: 'Search strategy',
-    selection: 'Study selection (PRISMA 2020)',
-    quality: 'Quality assessment',
-    characteristics: 'Characteristics of the studies',
-    references: 'Included studies',
-    stage: 'Stage',
-    count: 'n',
-    concept: 'Concept',
-    terms: 'Terms',
-    database: 'Database',
-    records: 'Records',
-    answers: 'Answers (weight)',
-    cutoff: 'Cutoff score',
-    none: 'not set',
-    excludedByQuality: 'Studies below the cutoff were excluded from the final selection.',
-    maxScore: 'Maximum score',
-  },
-};
 
 function heading(num: number, title: string): Paragraph[] {
   return [
@@ -182,20 +133,6 @@ function table(rows: string[][], widths?: number[]): Table {
   });
 }
 
-function reference(study: ScreeningRecord): string {
-  const authors = study.authors.split(';').map((author) => author.trim()).filter(Boolean);
-  const byline = authors.length > 3 ? `${authors.slice(0, 3).join('; ')} et al.` : authors.join('; ');
-  const doi = study.doi ? ` https://doi.org/${study.doi.replace(/^https?:\/\/(dx\.)?doi\.org\//i, '')}` : '';
-  return `${byline}${byline ? ' ' : ''}(${study.year ?? 's.d.'}). ${study.title}. ${study.venue}${study.venue ? '.' : ''}${doi}`.trim();
-}
-
-export interface ReviewReportInput {
-  review: ReviewState;
-  flow: ReviewFlow;
-  records: readonly ScreeningRecord[];
-  copy: ReviewCopy;
-  locale: 'pt' | 'en';
-}
 
 export async function downloadReviewReport({ review, flow, records, copy, locale }: ReviewReportInput): Promise<void> {
   const text = REPORT_TEXT[locale];
@@ -391,10 +328,4 @@ export async function downloadReviewReport({ review, flow, records, copy, locale
 
   const blob = await Packer.toBlob(doc);
   downloadBlob(timestampedFilename(`${review.title.trim() || 'revisao'}-relatorio`, 'docx'), blob);
-}
-
-function shortLabel(study: ScreeningRecord): string {
-  const firstAuthor = study.authors.split(';')[0]?.trim();
-  const label = [firstAuthor, study.year].filter(Boolean).join(', ');
-  return label || study.title.slice(0, 80);
 }
