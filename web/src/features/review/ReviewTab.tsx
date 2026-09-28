@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ClipboardList, Filter, GitBranch } from 'lucide-react';
+import { BarChart3, ClipboardList, Filter, GitBranch, ShieldCheck, TableProperties } from 'lucide-react';
 
 import { createReview } from '@/core/review/state';
 import { getDeviceId } from '@/lib/device-id';
@@ -7,20 +7,28 @@ import { cn } from '@/lib/utils';
 import { useLocale } from '@/state/locale.store';
 import { useReview } from '@/state/review.store';
 import { REVIEW_COPY } from './copy';
+import { ExtractionPanel } from './ExtractionPanel';
 import { PrismaPanel } from './PrismaPanel';
 import { ProtocolPanel } from './ProtocolPanel';
+import { QualityPanel } from './QualityPanel';
 import { ScreeningPanel } from './ScreeningPanel';
+import { SynthesisPanel } from './SynthesisPanel';
 
-type Step = 'protocol' | 'screening' | 'prisma';
+type Step = 'protocol' | 'screening' | 'quality' | 'extraction' | 'synthesis' | 'prisma';
 
 const STEPS: { value: Step; Icon: typeof ClipboardList }[] = [
   { value: 'protocol', Icon: ClipboardList },
   { value: 'screening', Icon: Filter },
+  { value: 'quality', Icon: ShieldCheck },
+  { value: 'extraction', Icon: TableProperties },
+  { value: 'synthesis', Icon: BarChart3 },
   { value: 'prisma', Icon: GitBranch },
 ];
 
 /**
- * Aba da revisão sistematizada: protocolo → triagem → PRISMA, no fluxo do Parsifal.
+ * Aba da revisão sistematizada no fluxo do Parsifal: planejamento (protocolo, checklist de
+ * qualidade, formulário de extração) → condução (triagem, qualidade, extração) → síntese
+ * e relato (PRISMA, relatório).
  * Trabalha sobre a mesma base do projeto que as análises bibliométricas.
  */
 export default function ReviewTab() {
@@ -62,6 +70,9 @@ export default function ReviewTab() {
 
       {step === 'protocol' && <ProtocolPanel review={review} copy={copy} />}
       {step === 'screening' && <ScreeningPanel review={review} copy={copy} />}
+      {step === 'quality' && <QualityPanel review={review} copy={copy} onEditProtocol={() => setStep('protocol')} />}
+      {step === 'extraction' && <ExtractionPanel review={review} copy={copy} onEditProtocol={() => setStep('protocol')} />}
+      {step === 'synthesis' && <SynthesisPanel review={review} copy={copy} />}
       {step === 'prisma' && <PrismaPanel review={review} copy={copy} />}
     </div>
   );

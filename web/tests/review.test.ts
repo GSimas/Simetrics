@@ -1,11 +1,20 @@
 import { describe, expect, it } from 'vitest';
 
-import { computeReviewFlow, isScreeningComplete, NO_REASON_ID } from '@/core/review/flow';
+import { computeReviewFlow, isScreeningComplete, NO_REASON_ID, QUALITY_REASON_ID } from '@/core/review/flow';
 import { PRISMALAB_COUNT_KEYS, toPrismaLabProject } from '@/core/review/prismalab';
+import {
+  defaultQualityAnswers,
+  finalSelection,
+  includedStudies,
+  isExcludedByQuality,
+  maxQualityScore,
+  scoreStudy,
+} from '@/core/review/quality';
 import { normalizeDoi, recordKey, toScreeningRecords } from '@/core/review/records';
 import { buildHighlighter, buildSearchString } from '@/core/review/search-string';
 import { createReview, decisionRows, hasReviewContent, normalizeReview } from '@/core/review/state';
-import type { Criterion, RecordScreening, SearchConcept } from '@/core/review/types';
+import { extractionRows, qualityRows, summarizeField } from '@/core/review/synthesis';
+import type { Criterion, RecordScreening, ReviewState, SearchConcept } from '@/core/review/types';
 import { parseProjectEnvelope } from '@/lib/project';
 import type { Dataset } from '@/lib/types';
 
@@ -215,5 +224,117 @@ describe('review persistence', () => {
     });
     expect(parsed.review?.title).toBe('My review');
     expect(parsed.active).toEqual([]);
+  });
+});
+
+describe('quality assessment and extraction', () => {
+  const at = '2026-01-01T00:00:00.000Z';
+  const records = toScreeningRecords([
+    doc({ TITLE: 'A', DOI: '10.1/a', 'YEAR CLEAN': 2020 }),
+    doc({ TITLE: 'B', DOI: '10.1/b', 'YEAR CLEAN': 2021 }),
+    doc({ TITLE: 'C', DOI: '10.1/c', 'YEAR CLEAN': 2021 }),
+    doc({ TITLE: 'D', DOI: '10.1/d', 'YEAR CLEAN': 2022 }),
+  ]);
+  let n = 0;
+  const answers = defaultQualityAnswers('pt', () => `ans-${(n += 1)}`);
+  const [yes, partial, no] = answers.map((answer) => answer.id) as [string, string, string];
+  const base = createReview('me');
+  const review = {
+    ...base,
+    decisions: {
+      'doi:10.1/a': { ta: 'include', ft: 'include', updatedAt: at },
+      'doi:10.1/b': { ta: 'include', ft: 'include', updatedAt: at },
+      'doi:10.1/c': { ta: 'maybe', ft: 'include', updatedAt: at },
+      'doi:10.1/d': { ta: 'include', ft: 'exclude', updatedAt: at },
+    },
+    qualityQuestions: [
+      { id: 'q1', text: 'Aims clear?' },
+      { id: 'q2', text: 'Method adequate?' },
+    ],
+    qualityAnswers: answers,
+    qualityCutoff: 1.5,
+    excludeBelowCutoff: true,
+    quality: {
+      'doi:10.1/a': { q1: yes, q2: partial }, // 1.5 — passa
+      'doi:10.1/b': { q1: partial, q2: no }, // 0.5 — abaixo
+      'doi:10.1/c': { q1: yes }, // incompleta — nunca exclui
+    },
+    extractionFields: [
+      { id: 'f1', label: 'Country', type: 'select' as const, options: ['Brazil', 'Chile'] },
+      { id: 'f2', label: 'Sample', type: 'number' as const, options: [] },
+      { id: 'f3', label: 'RCT', type: 'boolean' as const, options: [] },
+    ],
+    extraction: {
+      'doi:10.1/a': { values: { f1: 'Brazil', f2: 10, f3: true }, done: true },
+      'doi:10.1/c': { values: { f1: 'Brazil', f2: 30 }, done: false },
+    },
+  } satisfies ReviewState;
+
+  it('scores studies with the sum of answer weights', () => {
+    expect(maxQualityScore(review)).toBe(2);
+    expect(scoreStudy(review, 'doi:10.1/a')).toMatchObject({ score: 1.5, complete: true, passes: true });
+    expect(scoreStudy(review, 'doi:10.1/b')).toMatchObject({ score: 0.5, complete: true, passes: false });
+    expect(scoreStudy(review, 'doi:10.1/c')).toMatchObject({ score: 1, answered: 1, complete: false, passes: null });
+  });
+
+  it('drops only complete assessments below the cutoff from the final selection', () => {
+    expect(includedStudies(records, review).map((r) => r.key)).toEqual(['doi:10.1/a', 'doi:10.1/b', 'doi:10.1/c']);
+    expect(finalSelection(records, review).map((r) => r.key)).toEqual(['doi:10.1/a', 'doi:10.1/c']);
+    expect(isExcludedByQuality({ ...review, excludeBelowCutoff: false }, 'doi:10.1/b')).toBe(false);
+  });
+
+  it('counts quality exclusions as full-text exclusions in the PRISMA flow', () => {
+    const flow = computeReviewFlow([], records, review.decisions, review.criteria, 'No reason', {
+      isExcluded: (key) => isExcludedByQuality(review, key),
+      label: 'Low quality',
+    });
+    expect(flow.fullText).toMatchObject({ eligible: 4, include: 2, exclude: 2 });
+    expect(flow.included).toBe(2);
+    expect(flow.fullTextExclusions).toEqual(
+      expect.arrayContaining([{ id: QUALITY_REASON_ID, label: 'Low quality', count: 1 }]),
+    );
+  });
+
+  it('summarizes extraction fields over the final selection', () => {
+    const studies = finalSelection(records, review);
+    const labels = { yes: 'Sim', no: 'Não' };
+    expect(summarizeField(review.extractionFields[0]!, studies, review, labels)).toEqual({
+      kind: 'counts',
+      filled: 2,
+      counts: [
+        { label: 'Brazil', count: 2 },
+        { label: 'Chile', count: 0 },
+      ],
+    });
+    expect(summarizeField(review.extractionFields[1]!, studies, review, labels)).toEqual({
+      kind: 'numeric',
+      filled: 2,
+      mean: 20,
+      min: 10,
+      max: 30,
+    });
+    expect(summarizeField(review.extractionFields[2]!, studies, review, labels)).toMatchObject({
+      counts: [
+        { label: 'Sim', count: 1 },
+        { label: 'Não', count: 0 },
+      ],
+    });
+    expect(extractionRows(studies, review, labels)[0]).toMatchObject({ Country: 'Brazil', Sample: '10', RCT: 'Sim' });
+    expect(qualityRows(studies, review)[0]).toMatchObject({ Q1: 'Sim', Q2: 'Parcialmente', score: 1.5, max: 2 });
+  });
+
+  it('normalizes phase 2 fields from saved data', () => {
+    const normalized = normalizeReview({
+      ...review,
+      qualityAnswers: [...review.qualityAnswers, { id: 'bad', label: 'x', weight: 'heavy' }],
+      qualityCutoff: 'high',
+      extractionFields: [...review.extractionFields, { id: 'f9', label: 'x', type: 'bogus' }],
+      extraction: { k: { values: { f1: 'ok', f2: { nested: true } }, done: 'yes' } },
+    })!;
+    expect(normalized.qualityAnswers).toHaveLength(3);
+    expect(normalized.qualityCutoff).toBeNull();
+    expect(normalized.extractionFields).toHaveLength(3);
+    expect(normalized.extraction).toEqual({ k: { values: { f1: 'ok' }, done: false } });
+    expect(normalized.quality['doi:10.1/a']).toEqual({ q1: yes, q2: partial });
   });
 });

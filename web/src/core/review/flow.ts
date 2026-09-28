@@ -29,6 +29,13 @@ export interface ReviewFlow {
 }
 
 export const NO_REASON_ID = '__none__';
+/** Motivo das exclusões pela nota de corte da avaliação de qualidade. */
+export const QUALITY_REASON_ID = '__quality__';
+
+export interface QualityExclusion {
+  isExcluded: (key: string) => boolean;
+  label: string;
+}
 
 export function advancesToFullText(screening: RecordScreening | undefined): boolean {
   return screening?.ta === 'include' || screening?.ta === 'maybe';
@@ -40,6 +47,7 @@ export function computeReviewFlow(
   decisions: Record<string, RecordScreening>,
   criteria: readonly Criterion[],
   noReasonLabel: string,
+  qualityExclusion?: QualityExclusion,
 ): ReviewFlow {
   const bySource = new Map<string, number>();
   for (const doc of original) {
@@ -63,7 +71,11 @@ export function computeReviewFlow(
 
     fullText.eligible += 1;
     if (!screening.ft) fullText.pending += 1;
-    else if (screening.ft === 'include') fullText.include += 1;
+    else if (screening.ft === 'include' && qualityExclusion?.isExcluded(record.key)) {
+      // Abaixo da nota de corte: avaliado no texto completo e excluído, como no PRISMA.
+      fullText.exclude += 1;
+      reasons.set(QUALITY_REASON_ID, (reasons.get(QUALITY_REASON_ID) ?? 0) + 1);
+    } else if (screening.ft === 'include') fullText.include += 1;
     else if (screening.ft === 'not-retrieved') fullText.notRetrieved += 1;
     else {
       fullText.exclude += 1;
@@ -73,6 +85,7 @@ export function computeReviewFlow(
   }
 
   const labels = new Map(criteria.map((criterion) => [criterion.id, criterion.text]));
+  if (qualityExclusion) labels.set(QUALITY_REASON_ID, qualityExclusion.label);
   const fullTextExclusions = [...reasons.entries()]
     .map(([id, count]) => ({ id, label: labels.get(id) ?? noReasonLabel, count }))
     .sort((a, b) => b.count - a.count);

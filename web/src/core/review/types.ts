@@ -85,6 +85,39 @@ export interface RecordScreening {
   updatedAt: string;
 }
 
+/**
+ * Avaliação de qualidade no modelo do Parsifal: perguntas com as mesmas respostas para
+ * todas, cada resposta com um peso; a nota do estudo é a soma dos pesos respondidos.
+ */
+export interface QualityQuestion {
+  id: string;
+  text: string;
+}
+
+export interface QualityAnswer {
+  id: string;
+  label: string;
+  weight: number;
+}
+
+export const EXTRACTION_FIELD_TYPES = ['text', 'number', 'boolean', 'date', 'select', 'multiselect'] as const;
+export type ExtractionFieldType = (typeof EXTRACTION_FIELD_TYPES)[number];
+
+export interface ExtractionField {
+  id: string;
+  label: string;
+  type: ExtractionFieldType;
+  /** Opções de `select` e `multiselect`. */
+  options: string[];
+}
+
+export type ExtractionValue = string | number | boolean | string[];
+
+export interface StudyExtraction {
+  values: Record<string, ExtractionValue>;
+  done: boolean;
+}
+
 export interface ReviewState {
   schemaVersion: typeof REVIEW_SCHEMA_VERSION;
   type: ReviewType;
@@ -99,6 +132,16 @@ export interface ReviewState {
   criteria: Criterion[];
   /** Decisões por chave de registro. */
   decisions: Record<string, RecordScreening>;
+  qualityQuestions: QualityQuestion[];
+  qualityAnswers: QualityAnswer[];
+  /** Nota mínima para o estudo passar; `null` = sem nota de corte. */
+  qualityCutoff: number | null;
+  /** Estudos abaixo da nota de corte saem da seleção final (e entram como excluídos no PRISMA). */
+  excludeBelowCutoff: boolean;
+  /** Respostas por estudo: chave do registro → pergunta → resposta. */
+  quality: Record<string, Record<string, string>>;
+  extractionFields: ExtractionField[];
+  extraction: Record<string, StudyExtraction>;
   /**
    * Quem tomou as decisões deste arquivo: o id do dispositivo. Serve à fase de dois
    * revisores (juntar arquivos de pessoas diferentes) e, depois, à conta Scientata.

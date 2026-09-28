@@ -5,8 +5,12 @@ import {
   REVIEW_DEFAULTS,
   REVIEW_SCHEMA_VERSION,
   REVIEW_TYPES,
+  EXTRACTION_FIELD_TYPES,
   type Criterion,
+  type ExtractionField,
+  type ExtractionValue,
   type RecordScreening,
+  type StudyExtraction,
   type ReviewState,
   type ReviewType,
 } from './types';
@@ -25,6 +29,13 @@ export function createReview(reviewerId: string, type: ReviewType = 'systematic'
     searchTargets: [...DEFAULT_SEARCH_TARGETS],
     criteria: [],
     decisions: {},
+    qualityQuestions: [],
+    qualityAnswers: [],
+    qualityCutoff: null,
+    excludeBelowCutoff: false,
+    quality: {},
+    extractionFields: [],
+    extraction: {},
     reviewerId,
     createdAt: iso,
     updatedAt: iso,
@@ -41,7 +52,9 @@ export function hasReviewContent(review: ReviewState | null): boolean {
     review.questions.length > 0 ||
     review.concepts.length > 0 ||
     review.criteria.length > 0 ||
-    Object.keys(review.decisions).length > 0
+    Object.keys(review.decisions).length > 0 ||
+    review.qualityQuestions.length > 0 ||
+    review.extractionFields.length > 0
   );
 }
 
@@ -58,6 +71,45 @@ function list<T>(value: unknown, guard: (item: unknown) => item is T): T[] {
 }
 
 const hasId = (item: unknown): item is { id: string } => isRecord(item) && typeof item.id === 'string';
+
+function isExtractionValue(value: unknown): value is ExtractionValue {
+  return (
+    typeof value === 'string' ||
+    typeof value === 'boolean' ||
+    (typeof value === 'number' && Number.isFinite(value)) ||
+    (Array.isArray(value) && value.every((item) => typeof item === 'string'))
+  );
+}
+
+function normalizeQuality(raw: unknown): Record<string, Record<string, string>> {
+  const quality: Record<string, Record<string, string>> = {};
+  if (!isRecord(raw)) return quality;
+  for (const [key, responses] of Object.entries(raw)) {
+    if (!isRecord(responses)) continue;
+    const clean: Record<string, string> = {};
+    for (const [question, answer] of Object.entries(responses)) {
+      if (typeof answer === 'string') clean[question] = answer;
+    }
+    quality[key] = clean;
+  }
+  return quality;
+}
+
+function normalizeExtraction(raw: unknown): Record<string, StudyExtraction> {
+  const extraction: Record<string, StudyExtraction> = {};
+  if (!isRecord(raw)) return extraction;
+  for (const [key, study] of Object.entries(raw)) {
+    if (!isRecord(study)) continue;
+    const values: Record<string, ExtractionValue> = {};
+    if (isRecord(study.values)) {
+      for (const [field, value] of Object.entries(study.values)) {
+        if (isExtractionValue(value)) values[field] = value;
+      }
+    }
+    extraction[key] = { values, done: study.done === true };
+  }
+  return extraction;
+}
 
 /**
  * Normaliza a revisão vinda de um projeto salvo ou importado. Campos ausentes ou de tipo
@@ -116,6 +168,25 @@ export function normalizeReview(raw: unknown): ReviewState | null {
       .filter((c) => c.kind === 'inclusion' || c.kind === 'exclusion')
       .map((c) => ({ id: c.id, kind: c.kind as Criterion['kind'], text: str(c.text) })),
     decisions,
+    qualityQuestions: list(raw.qualityQuestions, hasId).map((q) => ({ id: q.id, text: str((q as { text?: unknown }).text) })),
+    qualityAnswers: list(raw.qualityAnswers, hasId)
+      .map((a) => a as { id: string; label?: unknown; weight?: unknown })
+      .filter((a) => typeof a.weight === 'number' && Number.isFinite(a.weight))
+      .map((a) => ({ id: a.id, label: str(a.label), weight: a.weight as number })),
+    qualityCutoff:
+      typeof raw.qualityCutoff === 'number' && Number.isFinite(raw.qualityCutoff) ? raw.qualityCutoff : null,
+    excludeBelowCutoff: raw.excludeBelowCutoff === true,
+    quality: normalizeQuality(raw.quality),
+    extractionFields: list(raw.extractionFields, hasId)
+      .map((f) => f as { id: string; label?: unknown; type?: unknown; options?: unknown })
+      .filter((f) => EXTRACTION_FIELD_TYPES.includes(f.type as ExtractionField['type']))
+      .map((f) => ({
+        id: f.id,
+        label: str(f.label),
+        type: f.type as ExtractionField['type'],
+        options: Array.isArray(f.options) ? f.options.filter((o): o is string => typeof o === 'string') : [],
+      })),
+    extraction: normalizeExtraction(raw.extraction),
     createdAt: str(raw.createdAt, base.createdAt),
     updatedAt: str(raw.updatedAt, base.updatedAt),
   };

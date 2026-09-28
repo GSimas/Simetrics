@@ -1,5 +1,5 @@
-import { useState, type KeyboardEvent } from 'react';
-import { Check, Copy, Plus, Trash2, X } from 'lucide-react';
+import { useState } from 'react';
+import { Check, Copy, Plus, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,19 +20,10 @@ import {
 } from '@/core/review/types';
 import { cn } from '@/lib/utils';
 import { useReview } from '@/state/review.store';
+import { ChipInput } from './ChipInput';
+import { Block } from './parts';
+import { ExtractionFormEditor, QualityChecklistEditor } from './PlanningEditors';
 import type { ReviewCopy } from './copy';
-
-function Block({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <section className="space-y-3 rounded-xl border border-border/80 p-4">
-      <div className="space-y-1">
-        <h3 className="text-sm font-semibold">{title}</h3>
-        {hint && <p className="text-xs leading-relaxed text-muted-foreground">{hint}</p>}
-      </div>
-      {children}
-    </section>
-  );
-}
 
 export function CopyButton({ text, copy }: { text: string; copy: ReviewCopy }) {
   const [copied, setCopied] = useState(false);
@@ -55,13 +46,6 @@ export function CopyButton({ text, copy }: { text: string; copy: ReviewCopy }) {
   );
 }
 
-function splitTerms(value: string): string[] {
-  return value
-    .split(/[,;\n]/)
-    .map((term) => term.trim())
-    .filter(Boolean);
-}
-
 function ConceptEditor({
   concept,
   copy,
@@ -75,23 +59,6 @@ function ConceptEditor({
   onChange: (concept: SearchConcept) => void;
   onRemove: () => void;
 }) {
-  const [draft, setDraft] = useState('');
-
-  const commit = (value: string): void => {
-    const incoming = splitTerms(value).filter((term) => !concept.terms.includes(term));
-    if (incoming.length > 0) onChange({ ...concept, terms: [...concept.terms, ...incoming] });
-    setDraft('');
-  };
-
-  const onKeyDown = (event: KeyboardEvent<HTMLInputElement>): void => {
-    if (event.key === 'Enter' || event.key === ',') {
-      event.preventDefault();
-      commit(draft);
-    } else if (event.key === 'Backspace' && !draft && concept.terms.length > 0) {
-      onChange({ ...concept, terms: concept.terms.slice(0, -1) });
-    }
-  };
-
   return (
     <div className="space-y-2 rounded-lg border border-border/60 p-3">
       <div className="flex items-center gap-2">
@@ -107,41 +74,14 @@ function ConceptEditor({
           <Trash2 aria-hidden />
         </Button>
       </div>
-      <div className="flex flex-wrap items-center gap-1.5">
-        {concept.terms.map((term, index) => (
-          <span
-            key={term}
-            className="inline-flex items-center gap-1 rounded-md border border-border bg-secondary px-2 py-0.5 font-mono text-xs"
-          >
-            {index > 0 && <span className="text-[10px] text-muted-foreground">OR</span>}
-            {term}
-            <button
-              type="button"
-              onClick={() => onChange({ ...concept, terms: concept.terms.filter((item) => item !== term) })}
-              aria-label={`${copy.removeTerm}: ${term}`}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <X className="size-3" aria-hidden />
-            </button>
-          </span>
-        ))}
-        <input
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={onKeyDown}
-          onBlur={() => commit(draft)}
-          onPaste={(event) => {
-            const text = event.clipboardData.getData('text');
-            if (/[,;\n]/.test(text)) {
-              event.preventDefault();
-              commit(text);
-            }
-          }}
-          placeholder={copy.termsPlaceholder}
-          aria-label={`${copy.termsPlaceholder} — ${concept.label}`}
-          className="min-w-[10rem] flex-1 bg-transparent px-1 py-0.5 text-sm outline-none placeholder:text-muted-foreground"
-        />
-      </div>
+      <ChipInput
+        items={concept.terms}
+        onChange={(terms) => onChange({ ...concept, terms })}
+        placeholder={copy.termsPlaceholder}
+        label={`${copy.termsPlaceholder} — ${concept.label}`}
+        removeLabel={copy.removeTerm}
+        separator="OR"
+      />
     </div>
   );
 }
@@ -355,6 +295,8 @@ export function ProtocolPanel({ review, copy }: { review: ReviewState; copy: Rev
             {copy.addQuestion}
           </Button>
         </Block>
+
+        <QualityChecklistEditor review={review} copy={copy} />
       </div>
 
       <div className="space-y-4">
@@ -419,6 +361,8 @@ export function ProtocolPanel({ review, copy }: { review: ReviewState; copy: Rev
           <CriteriaList kind="inclusion" review={review} copy={copy} focusId={focusId} onAdded={setFocusId} />
           <CriteriaList kind="exclusion" review={review} copy={copy} focusId={focusId} onAdded={setFocusId} />
         </Block>
+
+        <ExtractionFormEditor review={review} copy={copy} />
       </div>
     </div>
   );

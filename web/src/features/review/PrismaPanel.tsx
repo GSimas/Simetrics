@@ -1,10 +1,11 @@
-import { useMemo } from 'react';
-import { AlertTriangle, ArrowDown, Download, ExternalLink, FileSpreadsheet } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { AlertTriangle, ArrowDown, Download, ExternalLink, FileSpreadsheet, FileText, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { downloadBlob, downloadCsv, timestampedFilename, toCsv } from '@/core/export';
 import { computeReviewFlow, isScreeningComplete, type ReviewFlow } from '@/core/review/flow';
 import { PRISMALAB_URL, toPrismaLabProject } from '@/core/review/prismalab';
+import { finalSelection, isExcludedByQuality } from '@/core/review/quality';
 import { decisionRows } from '@/core/review/state';
 import type { ReviewState } from '@/core/review/types';
 import { numberLocale } from '@/lib/i18n/labels';
@@ -110,9 +111,14 @@ export function PrismaPanel({ review, copy }: { review: ReviewState; copy: Revie
   const records = useScreeningRecords();
 
   const flow = useMemo(
-    () => computeReviewFlow(original ?? [], records, review.decisions, review.criteria, copy.noReason),
-    [original, records, review.decisions, review.criteria, copy.noReason],
+    () =>
+      computeReviewFlow(original ?? [], records, review.decisions, review.criteria, copy.noReason, {
+        isExcluded: (key) => isExcludedByQuality(review, key),
+        label: copy.qualityReason,
+      }),
+    [original, records, review, copy.noReason, copy.qualityReason],
   );
+  const [generating, setGenerating] = useState(false);
   const complete = isScreeningComplete(flow);
   const baseName = review.title.trim() || projectName || 'revisao';
 
@@ -128,9 +134,8 @@ export function PrismaPanel({ review, copy }: { review: ReviewState; copy: Revie
     const rows = decisionRows(records, review, {
       decision: (value) => (value ? (copy.decisionLabels[value] ?? value) : ''),
     });
-    const selected = onlyIncluded
-      ? rows.filter((_, index) => review.decisions[records[index]!.key]?.ft === 'include')
-      : rows;
+    const finalKeys = new Set(finalSelection(records, review).map((record) => record.key));
+    const selected = onlyIncluded ? rows.filter((_, index) => finalKeys.has(records[index]!.key)) : rows;
     downloadCsv(timestampedFilename(`${baseName}-${onlyIncluded ? 'incluidos' : 'triagem'}`, 'csv'), toCsv(selected));
   };
 
@@ -179,6 +184,25 @@ export function PrismaPanel({ review, copy }: { review: ReviewState; copy: Revie
             </Button>
           </div>
           <p className="text-xs leading-relaxed text-muted-foreground">{copy.exportDecisionsHint}</p>
+        </div>
+        <div className="space-y-2 border-t border-border/80 pt-4">
+          <h4 className="text-sm font-semibold">{copy.reportTitle}</h4>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={generating || flow.screened === 0}
+            onClick={() => {
+              setGenerating(true);
+              // O gerador (e a biblioteca docx) só baixam quando alguém pede o relatório.
+              void import('./report-docx')
+                .then(({ downloadReviewReport }) => downloadReviewReport({ review, flow, records, copy, locale }))
+                .finally(() => setGenerating(false));
+            }}
+          >
+            {generating ? <Loader2 className="animate-spin" aria-hidden /> : <FileText aria-hidden />}
+            {generating ? copy.generating : copy.downloadReport}
+          </Button>
+          <p className="text-xs leading-relaxed text-muted-foreground">{copy.reportHint}</p>
         </div>
       </section>
     </div>

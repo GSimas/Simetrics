@@ -6,7 +6,9 @@ import { createReview } from '@/core/review/state';
 import {
   REVIEW_DEFAULTS,
   type CriterionKind,
+  type ExtractionValue,
   type FullTextDecision,
+  type QualityAnswer,
   type RecordScreening,
   type ReviewState,
   type ReviewType,
@@ -21,7 +23,12 @@ import { useDataset } from './dataset.store';
  * `project.store.ts`, que assina este store e grava a cada mudança).
  */
 
-type Editable = Omit<ReviewState, 'schemaVersion' | 'decisions' | 'reviewerId' | 'createdAt' | 'updatedAt'>;
+type Editable = Omit<
+  ReviewState,
+  'schemaVersion' | 'decisions' | 'quality' | 'extraction' | 'reviewerId' | 'createdAt' | 'updatedAt'
+>;
+
+type ListName = 'questions' | 'concepts' | 'criteria' | 'qualityQuestions' | 'qualityAnswers' | 'extractionFields';
 
 interface ReviewStoreState {
   review: ReviewState | null;
@@ -34,10 +41,17 @@ interface ReviewStoreState {
   addQuestion: () => string;
   addConcept: () => string;
   addCriterion: (kind: CriterionKind) => string;
-  removeItem: (list: 'questions' | 'concepts' | 'criteria', id: string) => void;
+  /** A primeira pergunta de qualidade traz junto as respostas padrão (Sim/Parcialmente/Não). */
+  addQualityQuestion: (defaultAnswers: () => QualityAnswer[]) => string;
+  addQualityAnswer: () => string;
+  addExtractionField: () => string;
+  removeItem: (list: ListName, id: string) => void;
   decideTitleAbstract: (key: string, decision: TitleAbstractDecision | null, reason?: string) => void;
   decideFullText: (key: string, decision: FullTextDecision | null, reason?: string) => void;
   setNote: (key: string, note: string) => void;
+  answerQuality: (key: string, questionId: string, answerId: string | null) => void;
+  setExtractionValue: (key: string, fieldId: string, value: ExtractionValue | null) => void;
+  setExtractionDone: (key: string, done: boolean) => void;
 }
 
 function current(review: ReviewState | null): ReviewState {
@@ -104,6 +118,36 @@ export const useReview = create<ReviewStoreState>()(
       return id;
     },
 
+    addQualityQuestion(defaultAnswers) {
+      const review = current(get().review);
+      const id = crypto.randomUUID();
+      set({
+        review: touch(review, {
+          qualityQuestions: [...review.qualityQuestions, { id, text: '' }],
+          ...(review.qualityAnswers.length === 0 ? { qualityAnswers: defaultAnswers() } : {}),
+        }),
+      });
+      return id;
+    },
+
+    addQualityAnswer() {
+      const review = current(get().review);
+      const id = crypto.randomUUID();
+      set({ review: touch(review, { qualityAnswers: [...review.qualityAnswers, { id, label: '', weight: 0 }] }) });
+      return id;
+    },
+
+    addExtractionField() {
+      const review = current(get().review);
+      const id = crypto.randomUUID();
+      set({
+        review: touch(review, {
+          extractionFields: [...review.extractionFields, { id, label: '', type: 'text', options: [] }],
+        }),
+      });
+      return id;
+    },
+
     removeItem(list, id) {
       const review = current(get().review);
       const items = review[list] as { id: string }[];
@@ -132,6 +176,32 @@ export const useReview = create<ReviewStoreState>()(
           return screening;
         }),
       });
+    },
+
+    answerQuality(key, questionId, answerId) {
+      const review = current(get().review);
+      const responses = { ...(review.quality[key] ?? {}) };
+      if (answerId) responses[questionId] = answerId;
+      else delete responses[questionId];
+      const quality = { ...review.quality };
+      if (Object.keys(responses).length > 0) quality[key] = responses;
+      else delete quality[key];
+      set({ review: touch(review, { quality }) });
+    },
+
+    setExtractionValue(key, fieldId, value) {
+      const review = current(get().review);
+      const study = review.extraction[key] ?? { values: {}, done: false };
+      const values = { ...study.values };
+      if (value === null || value === '' || (Array.isArray(value) && value.length === 0)) delete values[fieldId];
+      else values[fieldId] = value;
+      set({ review: touch(review, { extraction: { ...review.extraction, [key]: { ...study, values } } }) });
+    },
+
+    setExtractionDone(key, done) {
+      const review = current(get().review);
+      const study = review.extraction[key] ?? { values: {}, done: false };
+      set({ review: touch(review, { extraction: { ...review.extraction, [key]: { ...study, done } } }) });
     },
 
     setNote(key, note) {
