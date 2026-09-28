@@ -14,8 +14,10 @@ import {
   getProject,
   putProject,
 } from '@/lib/project-db';
+import { hasReviewContent, normalizeReview } from '@/core/review/state';
 import { useLocale } from './locale.store';
 import { DERIVED_RESET, useDataset, type DatasetSourceFile } from './dataset.store';
+import { useReview } from './review.store';
 
 /**
  * Camada de "Projetos" sobre o `dataset.store`: lista leve de projetos salvos + o
@@ -36,6 +38,8 @@ interface ProjectState {
 
   refreshList: () => Promise<void>;
   open: (id: string) => Promise<void>;
+  /** Workspace em branco: sem base, sem revisão, desligado de qualquer projeto salvo. */
+  startBlank: () => void;
   rename: (id: string, name: string) => Promise<void>;
   duplicate: (id: string) => Promise<void>;
   remove: (id: string) => Promise<void>;
@@ -61,6 +65,20 @@ function deriveDefaultName(sourceFiles: DatasetSourceFile[]): string {
 }
 
 /**
+ * Enquanto `open` troca o conteúdo dos stores, as assinaturas abaixo não reagem: a troca
+ * não é uma edição, e a base voltando a `null` (projeto só com revisão) não pode ser
+ * confundida com "limpar a base".
+ */
+let hydrating = false;
+
+/**
+ * Nome que o checkpoint deu a cada projeto a partir do título da revisão. Enquanto o nome
+ * salvo for esse, ele acompanha o título — o primeiro salvamento acontece no meio da
+ * digitação e gravaria um título pela metade. Renomear à mão quebra o vínculo.
+ */
+const autoNames = new Map<string, string>();
+
+/**
  * Grava o estado atual de `dataset.store` como o projeto ativo — cria um rascunho na
  * primeira vez (nenhum `activeProjectId` ainda), atualiza nas seguintes. Preserva
  * `name`/`createdAt` do projeto já existente lendo `projects` (a lista leve já reflete
@@ -68,27 +86,39 @@ function deriveDefaultName(sourceFiles: DatasetSourceFile[]): string {
  */
 async function checkpoint(): Promise<void> {
   const ds = useDataset.getState();
-  if (!ds.active || !ds.original) return;
+  const review = useReview.getState().review;
+  const hasDataset = Boolean(ds.active && ds.original);
+  // Um projeto nasce da base carregada ou de um protocolo de revisão — o que vier primeiro.
+  if (!hasDataset && !hasReviewContent(review)) return;
 
   const { activeProjectId, projects } = useProjectStore.getState();
   const existingMeta = activeProjectId ? projects.find((p) => p.id === activeProjectId) : undefined;
   const now = new Date().toISOString();
   const id = activeProjectId ?? crypto.randomUUID();
+  // O id vale já, antes do `await`: um segundo checkpoint (base e revisão mudando juntas)
+  // precisa gravar no mesmo projeto, e não criar outro.
+  if (!activeProjectId) useProjectStore.setState({ activeProjectId: id });
+
+  const reviewTitle = review?.title.trim() ?? '';
+  const followsTitle = !existingMeta || existingMeta.name === autoNames.get(id);
+  const name = followsTitle && reviewTitle ? reviewTitle : (existingMeta?.name ?? deriveDefaultName(ds.sourceFiles));
+  if (followsTitle && reviewTitle) autoNames.set(id, name);
 
   const record: ProjectRecord = {
     id,
     schemaVersion: 1,
-    name: existingMeta?.name ?? deriveDefaultName(ds.sourceFiles),
+    name,
     createdAt: existingMeta?.createdAt ?? now,
     updatedAt: now,
     sourceFiles: ds.sourceFiles,
     dedupStrategy: ds.dedupStrategy,
     dedupThreshold: ds.dedupThreshold,
-    original: ds.original,
-    active: ds.active,
+    original: ds.original ?? [],
+    active: ds.active ?? [],
     duplicates: ds.duplicates,
     clustering: ds.clustering,
     hybridRun: ds.hybridRun,
+    review,
   };
 
   useProjectStore.setState({ saveStatus: 'saving' });
@@ -156,19 +186,38 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     // `activeProjectId` já correto para não criar um rascunho novo por engano.
     set({ activeProjectId: id, saveStatus: 'saved', lastSavedAt: record.updatedAt, error: null });
 
-    useDataset.setState({
-      original: record.original,
-      active: record.active,
-      duplicates: record.duplicates,
-      dedupStrategy: record.dedupStrategy,
-      dedupThreshold: record.dedupThreshold,
-      sourceFiles: record.sourceFiles,
-      ...DERIVED_RESET,
-      clustering: record.clustering,
-      hybridRun: record.hybridRun,
-      searchOptions: buildSearchOptions(record.active),
-      error: null,
-    });
+    // Projeto só com revisão: a base fica `null`, como num workspace sem arquivos.
+    const hasDataset = record.active.length > 0;
+    hydrating = true;
+    try {
+      useReview.getState().hydrate(normalizeReview(record.review));
+      useDataset.setState({
+        original: hasDataset ? record.original : null,
+        active: hasDataset ? record.active : null,
+        duplicates: record.duplicates,
+        dedupStrategy: record.dedupStrategy,
+        dedupThreshold: record.dedupThreshold,
+        sourceFiles: record.sourceFiles,
+        ...DERIVED_RESET,
+        clustering: record.clustering,
+        hybridRun: record.hybridRun,
+        searchOptions: hasDataset ? buildSearchOptions(record.active) : null,
+        error: null,
+      });
+    } finally {
+      hydrating = false;
+    }
+  },
+
+  startBlank() {
+    hydrating = true;
+    try {
+      useDataset.getState().reset();
+      useReview.getState().hydrate(null);
+    } finally {
+      hydrating = false;
+    }
+    set({ activeProjectId: null, saveStatus: 'idle', lastSavedAt: null });
   },
 
   async rename(id, name) {
@@ -273,9 +322,24 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 useDataset.subscribe(
   (state) => state.active,
   (active, prevActive) => {
+    if (hydrating) return;
     if (active && active !== prevActive) void checkpoint();
     if (!active) {
+      // Limpar a base desliga o workspace do projeto salvo — a revisão vai junto.
+      useReview.getState().hydrate(null);
       useProjectStore.setState({ activeProjectId: null, saveStatus: 'idle', lastSavedAt: null });
     }
+  },
+);
+
+// Cada edição da revisão (protocolo, decisão de triagem) salva o projeto, agrupando as
+// edições próximas: triar em sequência pelo teclado não grava a base inteira a cada tecla.
+let reviewSaveTimer: ReturnType<typeof setTimeout> | undefined;
+useReview.subscribe(
+  (state) => state.review,
+  (review, prevReview) => {
+    if (hydrating || !review || review === prevReview) return;
+    clearTimeout(reviewSaveTimer);
+    reviewSaveTimer = setTimeout(() => void checkpoint(), 700);
   },
 );

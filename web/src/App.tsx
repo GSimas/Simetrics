@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useState } from 'react';
-import { BarChart3, FileText, FolderOpen, Network, Search } from 'lucide-react';
+import { BarChart3, FileText, FolderOpen, ListChecks, Network, Search } from 'lucide-react';
 
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { SettingsButton } from '@/components/HeaderActions';
@@ -26,6 +26,7 @@ const OverviewTab = lazyWithPreload(() => import('@/features/overview/OverviewTa
 const NetworksTab = lazyWithPreload(() => import('@/features/networks/NetworksTab'));
 const SearchTab = lazyWithPreload(() => import('@/features/search/SearchTab'));
 const ReportTab = lazyWithPreload(() => import('@/features/report/ReportTab'));
+const ReviewTab = lazyWithPreload(() => import('@/features/review/ReviewTab'));
 // Modal do tutorial e tour: só quando alguém os abre.
 const TutorialModal = lazyWithPreload(() =>
   import('@/components/TutorialModal').then((module) => ({ default: module.TutorialModal })),
@@ -67,6 +68,13 @@ const TABS = [
     iconColor: 'text-muted-foreground group-data-[state=active]:text-highlight',
     Panel: ReportTab,
   },
+  {
+    value: 'review',
+    labelKey: 'tab_review' as TranslationKey,
+    Icon: ListChecks,
+    iconColor: 'text-muted-foreground group-data-[state=active]:text-highlight',
+    Panel: ReviewTab,
+  },
 ] as const;
 
 export default function App() {
@@ -99,6 +107,7 @@ export default function App() {
       void NetworksTab.preload();
       void SearchTab.preload();
       void ReportTab.preload();
+      void ReviewTab.preload();
       void ChatWidget.preload();
     });
   }, [route.view]);

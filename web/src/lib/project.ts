@@ -1,5 +1,7 @@
 import type { ClusteringResult } from '@/core/clustering';
 import type { HybridRun } from '@/core/hybrid/types';
+import { normalizeReview } from '@/core/review/state';
+import type { ReviewState } from '@/core/review/types';
 import type { DatabaseName } from '@/lib/schema';
 import type { Dataset, DuplicateRecord } from '@/lib/types';
 
@@ -41,6 +43,9 @@ export interface ProjectRecord {
   /** Registro da classificação híbrida — a taxonomia e os parâmetros que a tornam
    * reproduzível. Opcional no arquivo: projetos anteriores a ela chegam como `null`. */
   hybridRun: HybridRun | null;
+  /** Revisão sistematizada (protocolo e triagem). Opcional no arquivo: projetos
+   * anteriores a ela chegam como `null`. Um projeto pode ter só a revisão, sem base. */
+  review: ReviewState | null;
 }
 
 /** Campos leves para listar projetos sem desserializar datasets inteiros. */
@@ -146,5 +151,6 @@ function normalizeV1(project: Partial<ProjectRecord>): ProjectRecord {
     duplicates: Array.isArray(project.duplicates) ? project.duplicates : [],
     clustering: project.clustering ?? null,
     hybridRun: project.hybridRun ?? null,
+    review: normalizeReview(project.review),
   };
 }

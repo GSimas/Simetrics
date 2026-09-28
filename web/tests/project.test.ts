@@ -17,6 +17,7 @@ function makeRecord(overrides: Partial<ProjectRecord> = {}): ProjectRecord {
     duplicates: [],
     clustering: null,
     hybridRun: null,
+    review: null,
     ...overrides,
   };
 }
