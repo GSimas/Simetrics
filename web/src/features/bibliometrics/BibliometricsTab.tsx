@@ -8,7 +8,7 @@ import { useNavigation } from '@/state/navigation.store';
 import { BIBLIOMETRIC_VIEWS } from './views';
 
 /**
- * Aba Análise Bibliométrica: Informações Principais, Redes e Relatório, na ordem natural
+ * Aba Análise Bibliométrica: Informações Principais, Redes, Análises Avançadas e Relatório, na ordem natural
  * de uma análise, sob uma navegação própria — o mesmo desenho das etapas da revisão.
  */
 export default function BibliometricsTab() {

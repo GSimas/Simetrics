@@ -4,11 +4,9 @@ import {
   Building2,
   CalendarRange,
   Globe2,
-  Layers,
   Quote,
   ShieldCheck,
   Sparkles,
-  Table2,
   TrendingUp,
   Users,
 } from 'lucide-react';
@@ -51,7 +49,6 @@ import { openInSearch } from '@/state/navigation.store';
 import { EntityTables } from './EntityTables';
 import { ThemePanel } from './ThemePanel';
 import { TopRankings } from './TopRankings';
-import { VisualAnalyses } from './VisualAnalyses';
 import { PALETTE, chartMessage } from './viz-shared';
 
 const PRODUCTION_CATEGORIES: readonly ProductionCategory[] = [
@@ -260,6 +257,57 @@ export default function OverviewTab() {
 
       {dedupCard}
 
+      <LauncherGrid label={t('launcher_section')}>
+        {overview && (
+          <Launcher
+            tour="launcher-meta"
+            Icon={ShieldCheck}
+            title={t('meta_quality_title')}
+            summary={t('sum_meta')}
+            info={t('meta_quality_description')}
+          >
+            <div className="overflow-x-auto border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{t('meta_col_field')}</TableHead>
+                    <TableHead>{t('meta_col_missing')}</TableHead>
+                    <TableHead>%</TableHead>
+                    <TableHead>{t('meta_col_status')}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {overview.completeness.map((row) => (
+                    <TableRow key={row.field}>
+                      <TableCell className="font-medium">{row.field}</TableCell>
+                      <TableCell className="tabular-nums">
+                        {row.missing.toLocaleString(nf)}
+                      </TableCell>
+                      <TableCell className="tabular-nums">
+                        {row.missingPct.toLocaleString(nf, {
+                          minimumFractionDigits: 1,
+                          maximumFractionDigits: 1,
+                        })}
+                        %
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={STATUS_VARIANT[row.status]}>{t(STATUS_LABEL[row.status])}</Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </Launcher>
+        )}
+
+        <Launcher tour="launcher-theme" Icon={Sparkles} title={t('theme_title')} summary={t('sum_theme')} info={t('theme_description')}>
+          <ThemePanel />
+        </Launcher>
+
+
+      </LauncherGrid>
+
       {summary && metrics && (
         <div
           data-tour="kpis"
@@ -348,66 +396,17 @@ export default function OverviewTab() {
         />
       )}
 
-      <LauncherGrid label={t('launcher_section')}>
-        {overview && (
-          <Launcher
-            tour="launcher-meta"
-            Icon={ShieldCheck}
-            title={t('meta_quality_title')}
-            summary={t('sum_meta')}
-            info={t('meta_quality_description')}
-          >
-            <div className="overflow-x-auto border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('meta_col_field')}</TableHead>
-                    <TableHead>{t('meta_col_missing')}</TableHead>
-                    <TableHead>%</TableHead>
-                    <TableHead>{t('meta_col_status')}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {overview.completeness.map((row) => (
-                    <TableRow key={row.field}>
-                      <TableCell className="font-medium">{row.field}</TableCell>
-                      <TableCell className="tabular-nums">
-                        {row.missing.toLocaleString(nf)}
-                      </TableCell>
-                      <TableCell className="tabular-nums">
-                        {row.missingPct.toLocaleString(nf, {
-                          minimumFractionDigits: 1,
-                          maximumFractionDigits: 1,
-                        })}
-                        %
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={STATUS_VARIANT[row.status]}>{t(STATUS_LABEL[row.status])}</Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </Launcher>
-        )}
-
-        <Launcher tour="launcher-visual" Icon={Layers} title={t('visual_title')} summary={t('sum_visual')} info={t('visual_description')}>
-          <VisualAnalyses dataset={active} />
-        </Launcher>
-
-        <Launcher tour="launcher-theme" Icon={Sparkles} title={t('theme_title')} summary={t('sum_theme')} info={t('theme_description')}>
-          <ThemePanel />
-        </Launcher>
-
-        {tables && (
-          <Launcher tour="launcher-tables" Icon={Table2} title={t('tables_title')} summary={t('sum_tables')} info={t('tables_description')}>
+      {tables && (
+        <Card data-tour="tables">
+          <CardHeader className="pb-3">
+            <SectionTitle title={t('tables_title')} info={t('tables_description')} />
+          </CardHeader>
+          <CardContent>
             <EntityTables tables={tables} />
-          </Launcher>
-        )}
+          </CardContent>
+        </Card>
+      )}
 
-
-      </LauncherGrid>
     </div>
   );
 }

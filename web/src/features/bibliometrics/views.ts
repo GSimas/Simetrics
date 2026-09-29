@@ -1,4 +1,4 @@
-import { FileText, LayoutDashboard, Network } from 'lucide-react';
+import { FileText, LayoutDashboard, Layers, Network } from 'lucide-react';
 
 import { lazyWithPreload } from '@/lib/lazy';
 import type { TranslationKey } from '@/lib/i18n/translations';
@@ -20,6 +20,12 @@ export const BIBLIOMETRIC_VIEWS = [
     labelKey: 'tab_networks',
     Icon: Network,
     Panel: lazyWithPreload(() => import('@/features/networks/NetworksTab')),
+  },
+  {
+    value: 'advanced',
+    labelKey: 'tab_advanced',
+    Icon: Layers,
+    Panel: lazyWithPreload(() => import('@/features/overview/AdvancedTab')),
   },
   {
     value: 'report',

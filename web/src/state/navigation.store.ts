@@ -15,9 +15,9 @@ import { useDataset } from './dataset.store';
 /** As três abas do workspace. */
 export type WorkspaceTab = 'bibliometrics' | 'search' | 'review';
 /** As vistas dentro da aba Análise Bibliométrica. */
-export type BibliometricView = 'overview' | 'networks' | 'report';
+export type BibliometricView = 'overview' | 'networks' | 'advanced' | 'report';
 
-const BIBLIOMETRIC_VIEWS: readonly string[] = ['overview', 'networks', 'report'] satisfies BibliometricView[];
+const BIBLIOMETRIC_VIEWS: readonly string[] = ['overview', 'networks', 'advanced', 'report'] satisfies BibliometricView[];
 
 /** Escopo do seletor de tipo: um tipo de entidade ou todos juntos. */
 export type SearchScope = SearchEntityType | 'Todos';
@@ -31,7 +31,7 @@ interface NavigationState {
   searchTerm: string | null;
   /**
    * Abre uma aba — ou, com o nome de uma vista bibliométrica (`overview`, `networks`,
-   * `report`), a aba Análise Bibliométrica já nessa vista.
+   * `advanced`, `report`), a aba Análise Bibliométrica já nessa vista.
    */
   setActiveTab: (tab: string) => void;
   /** Abre um termo; o escopo vira "Todos" se o atual não comportar o tipo do termo. */

@@ -36,7 +36,7 @@ import { useDataset } from '@/state/dataset.store';
 import { resolveEntity, useNavigation } from '@/state/navigation.store';
 import { useReviewNav, type ReviewStep } from '@/state/review.store';
 
-export type TourTab = 'overview' | 'networks' | 'search' | 'report' | 'review';
+export type TourTab = 'overview' | 'networks' | 'advanced' | 'search' | 'report' | 'review';
 
 /** Abre uma etapa da revisão sistematizada antes de procurar o alvo. */
 function openReviewStep(step: ReviewStep): () => void {
@@ -113,7 +113,7 @@ export const TOUR_STEPS: TourStep[] = [
       title: 'As três áreas',
       body: 'O trabalho se divide em três abas: a análise bibliométrica, o Motor de Busca e a revisão sistematizada, todas sobre a mesma base.',
       bullets: [
-        '01 Análise Bibliométrica — Informações Principais, Redes e Relatório, na ordem natural de uma análise.',
+        '01 Análise Bibliométrica — Informações Principais, Redes, Análises Avançadas e Relatório, na ordem natural de uma análise.',
         '02 Motor de Busca — o dossiê de qualquer autor, país, venue, termo ou documento.',
         '03 Revisão Sistematizada — protocolo, triagem, qualidade, extração, síntese e PRISMA.',
       ],
@@ -122,7 +122,7 @@ export const TOUR_STEPS: TourStep[] = [
       title: 'The three areas',
       body: 'Work is split into three tabs: the bibliometric analysis, the Search Engine and the systematized review, all over the same dataset.',
       bullets: [
-        '01 Bibliometric Analysis — Main Information, Networks and Report, in the natural order of an analysis.',
+        '01 Bibliometric Analysis — Main Information, Networks, Advanced Analyses and Report, in the natural order of an analysis.',
         '02 Search Engine — the dossier of any author, country, venue, term or document.',
         '03 Systematized Review — protocol, screening, quality, extraction, synthesis and PRISMA.',
       ],
@@ -135,20 +135,22 @@ export const TOUR_STEPS: TourStep[] = [
     tab: 'overview',
     pt: {
       title: 'Análise Bibliométrica',
-      body: 'A primeira aba reúne a análise bibliométrica em três vistas, que você alterna por estes botões.',
+      body: 'A primeira aba reúne a análise bibliométrica em quatro vistas, que você alterna por estes botões.',
       bullets: [
-        '1 Informações Principais — importação, indicadores, rankings e análises visuais.',
+        '1 Informações Principais — importação, indicadores, rankings e tabelas analíticas.',
         '2 Redes — coocorrência, comunidades e colaboração internacional.',
-        '3 Relatório — um documento PDF ou Word com o que você escolher.',
+        '3 Análises Avançadas — Sankey, boxplot, mapas conceitual e temático, historiograph e Lotka.',
+        '4 Relatório — um documento PDF ou Word com o que você escolher.',
       ],
     },
     en: {
       title: 'Bibliometric Analysis',
-      body: 'The first tab gathers the bibliometric analysis in three views, which you switch with these buttons.',
+      body: 'The first tab gathers the bibliometric analysis in four views, which you switch with these buttons.',
       bullets: [
-        '1 Main Information — import, indicators, rankings and visual analyses.',
+        '1 Main Information — import, indicators, rankings and analytical tables.',
         '2 Networks — co-occurrence, communities and international collaboration.',
-        '3 Report — a PDF or Word document with whatever you select.',
+        '3 Advanced Analyses — Sankey, boxplot, concept and thematic maps, historiograph and Lotka.',
+        '4 Report — a PDF or Word document with whatever you select.',
       ],
     },
   },
@@ -199,6 +201,51 @@ export const TOUR_STEPS: TourStep[] = [
         'By similarity — compares titles (Jaccard) and catches duplicates without a DOI.',
         'Both — applies both criteria. The report lists what was removed and what was kept.',
       ],
+    },
+  },
+  {
+    id: 'launchers',
+    Icon: Layers,
+    target: 'launchers',
+    tab: 'overview',
+    needsData: true,
+    pt: {
+      title: 'Aprofundar a análise',
+      body: 'Estes blocos abrem numa janela própria — e só são calculadas quando você abre. Vamos ver cada um.',
+    },
+    en: {
+      title: 'Deeper analysis',
+      body: 'These blocks open in their own window — and are only computed when you open them. Let us look at each one.',
+    },
+  },
+  {
+    id: 'launcher-meta',
+    Icon: ShieldCheck,
+    target: 'launcher-meta',
+    tab: 'overview',
+    needsData: true,
+    pt: {
+      title: 'Qualidade dos metadados',
+      body: 'Mostra, campo a campo (autores, resumo, palavras-chave, DOI, citações…), quantos registros estão sem informação e classifica a completude de Excelente a Ruim. Confira aqui antes de confiar numa análise que dependa de um campo incompleto.',
+    },
+    en: {
+      title: 'Metadata quality',
+      body: 'Shows, field by field (authors, abstract, keywords, DOI, citations…), how many records are missing data, rated from Excellent to Poor. Check it before trusting an analysis that depends on an incomplete field.',
+    },
+  },
+  {
+    id: 'launcher-theme',
+    Icon: Sparkles,
+    target: 'launcher-theme',
+    tab: 'overview',
+    needsData: true,
+    pt: {
+      title: 'Mapeamento temático por IA',
+      body: 'Agrupa os documentos por similaridade e pede à IA que dê nome a cada grupo, criando a categoria "Temas (IA)" usada no gráfico de produção, nas tabelas (Quociente Locacional) e no relatório. Requer uma chave de IA própria (BYOK), configurada na assistente Simi.',
+    },
+    en: {
+      title: 'AI thematic mapping',
+      body: 'Clusters documents by similarity and asks the AI to name each cluster, creating the "Themes (AI)" category used in the production chart, the tables (Location Quotient) and the report. Requires your own AI key (BYOK), set up in the Simi assistant.',
     },
   },
   {
@@ -297,83 +344,9 @@ export const TOUR_STEPS: TourStep[] = [
     },
   },
   {
-    id: 'launchers',
-    Icon: Layers,
-    target: 'launchers',
-    tab: 'overview',
-    needsData: true,
-    pt: {
-      title: 'Aprofundar a análise',
-      body: 'As análises mais pesadas ficam em blocos que abrem numa janela própria — e só são calculadas quando você abre. Vamos ver cada um.',
-    },
-    en: {
-      title: 'Deeper analysis',
-      body: 'The heavier analyses live in blocks that open in their own window — and are only computed when you open them. Let us look at each one.',
-    },
-  },
-  {
-    id: 'launcher-meta',
-    Icon: ShieldCheck,
-    target: 'launcher-meta',
-    tab: 'overview',
-    needsData: true,
-    pt: {
-      title: 'Qualidade dos metadados',
-      body: 'Mostra, campo a campo (autores, resumo, palavras-chave, DOI, citações…), quantos registros estão sem informação e classifica a completude de Excelente a Ruim. Confira aqui antes de confiar numa análise que dependa de um campo incompleto.',
-    },
-    en: {
-      title: 'Metadata quality',
-      body: 'Shows, field by field (authors, abstract, keywords, DOI, citations…), how many records are missing data, rated from Excellent to Poor. Check it before trusting an analysis that depends on an incomplete field.',
-    },
-  },
-  {
-    id: 'launcher-visual',
-    Icon: Radar,
-    target: 'launcher-visual',
-    tab: 'overview',
-    needsData: true,
-    pt: {
-      title: 'Análises visuais avançadas',
-      body: 'Sete visualizações clássicas da bibliometria, cada uma com seu "Como ler".',
-      bullets: [
-        'Sankey — evolução dos temas entre períodos (ajuste os cortes nos controles deslizantes).',
-        'Boxplot — distribuição de citações entre grupos.',
-        'Genética dos termos, mapa conceitual (PCA 2D/3D) e mapa temático em quadrantes.',
-        'Historiograph — a linhagem de citações entre documentos.',
-        'Lei de Lotka — a produtividade dos autores.',
-      ],
-    },
-    en: {
-      title: 'Advanced visual analyses',
-      body: 'Seven classic bibliometric visualisations, each with its own "How to read".',
-      bullets: [
-        'Sankey — how themes evolve across periods (adjust the cuts with the sliders).',
-        'Boxplot — citation distribution across groups.',
-        'Term genetics, concept map (2D/3D PCA) and quadrant thematic map.',
-        'Historiograph — the citation lineage between documents.',
-        "Lotka's law — author productivity.",
-      ],
-    },
-  },
-  {
-    id: 'launcher-theme',
-    Icon: Sparkles,
-    target: 'launcher-theme',
-    tab: 'overview',
-    needsData: true,
-    pt: {
-      title: 'Mapeamento temático por IA',
-      body: 'Agrupa os documentos por similaridade e pede à IA que dê nome a cada grupo, criando a categoria "Temas (IA)" usada no gráfico de produção, nas tabelas (Quociente Locacional) e no relatório. Requer uma chave de IA própria (BYOK), configurada na assistente Simi.',
-    },
-    en: {
-      title: 'AI thematic mapping',
-      body: 'Clusters documents by similarity and asks the AI to name each cluster, creating the "Themes (AI)" category used in the production chart, the tables (Location Quotient) and the report. Requires your own AI key (BYOK), set up in the Simi assistant.',
-    },
-  },
-  {
-    id: 'launcher-tables',
+    id: 'tables',
     Icon: Table2,
-    target: 'launcher-tables',
+    target: 'tables',
     tab: 'overview',
     needsData: true,
     pt: {
@@ -484,6 +457,35 @@ export const TOUR_STEPS: TourStep[] = [
     en: {
       title: 'Per-node metrics',
       body: 'The table of every node in the network: absolute degree, degree centrality, eigenvector, betweenness and closeness. Sort to find the central actors and the bridges between communities, and export as CSV.',
+    },
+  },
+  {
+    id: 'advanced',
+    Icon: Radar,
+    target: 'visual',
+    tab: 'advanced',
+    needsData: true,
+    pt: {
+      title: 'Análises visuais avançadas',
+      body: 'Sete visualizações clássicas da bibliometria, agora numa aba própria, cada uma com seu "Como ler".',
+      bullets: [
+        'Sankey — evolução dos temas entre períodos (ajuste os cortes nos controles deslizantes).',
+        'Boxplot — distribuição de citações entre grupos.',
+        'Genética dos termos, mapa conceitual (PCA 2D/3D) e mapa temático em quadrantes.',
+        'Historiograph — a linhagem de citações entre documentos.',
+        'Lei de Lotka — a produtividade dos autores.',
+      ],
+    },
+    en: {
+      title: 'Advanced visual analyses',
+      body: 'Seven classic bibliometric visualisations, now in their own tab, each with its own "How to read".',
+      bullets: [
+        'Sankey — how themes evolve across periods (adjust the cuts with the sliders).',
+        'Boxplot — citation distribution across groups.',
+        'Term genetics, concept map (2D/3D PCA) and quadrant thematic map.',
+        'Historiograph — the citation lineage between documents.',
+        "Lotka's law — author productivity.",
+      ],
     },
   },
   {

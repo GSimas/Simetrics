@@ -24,7 +24,7 @@ import { useTour } from '@/state/tour.store';
 // Cada aba é um chunk próprio: a landing (o primeiro paint) não baixa nem executa o
 // código do workspace. Ao entrar no workspace, as abas são pré-carregadas no ócio, então a
 // troca de aba não passa pelo fallback do Suspense.
-// Análise Bibliométrica: Informações Principais, Redes e Relatório, cada vista em seu chunk.
+// Análise Bibliométrica: Informações Principais, Redes, Análises Avançadas e Relatório, cada vista em seu chunk.
 const BibliometricsTab = lazyWithPreload(() => import('@/features/bibliometrics/BibliometricsTab'));
 const SearchTab = lazyWithPreload(() => import('@/features/search/SearchTab'));
 const ReviewTab = lazyWithPreload(() => import('@/features/review/ReviewTab'));
