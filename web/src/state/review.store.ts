@@ -5,15 +5,21 @@ import { subscribeWithSelector } from 'zustand/middleware';
 import { nextReviewAction, reviewProgress, type NextAction, type ReviewProgress, type ReviewStepId } from '@/core/review/progress';
 import { toScreeningRecords, type ScreeningRecord } from '@/core/review/records';
 import { createReview } from '@/core/review/state';
+import { statusAfterAnswer } from '@/core/review/evidence';
 import {
   REVIEW_DEFAULTS,
+  type AiSuggestion,
   type CriterionKind,
+  type Evidence,
+  type EvidenceTargetKey,
   type ExtractionValue,
   type FullTextDecision,
   type QualityAnswer,
   type RecordScreening,
   type ReviewState,
   type ReviewType,
+  type StudyDocument,
+  type TargetEvidence,
   type TitleAbstractDecision,
 } from '@/core/review/types';
 import { getDeviceId } from '@/lib/device-id';
@@ -27,8 +33,17 @@ import { useDataset } from './dataset.store';
 
 type Editable = Omit<
   ReviewState,
-  'schemaVersion' | 'decisions' | 'quality' | 'extraction' | 'reviewerId' | 'createdAt' | 'updatedAt'
+  'schemaVersion' | 'decisions' | 'quality' | 'extraction' | 'documents' | 'evidence' | 'reviewerId' | 'createdAt' | 'updatedAt'
 >;
+
+/** Uma evidência nova: o store dá o id, o revisor e a data. */
+export type NewEvidence = Omit<Evidence, 'id' | 'reviewerId' | 'createdAt'>;
+
+export interface AiProposal {
+  target: EvidenceTargetKey;
+  suggestion: AiSuggestion;
+  evidence: NewEvidence[];
+}
 
 type ListName = 'questions' | 'concepts' | 'criteria' | 'qualityQuestions' | 'qualityAnswers' | 'extractionFields';
 
@@ -54,6 +69,14 @@ interface ReviewStoreState {
   answerQuality: (key: string, questionId: string, answerId: string | null) => void;
   setExtractionValue: (key: string, fieldId: string, value: ExtractionValue | null) => void;
   setExtractionDone: (key: string, done: boolean) => void;
+  attachDocument: (key: string, document: StudyDocument) => void;
+  detachDocument: (key: string) => void;
+  addEvidence: (key: string, target: EvidenceTargetKey, evidence: NewEvidence) => void;
+  removeEvidence: (key: string, target: EvidenceTargetKey, evidenceId: string) => void;
+  /** Grava as propostas da IA de um estudo: trocam as anteriores, sem tocar nas evidências manuais. */
+  applyAiProposals: (key: string, proposals: AiProposal[]) => void;
+  acceptSuggestion: (key: string, target: EvidenceTargetKey) => void;
+  rejectSuggestion: (key: string, target: EvidenceTargetKey) => void;
 }
 
 /** O exemplo é só visualização: nenhuma ação altera a revisão dele. */
@@ -82,6 +105,35 @@ function withScreening(
   if (!next.ta && !next.ft && !next.note) delete decisions[key];
   else decisions[key] = next;
   return touch(review, { decisions });
+}
+
+/** Troca a entrada de evidências de uma resposta; `undefined` a remove. */
+function withEvidence(
+  review: ReviewState,
+  key: string,
+  target: EvidenceTargetKey,
+  change: (entry: TargetEvidence | undefined) => TargetEvidence | undefined,
+): ReviewState {
+  const study = { ...(review.evidence[key] ?? {}) };
+  const next = change(study[target]);
+  if (next) study[target] = next;
+  else delete study[target];
+  const evidence = { ...review.evidence };
+  if (Object.keys(study).length > 0) evidence[key] = study;
+  else delete evidence[key];
+  return touch(review, { evidence });
+}
+
+/** Depois que o revisor muda uma resposta, a conferência dela acompanha. */
+function verifyAnswer(review: ReviewState, key: string, target: EvidenceTargetKey, value: ExtractionValue | null): ReviewState {
+  if (!review.evidence[key]?.[target]) return review;
+  return withEvidence(review, key, target, (entry) =>
+    entry ? { ...entry, status: statusAfterAnswer(entry, value), verifiedBy: review.reviewerId, verifiedAt: new Date().toISOString() } : entry,
+  );
+}
+
+function stamp(review: ReviewState, evidence: NewEvidence): Evidence {
+  return { ...evidence, id: crypto.randomUUID(), reviewerId: review.reviewerId, createdAt: new Date().toISOString() };
 }
 
 export const useReview = create<ReviewStoreState>()(
@@ -207,7 +259,7 @@ export const useReview = create<ReviewStoreState>()(
       const quality = { ...review.quality };
       if (Object.keys(responses).length > 0) quality[key] = responses;
       else delete quality[key];
-      set({ review: touch(review, { quality }) });
+      set({ review: verifyAnswer(touch(review, { quality }), key, `quality:${questionId}`, answerId) });
     },
 
     setExtractionValue(key, fieldId, value) {
@@ -217,7 +269,8 @@ export const useReview = create<ReviewStoreState>()(
       const values = { ...study.values };
       if (value === null || value === '' || (Array.isArray(value) && value.length === 0)) delete values[fieldId];
       else values[fieldId] = value;
-      set({ review: touch(review, { extraction: { ...review.extraction, [key]: { ...study, values } } }) });
+      const next = touch(review, { extraction: { ...review.extraction, [key]: { ...study, values } } });
+      set({ review: verifyAnswer(next, key, `extraction:${fieldId}`, values[fieldId] ?? null) });
     },
 
     setExtractionDone(key, done) {
@@ -225,6 +278,81 @@ export const useReview = create<ReviewStoreState>()(
       const review = current(get().review);
       const study = review.extraction[key] ?? { values: {}, done: false };
       set({ review: touch(review, { extraction: { ...review.extraction, [key]: { ...study, done } } }) });
+    },
+
+    attachDocument(key, document) {
+      if (readOnly()) return;
+      const review = current(get().review);
+      set({ review: touch(review, { documents: { ...review.documents, [key]: document } }) });
+    },
+
+    detachDocument(key) {
+      if (readOnly()) return;
+      const review = current(get().review);
+      const documents = { ...review.documents };
+      delete documents[key];
+      // As evidências ficam: guardam o texto citado, e o PDF pode voltar (ou outra cópia dele).
+      set({ review: touch(review, { documents }) });
+    },
+
+    addEvidence(key, target, evidence) {
+      if (readOnly()) return;
+      const review = current(get().review);
+      set({
+        review: withEvidence(review, key, target, (entry) => ({
+          ...(entry ?? { status: 'manual' }),
+          evidence: [...(entry?.evidence ?? []), stamp(review, evidence)],
+        })),
+      });
+    },
+
+    removeEvidence(key, target, evidenceId) {
+      if (readOnly()) return;
+      set({
+        review: withEvidence(current(get().review), key, target, (entry) => {
+          if (!entry) return entry;
+          const evidence = entry.evidence.filter((item) => item.id !== evidenceId);
+          // Sem trecho nem proposta, não resta o que conferir.
+          return evidence.length === 0 && !entry.suggestion ? undefined : { ...entry, evidence };
+        }),
+      });
+    },
+
+    applyAiProposals(key, proposals) {
+      if (readOnly()) return;
+      let review = current(get().review);
+      for (const proposal of proposals) {
+        review = withEvidence(review, key, proposal.target, (entry) => ({
+          evidence: [
+            ...(entry?.evidence ?? []).filter((item) => item.origin !== 'ai'),
+            ...proposal.evidence.map((item) => stamp(review, item)),
+          ],
+          suggestion: proposal.suggestion,
+          status: 'suggested',
+        }));
+      }
+      set({ review });
+    },
+
+    acceptSuggestion(key, target) {
+      if (readOnly()) return;
+      const review = current(get().review);
+      const suggestion = review.evidence[key]?.[target]?.suggestion;
+      if (!suggestion) return;
+      if (target.startsWith('extraction:')) get().setExtractionValue(key, target.slice('extraction:'.length), suggestion.value);
+      else if (target.startsWith('quality:') && typeof suggestion.value === 'string') {
+        get().answerQuality(key, target.slice('quality:'.length), suggestion.value);
+      }
+    },
+
+    rejectSuggestion(key, target) {
+      if (readOnly()) return;
+      const review = current(get().review);
+      set({
+        review: withEvidence(review, key, target, (entry) =>
+          entry ? { ...entry, status: 'rejected', verifiedBy: review.reviewerId, verifiedAt: new Date().toISOString() } : entry,
+        ),
+      });
     },
 
     setNote(key, note) {

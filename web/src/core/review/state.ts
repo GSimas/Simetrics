@@ -7,11 +7,16 @@ import {
   REVIEW_TYPES,
   EXTRACTION_FIELD_TYPES,
   type Criterion,
+  type Evidence,
+  type EvidenceTargetKey,
   type ExtractionField,
   type ExtractionValue,
   type RecordScreening,
+  type StudyDocument,
   type StudyExtraction,
   type ReviewState,
+  type TargetEvidence,
+  type VerificationStatus,
   type ReviewType,
 } from './types';
 
@@ -36,6 +41,8 @@ export function createReview(reviewerId: string, type: ReviewType = 'systematic'
     quality: {},
     extractionFields: [],
     extraction: {},
+    documents: {},
+    evidence: {},
     reviewerId,
     createdAt: iso,
     updatedAt: iso,
@@ -54,7 +61,8 @@ export function hasReviewContent(review: ReviewState | null): boolean {
     review.criteria.length > 0 ||
     Object.keys(review.decisions).length > 0 ||
     review.qualityQuestions.length > 0 ||
-    review.extractionFields.length > 0
+    review.extractionFields.length > 0 ||
+    Object.keys(review.documents).length > 0
   );
 }
 
@@ -109,6 +117,82 @@ function normalizeExtraction(raw: unknown): Record<string, StudyExtraction> {
     extraction[key] = { values, done: study.done === true };
   }
   return extraction;
+}
+
+function normalizeDocuments(raw: unknown): Record<string, StudyDocument> {
+  const documents: Record<string, StudyDocument> = {};
+  if (!isRecord(raw)) return documents;
+  for (const [key, doc] of Object.entries(raw)) {
+    if (!isRecord(doc) || typeof doc.hash !== 'string' || !doc.hash) continue;
+    documents[key] = {
+      hash: doc.hash,
+      name: str(doc.name),
+      size: typeof doc.size === 'number' ? doc.size : 0,
+      pages: typeof doc.pages === 'number' ? doc.pages : 0,
+      textLayer: doc.textLayer === 'none' || doc.textLayer === 'partial' ? doc.textLayer : 'ok',
+      addedAt: str(doc.addedAt),
+    };
+  }
+  return documents;
+}
+
+const STATUSES: readonly VerificationStatus[] = ['suggested', 'confirmed', 'edited', 'rejected', 'manual'];
+const isTargetKey = (key: string): key is EvidenceTargetKey =>
+  key === 'ft-exclusion' || /^(extraction|quality):./.test(key);
+const num = (value: unknown): number => (typeof value === 'number' && Number.isFinite(value) ? value : 0);
+
+function normalizeEvidenceItem(raw: unknown): Evidence | null {
+  if (!isRecord(raw) || typeof raw.id !== 'string') return null;
+  const page = Math.round(num(raw.page));
+  if (page < 1) return null;
+  return {
+    id: raw.id,
+    page,
+    quote: str(raw.quote),
+    prefix: str(raw.prefix),
+    suffix: str(raw.suffix),
+    rects: Array.isArray(raw.rects)
+      ? raw.rects.filter(isRecord).map((rect) => ({ x: num(rect.x), y: num(rect.y), w: num(rect.w), h: num(rect.h) }))
+      : [],
+    origin: raw.origin === 'ai' ? 'ai' : 'manual',
+    location: raw.location === 'approximate' || raw.location === 'not-found' ? raw.location : 'exact',
+    reviewerId: str(raw.reviewerId),
+    createdAt: str(raw.createdAt),
+  };
+}
+
+function normalizeEvidence(raw: unknown): ReviewState['evidence'] {
+  const evidence: ReviewState['evidence'] = {};
+  if (!isRecord(raw)) return evidence;
+  for (const [key, targets] of Object.entries(raw)) {
+    if (!isRecord(targets)) continue;
+    const clean: Partial<Record<EvidenceTargetKey, TargetEvidence>> = {};
+    for (const [target, entry] of Object.entries(targets)) {
+      if (!isTargetKey(target) || !isRecord(entry)) continue;
+      const item: TargetEvidence = {
+        evidence: Array.isArray(entry.evidence)
+          ? entry.evidence.map(normalizeEvidenceItem).filter((e): e is Evidence => e !== null)
+          : [],
+        status: STATUSES.includes(entry.status as VerificationStatus) ? (entry.status as VerificationStatus) : 'manual',
+      };
+      const suggestion = entry.suggestion;
+      if (isRecord(suggestion) && isExtractionValue(suggestion.value)) {
+        item.suggestion = {
+          value: suggestion.value,
+          rationale: str(suggestion.rationale),
+          model: str(suggestion.model),
+          createdAt: str(suggestion.createdAt),
+        };
+      } else if (item.status === 'suggested') {
+        item.status = 'manual';
+      }
+      if (typeof entry.verifiedBy === 'string') item.verifiedBy = entry.verifiedBy;
+      if (typeof entry.verifiedAt === 'string') item.verifiedAt = entry.verifiedAt;
+      clean[target] = item;
+    }
+    if (Object.keys(clean).length > 0) evidence[key] = clean;
+  }
+  return evidence;
 }
 
 /**
@@ -187,6 +271,8 @@ export function normalizeReview(raw: unknown): ReviewState | null {
         options: Array.isArray(f.options) ? f.options.filter((o): o is string => typeof o === 'string') : [],
       })),
     extraction: normalizeExtraction(raw.extraction),
+    documents: normalizeDocuments(raw.documents),
+    evidence: normalizeEvidence(raw.evidence),
     createdAt: str(raw.createdAt, base.createdAt),
     updatedAt: str(raw.updatedAt, base.updatedAt),
   };

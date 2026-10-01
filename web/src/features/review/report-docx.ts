@@ -23,7 +23,8 @@ import { buildSearchString, SEARCH_TARGETS } from '@/core/review/search-string';
 import { formatExtractionValue } from '@/core/review/synthesis';
 import { FRAMEWORK_FIELDS, REVIEW_DEFAULTS } from '@/core/review/types';
 import { BRAND } from '@/features/report/chart-renderer';
-import { REPORT_TEXT, reference, shortLabel, type ReviewReportInput } from './report-shared';
+import { buildReportModel, fullTextParagraphs, quotesCell } from './report-model';
+import { fillText, REPORT_TEXT, reference, shortLabel, type ReviewReportInput } from './report-shared';
 
 /**
  * Relatório da revisão em Word: protocolo, estratégia de busca, fluxo PRISMA, qualidade e
@@ -97,15 +98,36 @@ function bullet(text: string): Paragraph {
   });
 }
 
+/** Linha de grupo dentro de uma tabela (extração, qualidade, exclusão): ocupa a largura toda. */
+export const GROUP_ROW = '\u0000group:';
+
 function table(rows: string[][], widths?: number[]): Table {
   const columns = rows[0]?.length ?? 1;
   const colWidths = widths ?? Array<number>(columns).fill(Math.floor(TEXT_WIDTH / columns));
   return new Table({
     columnWidths: colWidths,
     width: { size: colWidths.reduce((sum, width) => sum + width, 0), type: WidthType.DXA },
-    rows: rows.map(
-      (row, rowIndex) =>
-        new TableRow({
+    rows: rows.map((row, rowIndex) => {
+      const group = row[0]?.startsWith(GROUP_ROW) ? row[0].slice(GROUP_ROW.length) : null;
+      if (group !== null) {
+        return new TableRow({
+          cantSplit: true,
+          children: [
+            new TableCell({
+              columnSpan: columns,
+              borders: hairlines,
+              shading: { type: ShadingType.CLEAR, fill: PAPER },
+              margins: { top: 60, bottom: 60, left: 100, right: 100 },
+              children: [
+                new Paragraph({
+                  children: [new TextRun({ text: group.toUpperCase(), bold: true, font: MONO, size: 15, color: PINE, characterSpacing: 20 })],
+                }),
+              ],
+            }),
+          ],
+        });
+      }
+      return new TableRow({
           tableHeader: rowIndex === 0,
           cantSplit: true,
           children: row.map(
@@ -118,23 +140,27 @@ function table(rows: string[][], widths?: number[]): Table {
                   fill: rowIndex === 0 ? INK : rowIndex % 2 === 1 ? CARD : PAPER,
                 },
                 margins: { top: 60, bottom: 60, left: 100, right: 100 },
-                children: [
-                  new Paragraph({
-                    alignment: AlignmentType.LEFT,
-                    children: [
-                      new TextRun({ text: cell, bold: rowIndex === 0, font: SANS, size: 17, color: rowIndex === 0 ? PAPER : INK }),
-                    ],
-                  }),
-                ],
+                // Uma quebra de linha na célula vira um parágrafo: um trecho citado por linha.
+                children: cell.split('\n').map(
+                  (line) =>
+                    new Paragraph({
+                      alignment: AlignmentType.LEFT,
+                      spacing: { after: 40 },
+                      children: [
+                        new TextRun({ text: line, bold: rowIndex === 0, font: SANS, size: 17, color: rowIndex === 0 ? PAPER : INK }),
+                      ],
+                    }),
+                ),
               }),
           ),
-        }),
-    ),
+        });
+    }),
   });
 }
 
 
-export async function downloadReviewReport({ review, flow, records, copy, locale }: ReviewReportInput): Promise<void> {
+/** Monta o documento; `downloadReviewReport` o baixa. Separado para poder ser testado sem navegador. */
+export function buildReviewDocx({ review, flow, records, copy, locale }: ReviewReportInput): Document {
   const text = REPORT_TEXT[locale];
   const labels = { yes: copy.yes, no: copy.no };
   const num = (value: number) => value.toLocaleString(locale === 'en' ? 'en' : 'pt-BR', { maximumFractionDigits: 2 });
@@ -156,8 +182,12 @@ export async function downloadReviewReport({ review, flow, records, copy, locale
     body(`${text.generatedOn} ${new Date().toLocaleDateString(locale === 'en' ? 'en' : 'pt-BR')}`, { muted: true }),
   );
 
+  const model = buildReportModel(review, records, copy, locale);
+  const longDate = (iso: string) => (iso ? new Date(iso).toLocaleDateString(locale === 'en' ? 'en' : 'pt-BR') : '—');
+
   // Protocolo
   children.push(...heading((section += 1), text.protocol));
+  children.push(body(fillText(text.dates, { created: longDate(review.createdAt), updated: longDate(review.updatedAt) }), { muted: true }));
   if (review.objective.trim()) children.push(labeled(copy.objectiveLabel, review.objective.trim()));
   const frameworkRows = FRAMEWORK_FIELDS[review.framework]
     .filter((field) => review.frameworkValues[field]?.trim())
@@ -176,6 +206,9 @@ export async function downloadReviewReport({ review, flow, records, copy, locale
       subheading(`${copy.criteriaLabel} — ${kind === 'inclusion' ? copy.inclusion : copy.exclusion}`),
       ...criteria.map((criterion) => bullet(criterion.text.trim())),
     );
+  }
+  if (model.extractionForm.length > 0) {
+    children.push(subheading(copy.extractionForm), table([[text.field, text.type, text.options], ...model.extractionForm], [3200, 1800, TEXT_WIDTH - 5000]));
   }
 
   // Busca
@@ -221,6 +254,24 @@ export async function downloadReviewReport({ review, flow, records, copy, locale
   );
   if (flow.fullTextExclusions.length > 0) {
     children.push(subheading(copy.reportsExcluded), ...flow.fullTextExclusions.map((reason) => bullet(`${reason.label}: ${reason.count}`)));
+  }
+  if (model.taReasons.length > 0) {
+    children.push(
+      subheading(text.taReasons),
+      table([[text.reason, text.count], ...model.taReasons.map((reason) => [reason.label, num(reason.count)])], [7400, TEXT_WIDTH - 7400]),
+    );
+  }
+  if (model.fullTextExcluded.length > 0) {
+    children.push(
+      subheading(text.ftExcluded),
+      table(
+        [
+          [copy.study, text.reason, text.excerpt],
+          ...model.fullTextExcluded.map((item) => [item.label, item.reason, quotesCell(item.quotes, text.page, '—')]),
+        ],
+        [3600, 2200, TEXT_WIDTH - 5800],
+      ),
+    );
   }
 
   // Qualidade
@@ -292,12 +343,56 @@ export async function downloadReviewReport({ review, flow, records, copy, locale
     }
   }
 
+  // Síntese
+  if (selected.length > 0 && (model.synthesis.length > 0 || model.byYear.length > 0)) {
+    children.push(...heading((section += 1), text.synthesis));
+    if (model.synthesis.length > 0) {
+      children.push(
+        subheading(copy.fieldsSummary),
+        table([[text.field, text.filled, text.summary], ...model.synthesis.map((row) => [row.field, row.filled, row.summary])], [2800, 1800, TEXT_WIDTH - 4600]),
+      );
+    }
+    if (model.byYear.length > 0) {
+      children.push(subheading(copy.byYear), table([[text.year, text.studies], ...model.byYear.map((row) => [row.year, num(row.count)])], [6000, TEXT_WIDTH - 6000]));
+    }
+  }
+
+  // Textos completos e IA
+  if (model.ai.studiesWithPdf > 0 || model.evidence.length > 0) {
+    children.push(...heading((section += 1), text.fullText), ...fullTextParagraphs(model, text, locale).map((paragraph) => body(paragraph)));
+  }
+
+  // Evidências por estudo
+  if (model.evidence.length > 0) {
+    children.push(...heading((section += 1), text.evidence), body(text.evidenceHint, { muted: true }));
+    for (const block of model.evidence) {
+      children.push(subheading(block.label), body(block.reference, { muted: true }));
+      if (block.pdf) children.push(body(`${text.pdfLabel}: ${block.pdf}`, { mono: true, muted: true }));
+      if (block.note) children.push(labeled(copy.note, block.note));
+      const rows: string[][] = [[text.question, text.answer, text.verification, text.excerpt]];
+      let group = '';
+      for (const answer of block.answers) {
+        if (answer.group !== group) {
+          group = answer.group;
+          rows.push([`${GROUP_ROW}${text.groups[answer.group]}`, '', '', '']);
+        }
+        rows.push([
+          answer.question,
+          answer.suggestion ? `${answer.answer}\n${answer.suggestion}` : answer.answer,
+          answer.status || '—',
+          quotesCell(answer.quotes, text.page, text.noExcerpt),
+        ]);
+      }
+      children.push(table(rows, [2200, 2200, 1300, TEXT_WIDTH - 5700]));
+    }
+  }
+
   // Referências
   if (selected.length > 0) {
     children.push(...heading(section + 1, text.references), ...selected.map((study) => body(reference(study))));
   }
 
-  const doc = new Document({
+  return new Document({
     creator: 'Simetrics',
     title: review.title.trim() || text.untitled,
     sections: [
@@ -326,6 +421,9 @@ export async function downloadReviewReport({ review, flow, records, copy, locale
     ],
   });
 
-  const blob = await Packer.toBlob(doc);
-  downloadBlob(timestampedFilename(`${review.title.trim() || 'revisao'}-relatorio`, 'docx'), blob);
+}
+
+export async function downloadReviewReport(input: ReviewReportInput): Promise<void> {
+  const blob = await Packer.toBlob(buildReviewDocx(input));
+  downloadBlob(timestampedFilename(`${input.review.title.trim() || 'revisao'}-relatorio`, 'docx'), blob);
 }

@@ -6,7 +6,27 @@ import { buildSearchString, SEARCH_TARGETS } from '@/core/review/search-string';
 import { formatExtractionValue } from '@/core/review/synthesis';
 import { FRAMEWORK_FIELDS, REVIEW_DEFAULTS } from '@/core/review/types';
 import { BRAND } from '@/features/report/chart-renderer';
-import { REPORT_TEXT, reference, shortLabel, type ReviewReportInput } from './report-shared';
+import { buildReportModel, fullTextParagraphs, quotesCell, type ReportAnswer } from './report-model';
+import { fillText, REPORT_TEXT, reference, shortLabel, type ReviewReportInput } from './report-shared';
+
+/**
+ * As fontes padrão do PDF só têm o alfabeto Windows-1252. Trechos de artigos trazem
+ * ligaduras (ﬁ), letras gregas, símbolos: ligaduras e acentos compostos se decompõem; o
+ * que não tem equivalente vira "?" em vez de um glifo quebrado.
+ */
+const WIN_ANSI_EXTRA = new Set([...'€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ']);
+export function pdfSafe(value: string): string {
+  return [...value.normalize('NFKC')]
+    .map((char) => {
+      // A normalização troca o micro (µ, que a fonte tem) pelo mu grego (que não tem).
+      if (char === 'μ') return 'µ';
+      const code = char.codePointAt(0)!;
+      if (char === '\n' || (code >= 0x20 && code <= 0x7e) || (code >= 0xa0 && code <= 0xff) || WIN_ANSI_EXTRA.has(char)) return char;
+      const plain = char.normalize('NFKD').replace(/\p{M}/gu, '');
+      return /^[\x20-\x7e\xa0-\xff]+$/.test(plain) ? plain : '?';
+    })
+    .join('');
+}
 
 /**
  * Relatório da revisão em PDF, com a identidade do relatório bibliométrico
@@ -32,6 +52,8 @@ const C = {
   // Mesmos tons de --glow-include / --glow-exclude do tema claro.
   include: rgb('#16a34a'),
   includeTint: rgb('#e3f1e4'),
+  warning: rgb('#b45309'),
+  edited: rgb('#1d4ed8'),
   exclude: rgb('#dc2626'),
   excludeTint: rgb('#f6e3dc'),
 };
@@ -197,8 +219,13 @@ export function buildReviewPdf({ review, flow, records, copy, locale }: ReviewRe
   });
   y += 70;
 
+  const model = buildReportModel(review, records, copy, locale);
+  const longDate = (iso: string) =>
+    iso ? new Date(iso).toLocaleDateString(isEn ? 'en-US' : 'pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : '—';
+
   // --- Protocolo ---
   heading(text.protocol);
+  paragraph(fillText(text.dates, { created: longDate(review.createdAt), updated: longDate(review.updatedAt) }), { color: C.inkMuted, size: 8.5 });
   if (review.objective.trim()) {
     subheading(copy.objectiveLabel);
     paragraph(review.objective.trim());
@@ -222,6 +249,14 @@ export function buildReviewPdf({ review, flow, records, copy, locale }: ReviewRe
     subheading(`${copy.criteriaLabel} — ${kind === 'inclusion' ? copy.inclusion : copy.exclusion}`, color);
     criteria.forEach((criterion) => bullet(criterion.text.trim(), color));
     y += 4;
+  }
+  if (model.extractionForm.length > 0) {
+    subheading(copy.extractionForm);
+    table({
+      head: [[text.field, text.type, text.options]],
+      body: model.extractionForm.map((row) => row.map(pdfSafe)),
+      columnStyles: { 0: { cellWidth: 150, fontStyle: 'bold' }, 1: { cellWidth: 90 } },
+    });
   }
 
   // --- Busca ---
@@ -347,6 +382,27 @@ export function buildReviewPdf({ review, flow, records, copy, locale }: ReviewRe
   });
   y += 16;
 
+  if (model.taReasons.length > 0) {
+    subheading(text.taReasons, C.exclude);
+    table({
+      head: [[text.reason, text.count]],
+      body: model.taReasons.map((reason) => [pdfSafe(reason.label), num(reason.count)]),
+      columnStyles: { 1: { halign: 'right', cellWidth: 60 } },
+    });
+  }
+  if (model.fullTextExcluded.length > 0) {
+    subheading(text.ftExcluded, C.exclude);
+    table({
+      head: [[copy.study, text.reason, text.excerpt]],
+      body: model.fullTextExcluded.map((item) => [
+        pdfSafe(item.label),
+        pdfSafe(item.reason),
+        pdfSafe(quotesCell(item.quotes, text.page, '—')),
+      ]),
+      columnStyles: { 0: { cellWidth: 170 }, 1: { cellWidth: 110 } },
+    });
+  }
+
   // --- Qualidade ---
   if (hasQualityChecklist(review)) {
     heading(text.quality);
@@ -410,6 +466,87 @@ export function buildReviewPdf({ review, flow, records, copy, locale }: ReviewRe
           ]),
         ),
         columnStyles: { 0: { cellWidth: 120 }, 1: { cellWidth: 130 } },
+      });
+    }
+  }
+
+  // --- Síntese ---
+  if (selected.length > 0 && (model.synthesis.length > 0 || model.byYear.length > 0)) {
+    heading(text.synthesis);
+    if (model.synthesis.length > 0) {
+      subheading(copy.fieldsSummary);
+      table({
+        head: [[text.field, text.filled, text.summary]],
+        body: model.synthesis.map((row) => [pdfSafe(row.field), row.filled, pdfSafe(row.summary)]),
+        columnStyles: { 0: { cellWidth: 130, fontStyle: 'bold' }, 1: { cellWidth: 90 } },
+      });
+    }
+    if (model.byYear.length > 0) {
+      subheading(copy.byYear);
+      table({
+        head: [[text.year, text.studies]],
+        body: model.byYear.map((row) => [row.year, num(row.count)]),
+        columnStyles: { 1: { halign: 'right', cellWidth: 80 } },
+      });
+    }
+  }
+
+  // --- Textos completos e IA ---
+  if (model.ai.studiesWithPdf > 0 || model.evidence.length > 0) {
+    heading(text.fullText);
+    fullTextParagraphs(model, text, locale).forEach((body) => paragraph(pdfSafe(body)));
+  }
+
+  // --- Evidências por estudo ---
+  if (model.evidence.length > 0) {
+    heading(text.evidence);
+    paragraph(text.evidenceHint, { color: C.inkMuted, size: 8.5 });
+    const statusColor: Partial<Record<NonNullable<ReportAnswer['statusKind']>, Rgb>> = {
+      confirmed: C.include,
+      edited: C.edited,
+      rejected: C.exclude,
+      suggested: C.warning,
+    };
+    for (const block of model.evidence) {
+      ensure(90);
+      subheading(pdfSafe(block.label));
+      paragraph(pdfSafe(block.reference), { size: 8, color: C.inkMuted });
+      if (block.pdf) paragraph(pdfSafe(`${text.pdfLabel}: ${block.pdf}`), { size: 8, color: C.inkMuted, font: 'courier' });
+      if (block.note) paragraph(pdfSafe(`${copy.note}: ${block.note}`), { size: 8 });
+      // Linhas de grupo (extração, qualidade, exclusão) separam as perguntas na mesma tabela.
+      type Row = { group: string } | { answer: ReportAnswer };
+      const rows: Row[] = [];
+      let group = '';
+      for (const answer of block.answers) {
+        if (answer.group !== group) {
+          group = answer.group;
+          rows.push({ group: text.groups[answer.group] });
+        }
+        rows.push({ answer });
+      }
+      table({
+        head: [[text.question, text.answer, text.verification, text.excerpt]],
+        body: rows.map((row) =>
+          'group' in row
+            ? [{ content: row.group.toUpperCase(), colSpan: 4, styles: { fillColor: C.paper, textColor: C.pine, fontStyle: 'bold', fontSize: 7 } }]
+            : [
+                pdfSafe(row.answer.question),
+                pdfSafe(row.answer.suggestion ? `${row.answer.answer}\n${row.answer.suggestion}` : row.answer.answer),
+                row.answer.status || '—',
+                pdfSafe(quotesCell(row.answer.quotes, text.page, text.noExcerpt)),
+              ],
+        ),
+        columnStyles: { 0: { cellWidth: 110, fontStyle: 'bold' }, 1: { cellWidth: 115 }, 2: { cellWidth: 62 } },
+        didParseCell: (data) => {
+          if (data.section !== 'body' || data.column.index !== 2) return;
+          const row = rows[data.row.index];
+          const kind = row && 'answer' in row ? row.answer.statusKind : null;
+          const color = kind ? statusColor[kind] : undefined;
+          if (color) {
+            data.cell.styles.textColor = color;
+            data.cell.styles.fontStyle = 'bold';
+          }
+        },
       });
     }
   }

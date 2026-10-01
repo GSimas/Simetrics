@@ -19,6 +19,8 @@ import type { ReviewCopy } from './copy';
 import { chipClass, decisionClass, PRESS, useFlash, type FlashKind, type Tone } from './motion';
 import { DecisionFlash } from './motion-parts';
 import { ReadOnlyScope } from './parts';
+import { FT_EXCLUSION } from '@/core/review/evidence';
+import { DocumentSlot, EvidenceInline } from './evidence/DocumentSlot';
 
 type Status = 'pending' | 'include' | 'exclude' | 'maybe' | 'not-retrieved';
 type Filter = Status | 'all';
@@ -202,6 +204,8 @@ export function ScreeningPanel({ review, copy }: { review: ReviewState; copy: Re
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey || isTyping(event.target)) return;
+      // Com o leitor de PDF (ou outro diálogo) aberto, as teclas são dele.
+      if (document.querySelector('[role="dialog"]')) return;
       const key = event.key.toLowerCase();
 
       if (choosingReason) {
@@ -539,6 +543,13 @@ export function ScreeningPanel({ review, copy }: { review: ReviewState; copy: Re
                       )}
                     </div>
                   </Collapse>
+
+                  {stage === 'full-text' && (
+                    <div className="space-y-2">
+                      <DocumentSlot studyKey={selected.key} scope="full-text" />
+                      <EvidenceInline studyKey={selected.key} target={FT_EXCLUSION} scope="full-text" />
+                    </div>
+                  )}
 
                   <div className="space-y-1">
                     <label htmlFor="screening-note" className="text-xs font-medium">

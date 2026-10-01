@@ -9,7 +9,8 @@
  * revisores, à troca de arquivos entre pessoas que importaram a mesma busca.
  */
 
-export const REVIEW_SCHEMA_VERSION = 1;
+/** 2: texto completo em PDF e evidências ligadas às respostas (`documents`, `evidence`). */
+export const REVIEW_SCHEMA_VERSION = 2;
 
 export const REVIEW_TYPES = [
   'systematic',
@@ -118,6 +119,96 @@ export interface StudyExtraction {
   done: boolean;
 }
 
+/**
+ * O PDF do texto completo de um estudo. O arquivo em si fica fora do projeto, num banco
+ * próprio do navegador (`pdf-store.ts`), endereçado pelo hash: o projeto e o arquivo de
+ * decisões trocado entre revisores continuam leves e não levam o artigo por acidente.
+ */
+export interface StudyDocument {
+  /** SHA-256 do arquivo — quem recebe o projeto sem o PDF anexa a própria cópia e ela é reconhecida. */
+  hash: string;
+  name: string;
+  size: number;
+  pages: number;
+  /**
+   * Camada de texto: `none` é PDF escaneado (sem texto para selecionar nem para a IA ler);
+   * `partial`, algumas páginas sem texto — em geral figuras ou tabelas em imagem.
+   */
+  textLayer: 'ok' | 'partial' | 'none';
+  addedAt: string;
+}
+
+/**
+ * Onde uma resposta mora: um campo da extração, uma pergunta da avaliação de qualidade ou
+ * o motivo de exclusão do texto completo. Em texto (`extraction:<id>`, `quality:<id>`,
+ * `ft-exclusion`) para servir de chave de mapa.
+ */
+export type EvidenceTargetKey = `extraction:${string}` | `quality:${string}` | 'ft-exclusion';
+
+/** Retângulo numa página, em frações do tamanho dela (0–1) — independe do zoom. */
+export interface PageRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/**
+ * Onde o trecho citado pela IA foi achado no texto do PDF: `exact` (o mesmo texto, fora
+ * espaços e pontuação), `approximate` (começo e fim batem, o meio difere um pouco) ou
+ * `not-found` — citação que o modelo pode ter inventado e que não pode ser confirmada direto.
+ */
+export type QuoteLocation = 'exact' | 'approximate' | 'not-found';
+
+/**
+ * Um trecho do artigo que sustenta uma resposta. Guarda o texto citado e um pouco do
+ * texto em volta (como o seletor de citação da W3C Web Annotation), não só coordenadas:
+ * assim o destaque é reencontrado mesmo em outra cópia do PDF, e o relatório mostra a
+ * citação sem precisar do arquivo.
+ */
+export interface Evidence {
+  id: string;
+  /** 1 em diante. */
+  page: number;
+  /** Vazio numa marcação de área (tabela, figura). */
+  quote: string;
+  prefix: string;
+  suffix: string;
+  /** Contorno do destaque — o que resta quando o texto não é reencontrado, e toda a marcação de área. */
+  rects: PageRect[];
+  origin: 'manual' | 'ai';
+  location: QuoteLocation;
+  reviewerId: string;
+  createdAt: string;
+}
+
+/** Resposta proposta pela IA: o valor do campo, o id da resposta de qualidade ou o id do critério de exclusão. */
+export interface AiSuggestion {
+  value: ExtractionValue;
+  /** Por que o modelo respondeu assim, em uma frase. */
+  rationale: string;
+  model: string;
+  createdAt: string;
+}
+
+/**
+ * Conferência humana de uma resposta:
+ * - `suggested`: a IA propôs, ninguém conferiu ainda;
+ * - `confirmed`: o revisor aceitou a resposta da IA como veio;
+ * - `edited`: o revisor corrigiu a resposta da IA;
+ * - `rejected`: o revisor descartou a proposta;
+ * - `manual`: o revisor respondeu sem a IA.
+ */
+export type VerificationStatus = 'suggested' | 'confirmed' | 'edited' | 'rejected' | 'manual';
+
+export interface TargetEvidence {
+  evidence: Evidence[];
+  suggestion?: AiSuggestion;
+  status: VerificationStatus;
+  verifiedBy?: string;
+  verifiedAt?: string;
+}
+
 export interface ReviewState {
   schemaVersion: typeof REVIEW_SCHEMA_VERSION;
   type: ReviewType;
@@ -142,6 +233,10 @@ export interface ReviewState {
   quality: Record<string, Record<string, string>>;
   extractionFields: ExtractionField[];
   extraction: Record<string, StudyExtraction>;
+  /** PDF do texto completo por chave de registro. */
+  documents: Record<string, StudyDocument>;
+  /** Evidências e conferência por estudo → resposta (`EvidenceTargetKey`). */
+  evidence: Record<string, Partial<Record<EvidenceTargetKey, TargetEvidence>>>;
   /**
    * Quem tomou as decisões deste arquivo: o id do dispositivo. Serve à fase de dois
    * revisores (juntar arquivos de pessoas diferentes) e, depois, à conta Scientata.
