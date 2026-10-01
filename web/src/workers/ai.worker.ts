@@ -7,6 +7,7 @@ import {
   search,
   toContextDocuments,
   type ContextDocument,
+  type RetrievalHit,
   type RetrievalIndex,
 } from '@/core/retrieval';
 import { summarize } from '@/core/summary';
@@ -155,6 +156,14 @@ const api = {
       documents: toContextDocuments(dataset, hits),
       aggregate: cachedAggregate.summary,
     };
+  },
+
+  /**
+   * Busca textual do Motor de Busca: posições na base dos documentos mais relevantes.
+   * Usa o mesmo índice BM25 do assistente — quem busca antes de conversar já o deixa pronto.
+   */
+  searchDocuments(dataset: Dataset, query: string, topN = 50): RetrievalHit[] {
+    return search(getIndex(dataset), query, topN);
   },
 
   /** Executa uma ferramenta analítica de forma isolada no worker */

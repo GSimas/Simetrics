@@ -24,10 +24,18 @@ export const TRANSLATIONS = {
     tab_networks: 'Redes',
     tab_advanced: 'Análises Avançadas',
     tab_search: 'Motor de Busca',
-    tab_chat: 'Assistente Científica',
     tab_report: 'Relatório',
     tab_review: 'Revisão Sistematizada',
     tab_feedback: 'Feedback',
+    nav_data: 'Dados',
+    nav_modules: 'Módulos do Simetrics',
+    nav_locked: 'carregue uma base em Dados para liberar',
+    sidebar_collapse: 'Recolher menu',
+    sidebar_expand: 'Expandir menu',
+    data_next_title: 'Próximo passo',
+    data_next_desc: 'Base pronta. Explore os documentos no Motor de Busca ou siga para uma análise.',
+    data_protocol_first: 'Vai fazer uma revisão sistematizada? O protocolo vem antes da busca e não precisa de base.',
+    data_protocol_first_btn: 'Começar pelo protocolo',
 
     // Upload Panel
     upload_title: 'Base de dados',
@@ -76,6 +84,10 @@ export const TRANSLATIONS = {
     dedup_both: 'Deduplicação por ambas (DOI e similaridade)',
     dedup_execute_btn: 'Executar deduplicação',
     dedup_removed: 'documentos removidos',
+    dedup_nothing_found: 'Nada a deduplicar: nenhum registro repetido {criterion}. A base continua completa.',
+    dedup_criterion_doi: 'por DOI',
+    dedup_criterion_similarity: 'por similaridade de título',
+    dedup_criterion_both: 'por DOI nem por similaridade de título',
 
     // Theme Panel (AI)
     theme_title: 'Mapeamento temático por IA',
@@ -202,12 +214,6 @@ export const TRANSLATIONS = {
     network_nodes_metrics_desc: 'Todos os nós do grafo heterogêneo, ordenados por grau.',
 
     // Search Tab
-    search_title: 'Motor de busca',
-    search_desc:
-      'Escolha uma entidade para montar seu dossiê: produção, impacto, documentos e perfis semelhantes.',
-    search_type_label: 'Tipo',
-    search_query_label: 'Buscar',
-    search_placeholder: 'Digite para filtrar...',
     search_dossier_title: 'Dossiê Científico',
     search_similar_title: 'Entidades semelhantes',
     search_similar_desc:
@@ -230,8 +236,6 @@ export const TRANSLATIONS = {
 
     // Chat Tab
     chat_title: 'Simi - Assistente Científica',
-    chat_desc:
-      'Conversando com seus documentos. A cada pergunta, os documentos mais relevantes são selecionados no seu navegador via BM25 e enviados com segurança ao modelo configurado.',
     chat_greeting:
       'Olá! Sou a Simi, sua assistente científica no Simetrics. Respondo com base nos documentos da sua base carregada. Posso recomendar leituras fundamentais, identificar especialistas ou sugerir periódicos para submissão. O que você gostaria de investigar?',
     chat_suggestions_label: 'Sugestões de perguntas:',
@@ -240,9 +244,7 @@ export const TRANSLATIONS = {
     chat_sugg_3: 'Em quais periódicos eu deveria submeter um artigo sobre este tema?',
     chat_sugg_4: 'Que lacunas de pesquisa aparecem nesta literatura?',
     chat_placeholder: 'Ex.: quais são os documentos fundamentais sobre este tema?',
-    chat_btn_send: 'Enviar',
     chat_btn_stop: 'Parar',
-    chat_analyzing: 'Analisando a base bibliométrica...',
     chat_thinking: 'Simi está pensando…',
     chat_writing: 'Simi está escrevendo…',
     chat_status_querying_table: 'Consultando tabela analítica local ({table})...',
@@ -251,7 +253,6 @@ export const TRANSLATIONS = {
     chat_status_entity_profile: 'Analisando perfil detalhado de {entity}...',
     chat_tool_executed: 'Consulta analítica executada na base local',
     chat_tools_executed_count: 'consultas analíticas locais realizadas',
-    chat_tools_badge: 'Cálculo determinístico no navegador',
     chat_no_key_warning:
       'Para conversar com a Simi, entre com sua conta OpenRouter (modelos gratuitos) ou configure sua própria chave de API.',
     chat_free_remaining:
@@ -282,7 +283,7 @@ export const TRANSLATIONS = {
     empty_client_note:
       'Todo o processamento acontece no seu navegador — os documentos não são enviados para nenhum servidor.',
     empty_generic_desc:
-      'Carregue uma base de dados na aba Informações Principais para liberar esta análise.',
+      'Carregue uma base de dados na tela Dados para liberar esta análise.',
 
     // AI Settings Modal (BYOK)
     ai_modal_title: 'Configurações de IA (Bring Your Own Key)',
@@ -320,6 +321,10 @@ export const TRANSLATIONS = {
     settings_font_max: 'Máximo',
     settings_contrast: 'Alto contraste',
     settings_contrast_desc: 'Reforça textos secundários, bordas e foco para facilitar a leitura.',
+    settings_motion: 'Movimento',
+    settings_motion_reduce: 'Reduzir movimento',
+    settings_motion_desc: 'Pausa animações, transições e o fundo animado. Útil para quem sente desconforto com movimento ou quer poupar bateria.',
+    settings_motion_system: 'Seu sistema operacional já pede menos movimento, então ele vale sempre. Para mudar, ajuste a acessibilidade do sistema.',
     settings_ai: 'Chave de IA (BYOK)',
     settings_ai_configure: 'Configurar chave',
     settings_ai_missing: 'Nenhuma chave configurada',
@@ -382,6 +387,28 @@ export const TRANSLATIONS = {
     search_coauthors_label: 'Coautores:',
     search_show_all: 'Ver todos',
     search_show_less: 'Mostrar menos',
+    search_hero_a: 'O que você procura',
+    search_hero_em: 'nesta base?',
+    search_hero_hint: 'Busque um tema, autor, país, periódico ou título.',
+    search_input_placeholder: 'Buscar na base…',
+    search_submit: 'Buscar',
+    search_clear: 'Limpar busca',
+    search_suggestions: 'Sugestões',
+    search_stats: '{docs} documentos · {authors} autores · {countries} países · {venues} periódicos',
+    search_entities: 'Entidades',
+    search_results_count: '{count} documentos mais relevantes',
+    search_no_results: 'Nenhum documento encontrado para esta busca.',
+    search_citations: 'citações',
+    search_back_results: 'Voltar aos resultados',
+    search_back_chat: 'Voltar à conversa',
+    search_ask_ai: 'Perguntar à IA',
+    search_ask_ai_hint: 'Conversar com a Simi sobre a base inteira, a partir desta frase',
+    chat_back_search: 'Voltar à busca',
+    chat_view_title: 'Conversa com a base',
+    chat_clear: 'Limpar conversa',
+    chat_sources: 'Baseada em {count} documentos recuperados da base',
+    chat_privacy_note: 'Ao perguntar, até {count} documentos relevantes (título, autores, resumo) e um panorama agregado da base são enviados a {provider}. O restante continua no seu navegador.',
+    chat_privacy_free_provider: 'DeepSeek, pela cota gratuita do Simetrics',
     radial_links: 'ligações',
     radial_click_hint: 'Clique para destacar; clique de novo para abrir o perfil',
     radial_aria: 'Grafo radial com {count} nós',
@@ -515,10 +542,18 @@ export const TRANSLATIONS = {
     tab_networks: 'Networks',
     tab_advanced: 'Advanced Analyses',
     tab_search: 'Search Engine',
-    tab_chat: 'Scientific Assistant',
     tab_report: 'Report',
     tab_review: 'Systematized Review',
     tab_feedback: 'Feedback',
+    nav_data: 'Data',
+    nav_modules: 'Simetrics modules',
+    nav_locked: 'load a dataset in Data to unlock',
+    sidebar_collapse: 'Collapse menu',
+    sidebar_expand: 'Expand menu',
+    data_next_title: 'Next step',
+    data_next_desc: 'Dataset ready. Explore the documents in the Search Engine or move on to an analysis.',
+    data_protocol_first: 'Doing a systematized review? The protocol comes before the search and needs no dataset.',
+    data_protocol_first_btn: 'Start with the protocol',
 
     // Upload Panel
     upload_title: 'Bibliographic Database',
@@ -567,6 +602,10 @@ export const TRANSLATIONS = {
     dedup_both: 'Deduplicate by both (DOI and similarity)',
     dedup_execute_btn: 'Run deduplication',
     dedup_removed: 'documents removed',
+    dedup_nothing_found: 'Nothing to deduplicate: no repeated records {criterion}. The dataset stays complete.',
+    dedup_criterion_doi: 'by DOI',
+    dedup_criterion_similarity: 'by title similarity',
+    dedup_criterion_both: 'by DOI or by title similarity',
 
     // Theme Panel (AI)
     theme_title: 'AI Topic Mapping',
@@ -692,12 +731,6 @@ export const TRANSLATIONS = {
     network_nodes_metrics_desc: 'All nodes from the heterogeneous graph sorted by degree.',
 
     // Search Tab
-    search_title: 'Search Engine',
-    search_desc:
-      'Pick an entity to generate its dossier: scientific output, citation impact, documents, and similar profiles.',
-    search_type_label: 'Type',
-    search_query_label: 'Search',
-    search_placeholder: 'Type to filter...',
     search_dossier_title: 'Scientific Dossier',
     search_similar_title: 'Similar Entities',
     search_similar_desc:
@@ -720,8 +753,6 @@ export const TRANSLATIONS = {
 
     // Chat Tab
     chat_title: 'Simi - Scientific Assistant',
-    chat_desc:
-      'Chatting with your dataset. For each query, the most relevant documents are selected in your browser via BM25 and safely sent to your configured AI model.',
     chat_greeting:
       "Hello! I'm Simi, your scientific assistant in Simetrics. I answer based on the documents in your loaded dataset. I can recommend foundational readings, identify research leaders, or suggest journals for submission. What would you like to explore?",
     chat_suggestions_label: 'Suggested questions:',
@@ -730,9 +761,7 @@ export const TRANSLATIONS = {
     chat_sugg_3: 'Which journals should I consider submitting an article on this topic to?',
     chat_sugg_4: 'What research gaps appear in this literature?',
     chat_placeholder: 'E.g., what are the foundational papers on this topic?',
-    chat_btn_send: 'Send',
     chat_btn_stop: 'Stop',
-    chat_analyzing: 'Analyzing bibliometric database...',
     chat_thinking: 'Simi is thinking…',
     chat_writing: 'Simi is writing…',
     chat_status_querying_table: 'Querying local analytical table ({table})...',
@@ -741,7 +770,6 @@ export const TRANSLATIONS = {
     chat_status_entity_profile: 'Analyzing detailed profile for {entity}...',
     chat_tool_executed: 'Analytical query executed on local dataset',
     chat_tools_executed_count: 'local analytical queries executed',
-    chat_tools_badge: 'Deterministic in-browser calculation',
     chat_no_key_warning:
       'To chat with Simi, sign in with your OpenRouter account (free models) or set your own API key.',
     chat_free_remaining:
@@ -772,7 +800,7 @@ export const TRANSLATIONS = {
     empty_client_note:
       'All processing runs entirely inside your browser — documents are never uploaded to any remote server.',
     empty_generic_desc:
-      'Load a dataset in the Overview tab to unlock this analysis.',
+      'Load a dataset in the Data screen to unlock this analysis.',
 
     // AI Settings Modal (BYOK)
     ai_modal_title: 'AI Settings (Bring Your Own Key)',
@@ -811,6 +839,10 @@ export const TRANSLATIONS = {
     settings_font_max: 'Large',
     settings_contrast: 'High contrast',
     settings_contrast_desc: 'Strengthens secondary text, borders and focus for easier reading.',
+    settings_motion: 'Motion',
+    settings_motion_reduce: 'Reduce motion',
+    settings_motion_desc: 'Stops animations, transitions and the animated background. Helpful if motion is uncomfortable or to save battery.',
+    settings_motion_system: 'Your operating system already asks for less motion, so it always applies. To change it, adjust the system accessibility settings.',
     settings_ai: 'AI key (BYOK)',
     settings_ai_configure: 'Configure key',
     settings_ai_missing: 'No key configured',
@@ -873,6 +905,28 @@ export const TRANSLATIONS = {
     search_coauthors_label: 'Co-authors:',
     search_show_all: 'Show all',
     search_show_less: 'Show less',
+    search_hero_a: 'What are you looking for',
+    search_hero_em: 'in this dataset?',
+    search_hero_hint: 'Search for a topic, author, country, venue or title.',
+    search_input_placeholder: 'Search the dataset…',
+    search_submit: 'Search',
+    search_clear: 'Clear search',
+    search_suggestions: 'Suggestions',
+    search_stats: '{docs} documents · {authors} authors · {countries} countries · {venues} venues',
+    search_entities: 'Entities',
+    search_results_count: '{count} most relevant documents',
+    search_no_results: 'No documents found for this search.',
+    search_citations: 'citations',
+    search_back_results: 'Back to results',
+    search_back_chat: 'Back to the conversation',
+    search_ask_ai: 'Ask AI',
+    search_ask_ai_hint: 'Chat with Simi about the whole dataset, starting from this phrase',
+    chat_back_search: 'Back to search',
+    chat_view_title: 'Chat with the dataset',
+    chat_clear: 'Clear conversation',
+    chat_sources: 'Based on {count} documents retrieved from the dataset',
+    chat_privacy_note: 'When you ask, up to {count} relevant documents (title, authors, abstract) and an aggregate overview of the dataset are sent to {provider}. Everything else stays in your browser.',
+    chat_privacy_free_provider: 'DeepSeek, through the Simetrics free quota',
     radial_links: 'links',
     radial_click_hint: 'Click to highlight; click again to open the profile',
     radial_aria: 'Radial graph with {count} nodes',

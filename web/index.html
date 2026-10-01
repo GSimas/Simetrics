@@ -55,7 +55,7 @@
     />
 
     <!-- Aplica as preferências antes do primeiro paint (tema escuro por padrão, como o
-         Scientata; tamanho da letra; alto contraste). Mesmas chaves de
+         Scientata; tamanho da letra; alto contraste; menos movimento). Mesmas chaves de
          src/state/preferences.store.ts. -->
     <script>
       (function () {
@@ -65,6 +65,7 @@
           var font = localStorage.getItem('simetrics-font');
           root.dataset.font = font === 'min' || font === 'max' ? font : 'med';
           if (localStorage.getItem('simetrics-contrast') === 'high') root.dataset.contrast = 'high';
+          if (localStorage.getItem('simetrics-motion') === 'reduce') root.dataset.motion = 'reduce';
         } catch (e) {
           root.classList.add('dark');
         }

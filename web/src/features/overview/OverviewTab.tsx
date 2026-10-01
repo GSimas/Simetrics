@@ -13,12 +13,9 @@ import {
 
 import TimeSeriesChart from '@/components/charts/TimeSeriesChart';
 import { SectionTitle } from '@/components/InfoTip';
-import { Collapse } from '@/components/Collapse';
 import { KpiCard } from '@/components/KpiCard';
 import { Launcher, LauncherGrid } from '@/components/Launcher';
-import { UploadPanel } from '@/components/UploadPanel';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import {
@@ -42,13 +39,14 @@ import type { Dataset, MetadataCompleteness, SearchEntityType } from '@/lib/type
 import { identityKey, useAsyncResult } from '@/lib/use-async-result';
 import { useStickyValue } from '@/lib/use-sticky-value';
 import { cn } from '@/lib/utils';
-import { useDataset, type DedupStrategy } from '@/state/dataset.store';
+import { useDataset } from '@/state/dataset.store';
 import { useLocale } from '@/state/locale.store';
 import { getAnalyticsWorker } from '@/workers/client';
 import { openInSearch } from '@/state/navigation.store';
 import { EntityTables } from './EntityTables';
 import { ThemePanel } from './ThemePanel';
 import { TopRankings } from './TopRankings';
+import { EmptyState } from '@/features/EmptyState';
 import { PALETTE, chartMessage } from './viz-shared';
 
 const PRODUCTION_CATEGORIES: readonly ProductionCategory[] = [
@@ -91,37 +89,11 @@ export default function OverviewTab() {
     useDataset((state) => state.overview),
   );
   const { value: tables } = useStickyValue(useDataset((state) => state.tables));
-  const duplicates = useDataset((state) => state.duplicates);
-  const shownDuplicates = useStickyValue(duplicates.length > 0 ? duplicates : null).value ?? [];
-  const dedupStrategy = useDataset((state) => state.dedupStrategy);
   const computeOverview = useDataset((state) => state.computeOverview);
   const computeTables = useDataset((state) => state.computeTables);
-  const applyDedup = useDataset((state) => state.applyDedup);
-  const isDeduplicating = useDataset((state) => state.isDeduplicating);
-  const isIngesting = useDataset((state) => state.isIngesting);
-  const isDemo = useDataset((state) => state.isDemo);
-  const busy = isDeduplicating || isIngesting;
   const t = useLocale((state) => state.t);
   const locale = useLocale((state) => state.locale);
-  const isEn = locale === 'en';
   const nf = numberLocale(locale);
-
-  const [selectedStrategy, setSelectedStrategy] = useState<DedupStrategy>(dedupStrategy);
-
-  // A estratégia aplicada mudou (outra base, outro projeto): o seletor acompanha. Ajuste
-  // durante o render, e não num efeito — o efeito renderizava duas vezes a cada troca.
-  const [appliedStrategy, setAppliedStrategy] = useState(dedupStrategy);
-  if (appliedStrategy !== dedupStrategy) {
-    setAppliedStrategy(dedupStrategy);
-    setSelectedStrategy(dedupStrategy);
-  }
-
-  const dedupLabels: Record<DedupStrategy, string> = {
-    none: t('dedup_none'),
-    doi: t('dedup_doi'),
-    similarity: t('dedup_similarity'),
-    both: t('dedup_both'),
-  };
 
   useEffect(() => {
     if (!active) return;
@@ -129,134 +101,16 @@ export default function OverviewTab() {
     void computeTables();
   }, [active, computeOverview, computeTables]);
 
-  if (!active) {
-    return (
-      <div className="space-y-4">
-        <UploadPanel />
-        <div className="border border-dashed border-border p-10 text-center">
-          <SectionTitle
-            className="justify-center"
-            title={t('empty_start_title')}
-            info={
-              <>
-                <p>{t('empty_start_desc')}</p>
-                <p>{t('empty_client_note')}</p>
-              </>
-            }
-          />
-        </div>
-      </div>
-    );
-  }
+  // Sem base, os módulos ficam bloqueados na navegação; isto só cobre um acesso direto.
+  if (!active) return <EmptyState title={t('empty_start_title')} />;
 
   const summary = overview?.summary;
   const metrics = summary?.bibliometrix;
 
-  const dedupCard = (
-    <Card data-tour="dedup">
-      <CardHeader className="pb-3">
-        <SectionTitle title={t('dedup_title')} info={t('dedup_description')} />
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="w-72 sm:w-80" title={isDemo ? t('demo_readonly_hint') : undefined}>
-            <Select
-              value={selectedStrategy}
-              onValueChange={(val) => {
-                const strategy = val as DedupStrategy;
-                setSelectedStrategy(strategy);
-                // "Base completa" não tem o que executar: escolhê-la já desfaz a deduplicação.
-                if (strategy === 'none' && dedupStrategy !== 'none') void applyDedup('none');
-              }}
-              disabled={busy || isDemo}
-            >
-              <SelectTrigger className="h-9" aria-label={t('dedup_strategy_aria')}>
-                <SelectValue placeholder={t('dedup_strategy_label')} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">{t('dedup_none')}</SelectItem>
-                <SelectItem value="doi">{t('dedup_doi')}</SelectItem>
-                <SelectItem value="similarity">{t('dedup_similarity')}</SelectItem>
-                <SelectItem value="both">{t('dedup_both')}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {selectedStrategy !== 'none' && (
-            <Button
-              size="sm"
-              disabled={busy}
-              onClick={() => void applyDedup(selectedStrategy)}
-              className="cursor-pointer"
-            >
-              {t('dedup_execute_btn')}
-            </Button>
-          )}
-
-          {dedupStrategy !== 'none' && <Badge variant="blue">{dedupLabels[dedupStrategy]}</Badge>}
-
-          {duplicates.length > 0 && (
-            <Badge variant="warning">
-              {duplicates.length.toLocaleString(nf)} {t('dedup_removed')}
-            </Badge>
-          )}
-        </div>
-
-        {/* O relatório abre e fecha animado; durante o fechamento mostra a última lista. */}
-        <Collapse open={duplicates.length > 0} delayOpen={false}>
-            <div className="space-y-3 pt-2">
-              <SectionTitle
-                title={isEn ? 'Removed documents report' : 'Relatório de documentos excluídos'}
-                info={
-                  isEn
-                    ? 'Each row shows the removed document and the one kept in its place.'
-                    : 'Cada linha indica o documento removido e qual foi mantido em seu lugar.'
-                }
-              />
-              <div className="max-h-96 overflow-auto border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{isEn ? 'Removed document' : 'Documento removido'}</TableHead>
-                      <TableHead>{isEn ? 'Kept in its place' : 'Mantido no lugar'}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {shownDuplicates.slice(0, 200).map((doc, index) => (
-                      <TableRow key={`${String(doc['TITLE'])}-${index}`}>
-                        <TableCell className="max-w-96 truncate" title={String(doc['TITLE'])}>
-                          {String(doc['TITLE'])}
-                        </TableCell>
-                        <TableCell
-                          className="max-w-96 truncate"
-                          title={doc['DOCUMENTO DE REFERÊNCIA (MANTIDO)']}
-                        >
-                          {doc['DOCUMENTO DE REFERÊNCIA (MANTIDO)']}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-              {shownDuplicates.length > 200 && (
-                <p className="eyebrow">
-                  {isEn ? 'Showing the first 200 of' : 'Exibindo as 200 primeiras de'}{' '}
-                  {shownDuplicates.length.toLocaleString(nf)}.
-                </p>
-              )}
-            </div>
-        </Collapse>
-      </CardContent>
-    </Card>
-  );
 
 
   return (
     <div className="space-y-6">
-      <UploadPanel />
-
-      {dedupCard}
-
       <LauncherGrid label={t('launcher_section')}>
         {overview && (
           <Launcher

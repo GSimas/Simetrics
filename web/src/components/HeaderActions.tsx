@@ -14,7 +14,7 @@ import type { Locale } from '@/lib/i18n/translations';
 import { cn } from '@/lib/utils';
 import { useAiConfig } from '@/state/ai-config.store';
 import { useLocale } from '@/state/locale.store';
-import { usePreferences, type FontScale, type Theme } from '@/state/preferences.store';
+import { systemReducesMotion, usePreferences, type FontScale, type Theme } from '@/state/preferences.store';
 
 // Só baixado quando alguém abre as configurações de IA.
 const AiSettingsModal = lazyWithPreload(() =>
@@ -64,18 +64,21 @@ function Switch({
   label,
   checked,
   onChange,
+  disabled = false,
 }: {
   label: string;
   checked: boolean;
   onChange: (checked: boolean) => void;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
+      disabled={disabled}
       onClick={() => onChange(!checked)}
-      className="flex w-full cursor-pointer items-center justify-between border border-border px-3 py-2 text-sm transition-colors hover:border-highlight"
+      className="flex w-full cursor-pointer items-center justify-between border border-border px-3 py-2 text-sm transition-colors hover:border-highlight disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-border"
     >
       <span>{label}</span>
       <span
@@ -116,7 +119,10 @@ export function SettingsButton() {
   const fontScale = usePreferences((state) => state.fontScale);
   const highContrast = usePreferences((state) => state.highContrast);
   const tickerScroll = usePreferences((state) => state.tickerScroll);
-  const { setTheme, setFontScale, setHighContrast, setTickerScroll } = usePreferences.getState();
+  const reduceMotion = usePreferences((state) => state.reduceMotion);
+  const { setTheme, setFontScale, setHighContrast, setTickerScroll, setReduceMotion } = usePreferences.getState();
+  // Pedido pelo sistema, vale sempre: a opção aparece ligada e travada.
+  const systemMotion = systemReducesMotion();
   const isAiConfigured = useAiConfig((state) => state.isConfigured());
 
   const [open, setOpen] = useState(false);
@@ -184,6 +190,18 @@ export function SettingsButton() {
 
             <Field label={t('settings_contrast')} hint={t('settings_contrast_desc')}>
               <Switch label={t('settings_contrast')} checked={highContrast} onChange={setHighContrast} />
+            </Field>
+
+            <Field
+              label={t('settings_motion')}
+              hint={systemMotion ? t('settings_motion_system') : t('settings_motion_desc')}
+            >
+              <Switch
+                label={t('settings_motion_reduce')}
+                checked={reduceMotion || systemMotion}
+                onChange={setReduceMotion}
+                disabled={systemMotion}
+              />
             </Field>
 
             <Field label={t('settings_ticker')} hint={t('settings_ticker_desc')}>

@@ -1,6 +1,8 @@
+import { useMemo } from 'react';
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 
+import { nextReviewAction, reviewProgress, type NextAction, type ReviewProgress, type ReviewStepId } from '@/core/review/progress';
 import { toScreeningRecords, type ScreeningRecord } from '@/core/review/records';
 import { createReview } from '@/core/review/state';
 import {
@@ -261,10 +263,27 @@ export function useReviewReadOnly(): boolean {
   return useDataset((state) => state.isDemo);
 }
 
-export type ReviewStep = 'protocol' | 'screening' | 'quality' | 'extraction' | 'synthesis' | 'prisma';
+export type ReviewStep = ReviewStepId;
+
+// Sem revisão ainda, o progresso é o de um protocolo em branco.
+const BLANK_REVIEW = createReview('');
+
+/** Completude de cada etapa e da revisão inteira — recalculada a cada decisão. */
+export function useReviewProgress(): ReviewProgress {
+  const review = useReview((state) => state.review);
+  const records = useScreeningRecords();
+  return useMemo(() => reviewProgress(review ?? BLANK_REVIEW, records), [review, records]);
+}
 
 /** Etapa aberta na aba da revisão — num store para o tour guiado poder trocá-la. */
 export const useReviewNav = create<{ step: ReviewStep; setStep: (step: ReviewStep) => void }>()((set) => ({
   step: 'protocol',
   setStep: (step) => set({ step }),
 }));
+
+/** O que falta fazer primeiro na revisão — o bloco "Próximo passo". */
+export function useNextReviewAction(): NextAction {
+  const review = useReview((state) => state.review);
+  const records = useScreeningRecords();
+  return useMemo(() => nextReviewAction(review ?? BLANK_REVIEW, records), [review, records]);
+}

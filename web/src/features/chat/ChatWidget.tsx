@@ -1,46 +1,17 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bot, Database, KeyRound, MessageSquare, Send, Square, Trash2, User, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Bot, KeyRound, MessageSquare, Send, Square, Trash2, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { streamChat, type ChatTurn, type ChatStatusUpdate } from '@/lib/ai-client';
 import { useAiConfig } from '@/state/ai-config.store';
+import { useChat } from '@/state/chat.store';
 import { useDataset } from '@/state/dataset.store';
 import { useLocale } from '@/state/locale.store';
-import { getAiWorker } from '@/workers/client';
 import { cn } from '@/lib/utils';
 import { AiSettingsModal } from '@/components/AiSettingsModal';
-import { FreeQuotaNotice } from '@/components/FreeQuotaNotice';
 import { useFreeTier } from '@/state/free-tier.store';
-import { MarkdownContent } from '@/components/MarkdownContent';
 import { usePresence } from '@/lib/use-presence';
-
-/**
- * Markdown memoizado: durante o streaming o chat re-renderiza a cada trecho, e sem isso
- * todas as respostas anteriores eram re-parseadas a cada vez (custo quadrático na conversa).
- */
-const MessageMarkdown = memo(MarkdownContent);
-
-/** Quantos documentos o BM25 seleciona por pergunta. */
-const CONTEXT_SIZE = 40;
-
-/** Três pontos pulsando + rótulo: "pensando" antes do texto chegar, "escrevendo" durante. */
-function TypingIndicator({ label, className }: { label: string; className?: string | undefined }) {
-  return (
-    <span className={cn('flex items-center gap-2 text-[11px] text-muted-foreground', className)}>
-      <span className="flex items-center gap-1" aria-hidden>
-        {[0, 150, 300].map((delay) => (
-          <span
-            key={delay}
-            className="size-1.5 animate-bounce rounded-full bg-emerald-500"
-            style={{ animationDelay: `${delay}ms` }}
-          />
-        ))}
-      </span>
-      {label}
-    </span>
-  );
-}
+import { ChatThread, PrivacyNote } from './ChatThread';
 
 export function ChatWidget() {
   const active = useDataset((state) => state.active);
@@ -54,21 +25,16 @@ export function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const panel = usePresence(isOpen);
   const [aiModalOpen, setAiModalOpen] = useState(false);
-  const [messages, setMessages] = useState<ChatTurn[]>([]);
+  const messages = useChat((state) => state.messages);
+  const streaming = useChat((state) => state.streaming);
+  const status = useChat((state) => state.status);
+  const ask = useChat((state) => state.ask);
   const [draft, setDraft] = useState('');
-  const [streaming, setStreaming] = useState(false);
-  const [currentStatus, setCurrentStatus] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
-  const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const fabRef = useRef<HTMLDivElement>(null);
-
-  const displayedMessages: ChatTurn[] = useMemo(() => {
-    return [{ role: 'assistant', content: t('chat_greeting') }, ...messages];
-  }, [messages, t]);
 
   // Rolagem acompanha cada trecho da resposta; o foco vai para o campo só ao abrir (antes
   // era devolvido a cada trecho recebido, com um timer por trecho que ninguém limpava).
@@ -76,7 +42,7 @@ export function ChatWidget() {
     if (!isOpen) return;
     const container = scrollRef.current;
     if (container) container.scrollTop = container.scrollHeight;
-  }, [isOpen, displayedMessages, currentStatus]);
+  }, [isOpen, messages, status]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -97,93 +63,6 @@ export function ChatWidget() {
     document.addEventListener('pointerdown', onPointerDown);
     return () => document.removeEventListener('pointerdown', onPointerDown);
   }, [isOpen, aiModalOpen]);
-
-  // Uma resposta em andamento não sobrevive à troca de base nem à saída do workspace:
-  // continuaria gastando a chave de API e rodando ferramentas sobre a base antiga.
-  useEffect(() => () => abortRef.current?.abort(), [active]);
-
-  const suggestions = [
-    t('chat_sugg_1'),
-    t('chat_sugg_2'),
-    t('chat_sugg_3'),
-    t('chat_sugg_4'),
-  ];
-
-  const ask = useCallback(
-    async (question: string): Promise<void> => {
-      if (!active || !question.trim() || streaming) return;
-
-      const history = messages;
-      setMessages((current) => [
-        ...current,
-        { role: 'user', content: question },
-        { role: 'assistant', content: '', toolsExecuted: [] },
-      ]);
-      setDraft('');
-      setError(null);
-      setStreaming(true);
-      setCurrentStatus(null);
-
-      const controller = new AbortController();
-      abortRef.current = controller;
-      const executedTools: string[] = [];
-
-      try {
-        const context = await getAiWorker().buildChatContext(active, question, CONTEXT_SIZE);
-
-        await streamChat({
-          question,
-          history,
-          context,
-          dataset: active,
-          signal: controller.signal,
-          onStatus: (status: ChatStatusUpdate) => {
-            if (status.type === 'tool_call') {
-              setCurrentStatus(status.message);
-              if (status.toolName && !executedTools.includes(status.toolName)) {
-                executedTools.push(status.toolName);
-              }
-            } else if (status.type === 'tool_result') {
-              setCurrentStatus(null);
-            }
-          },
-          onChunk: (text) =>
-            setMessages((current) => {
-              const next = [...current];
-              const last = next[next.length - 1];
-              if (last?.role === 'assistant') {
-                const updatedTools = executedTools.length > 0 ? [...executedTools] : last.toolsExecuted;
-                next[next.length - 1] = {
-                  role: 'assistant',
-                  content: last.content + text,
-                  ...(updatedTools ? { toolsExecuted: updatedTools } : {}),
-                };
-              }
-              return next;
-            }),
-        });
-      } catch (cause) {
-        if (controller.signal.aborted) return;
-
-        const message = cause instanceof Error ? cause.message : String(cause);
-        setError(message);
-        setMessages((current) => {
-          const last = current[current.length - 1];
-          return last?.role === 'assistant' && last.content === '' ? current.slice(0, -1) : current;
-        });
-      } finally {
-        setStreaming(false);
-        setCurrentStatus(null);
-        abortRef.current = null;
-      }
-    },
-    [active, messages, streaming],
-  );
-
-  const clearChat = () => {
-    setMessages([]);
-    setError(null);
-  };
 
   return (
     <>
@@ -275,7 +154,7 @@ export function ChatWidget() {
               {messages.length > 0 && (
                 <button
                   type="button"
-                  onClick={clearChat}
+                  onClick={() => useChat.getState().clear()}
                   className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
                   title={isEn ? 'Clear history' : 'Limpar conversa'}
                   aria-label={isEn ? 'Clear history' : 'Limpar conversa'}
@@ -320,101 +199,7 @@ export function ChatWidget() {
                 </div>
               </div>
             ) : (
-              <>
-                <FreeQuotaNotice compact onConfigure={() => setAiModalOpen(true)} />
-
-                {displayedMessages.map((message, index) => (
-                  <div
-                    key={index}
-                    className={cn(
-                      'flex gap-2',
-                      message.role === 'user' ? 'flex-row-reverse' : 'flex-row',
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        'grid size-6.5 shrink-0 place-items-center rounded-full text-[10px] font-semibold shadow-2xs',
-                        message.role === 'user'
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-emerald-600 text-white',
-                      )}
-                    >
-                      {message.role === 'user' ? (
-                        <User className="size-3.5" aria-hidden />
-                      ) : (
-                        <Bot className="size-3.5" aria-hidden />
-                      )}
-                    </div>
-
-                    <div
-                      className={cn(
-                        'max-w-[88%] rounded-xl px-3.5 py-2.5 text-xs leading-relaxed shadow-2xs',
-                        message.role === 'user'
-                          ? 'bg-primary text-primary-foreground font-medium'
-                          : 'border border-border/80 bg-card text-foreground',
-                      )}
-                    >
-                      {/* Badge de Consulta Local */}
-                      {message.role === 'assistant' && message.toolsExecuted && message.toolsExecuted.length > 0 && (
-                        <div className="mb-2 flex items-center gap-1.5 rounded-md border border-emerald-200/80 bg-emerald-50/70 px-2 py-0.5 text-[10px] font-medium text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300">
-                          <Database className="size-2.5 text-emerald-600 dark:text-emerald-400" />
-                          <span>
-                            {message.toolsExecuted.length === 1
-                              ? t('chat_tool_executed')
-                              : `${message.toolsExecuted.length} ${t('chat_tools_executed_count')}`}
-                          </span>
-                        </div>
-                      )}
-
-                      {message.role === 'user' ? (
-                        <p className="whitespace-pre-wrap">{message.content}</p>
-                      ) : (
-                        <>
-                          {/* trim: modelos com raciocínio costumam abrir com quebras de linha,
-                              que o Markdown não desenha — o balão ficava em branco. */}
-                          {message.content.trim() && <MessageMarkdown content={message.content} />}
-                          {streaming && index === displayedMessages.length - 1 && (
-                            <TypingIndicator
-                              label={
-                                message.content.trim()
-                                  ? t('chat_writing')
-                                  : currentStatus || t('chat_thinking')
-                              }
-                              className={message.content.trim() ? 'mt-2' : undefined}
-                            />
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ))}
-
-                {messages.length === 0 && (
-                  <div className="mt-2 space-y-1.5">
-                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-                      {t('chat_suggestions_label')}
-                    </p>
-                    <div className="flex flex-col gap-1.5">
-                      {suggestions.map((suggestion) => (
-                        <button
-                          key={suggestion}
-                          type="button"
-                          className="rounded-lg border border-border/80 bg-card/80 px-2.5 py-1.5 text-left text-[11px] font-medium text-foreground transition-all hover:border-emerald-400 hover:bg-emerald-50/50 hover:text-emerald-950 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-300"
-                          onClick={() => void ask(suggestion)}
-                        >
-                          💡 {suggestion}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-
-            {error && (
-              <p className="rounded-lg border border-destructive/40 bg-destructive/10 p-2 text-[11px] text-destructive">
-                {error}
-              </p>
+              <ChatThread compact onConfigure={() => setAiModalOpen(true)} />
             )}
           </div>
 
@@ -425,6 +210,7 @@ export function ChatWidget() {
               onSubmit={(event) => {
                 event.preventDefault();
                 void ask(draft);
+                setDraft('');
               }}
             >
               <Input
@@ -442,7 +228,7 @@ export function ChatWidget() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => abortRef.current?.abort()}
+                  onClick={() => useChat.getState().stop()}
                   className="h-9 gap-1 text-xs"
                 >
                   <Square className="size-3.5" aria-hidden />
@@ -462,6 +248,7 @@ export function ChatWidget() {
                 </Button>
               )}
             </form>
+            <PrivacyNote className="mt-1.5 px-0.5" />
           </div>
         </div>
       )}
