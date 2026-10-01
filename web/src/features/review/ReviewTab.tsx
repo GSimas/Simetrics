@@ -10,6 +10,7 @@ import { useDataset } from '@/state/dataset.store';
 import { useLocale } from '@/state/locale.store';
 import { useNextReviewAction, useReview, useReviewNav, useReviewProgress, useReviewReadOnly } from '@/state/review.store';
 import { REVIEW_COPY } from './copy';
+import { EvidenceReaderHost } from './evidence/EvidenceReader';
 import { ExtractionPanel } from './ExtractionPanel';
 import { PANEL_ENTER, PRESS } from './motion';
 import { goToNextAction, goToProtocolBlock } from './next-step';
@@ -72,6 +73,7 @@ export default function ReviewTab() {
         {step === 'synthesis' && <SynthesisPanel review={review} copy={copy} />}
         {step === 'prisma' && <PrismaPanel review={review} copy={copy} />}
       </div>
+      <EvidenceReaderHost />
     </div>
   );
 }

@@ -857,3 +857,69 @@ html[data-motion='reduce'] .target-flash {
   filter: blur(5px);
   opacity: 0.85;
 }
+
+/*
+ * Camada de texto do leitor de PDF da revisão (pdf.js). Texto transparente posicionado
+ * sobre o canvas: é o que deixa selecionar trechos. Regras equivalentes às do
+ * `pdf_viewer.css` do pdf.js, só o necessário, sem importar a folha inteira do visualizador.
+ */
+.sm-pdf .textLayer {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  line-height: 1;
+  text-align: initial;
+  letter-spacing: normal;
+  word-spacing: normal;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  caret-color: CanvasText;
+  --scale-round-x: 1px;
+  --scale-round-y: 1px;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+}
+.sm-pdf .textLayer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+}
+.sm-pdf .textLayer > :not(.markedContent),
+.sm-pdf .textLayer .markedContent span:not(.markedContent) {
+  z-index: 1;
+  --font-height: 0;
+  font-size: calc(var(--text-scale-factor) * var(--font-height));
+  --scale-x: 1;
+  --rotate: 0deg;
+  transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+.sm-pdf .textLayer .markedContent {
+  display: contents;
+}
+/*
+ * Só o fundo da seleção aparece: o texto da camada usa uma fonte substituta, um pouco fora
+ * do lugar dos glifos do canvas — pintado na cor de seleção padrão, vira "palavra dobrada".
+ */
+.sm-pdf .textLayer ::selection {
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  background: color-mix(in srgb, var(--highlight) 38%, transparent);
+}
+.sm-pdf .textLayer br::selection {
+  background: transparent;
+}
+.sm-pdf .textLayer .endOfContent {
+  display: block;
+  position: absolute;
+  inset: 100% 0 0;
+  z-index: 0;
+  cursor: default;
+  user-select: none;
+}
+.sm-pdf .textLayer.selecting .endOfContent {
+  top: 0;
+}

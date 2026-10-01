@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react';
 
 import { Badge } from '@/components/ui/badge';
+import { qualityTarget } from '@/core/review/evidence';
 import { hasQualityChecklist, includedStudies, scoreStudy } from '@/core/review/quality';
 import type { QualityAnswer, ReviewState } from '@/core/review/types';
 import { cn } from '@/lib/utils';
@@ -9,6 +10,8 @@ import { useReview, useReviewReadOnly, useScreeningRecords } from '@/state/revie
 import type { ReviewCopy } from './copy';
 import { chipClass, useFlash, type Tone } from './motion';
 import { ReadOnlyScope } from './parts';
+import { DocumentSlot, EvidenceInline } from './evidence/DocumentSlot';
+import { EvidenceBlock } from './evidence/EvidenceBlock';
 import { EmptyStep, StudyWorkspace } from './StudyWorkspace';
 
 /** A resposta de maior peso acende em verde, a de peso zero em vermelho, as do meio em âmbar. */
@@ -68,6 +71,8 @@ export function QualityPanel({ review, copy, onEditProtocol }: { review: ReviewS
   };
 
   return (
+    <div className="space-y-4">
+    <EvidenceBlock review={review} studies={studies} />
     <StudyWorkspace
       studies={studies}
       isDone={isDone}
@@ -80,6 +85,8 @@ export function QualityPanel({ review, copy, onEditProtocol }: { review: ReviewS
         const responses = review.quality[study.key] ?? {};
         const result = scoreStudy(review, study.key);
         return (
+          <div className="space-y-4">
+          <DocumentSlot studyKey={study.key} scope="quality" />
           <ReadOnlyScope readOnly={readOnly} className="space-y-4">
             <ol className="space-y-3">
               {review.qualityQuestions.map((question, index) => (
@@ -105,6 +112,7 @@ export function QualityPanel({ review, copy, onEditProtocol }: { review: ReviewS
                       );
                     })}
                   </div>
+                  <EvidenceInline studyKey={study.key} target={qualityTarget(question.id)} scope="quality" />
                 </li>
               ))}
             </ol>
@@ -131,8 +139,10 @@ export function QualityPanel({ review, copy, onEditProtocol }: { review: ReviewS
               </Badge>
             </div>
           </ReadOnlyScope>
+          </div>
         );
       }}
     </StudyWorkspace>
+    </div>
   );
 }

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
 import { NumberInput } from '@/components/ui/number-input';
 import { Textarea } from '@/components/ui/textarea';
+import { extractionTarget } from '@/core/review/evidence';
 import { finalSelection } from '@/core/review/quality';
 import type { ExtractionField, ExtractionValue, ReviewState } from '@/core/review/types';
 import { cn } from '@/lib/utils';
@@ -13,6 +14,8 @@ import { useReview, useReviewReadOnly, useScreeningRecords } from '@/state/revie
 import type { ReviewCopy } from './copy';
 import { chipClass, useFlash, type Tone } from './motion';
 import { ReadOnlyScope } from './parts';
+import { DocumentSlot, EvidenceInline } from './evidence/DocumentSlot';
+import { EvidenceBlock } from './evidence/EvidenceBlock';
 import { EmptyStep, StudyWorkspace } from './StudyWorkspace';
 
 function Choice({
@@ -33,7 +36,7 @@ function Choice({
   );
 }
 
-function FieldInput({
+export function FieldInput({
   field,
   value,
   onChange,
@@ -124,6 +127,8 @@ export function ExtractionPanel({ review, copy, onEditProtocol }: { review: Revi
   }
 
   return (
+    <div className="space-y-4">
+    <EvidenceBlock review={review} studies={studies} />
     <StudyWorkspace
       studies={studies}
       isDone={isDone}
@@ -145,6 +150,8 @@ export function ExtractionPanel({ review, copy, onEditProtocol }: { review: Revi
         const extraction = review.extraction[study.key];
         const done = extraction?.done === true;
         return (
+          <div className="space-y-4">
+          <DocumentSlot studyKey={study.key} scope="extraction" />
           <ReadOnlyScope readOnly={readOnly} className="space-y-4">
             {review.extractionFields.map((field) => (
               <div
@@ -160,6 +167,7 @@ export function ExtractionPanel({ review, copy, onEditProtocol }: { review: Revi
                   onChange={(value) => setExtractionValue(study.key, field.id, value)}
                   copy={copy}
                 />
+                <EvidenceInline studyKey={study.key} target={extractionTarget(field.id)} scope="extraction" />
               </div>
             ))}
             <div className="border-t border-border/80 pt-3">
@@ -195,8 +203,10 @@ export function ExtractionPanel({ review, copy, onEditProtocol }: { review: Revi
               )}
             </div>
           </ReadOnlyScope>
+          </div>
         );
       }}
     </StudyWorkspace>
+    </div>
   );
 }
