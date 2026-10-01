@@ -21,6 +21,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useReview, useReviewReadOnly } from '@/state/review.store';
 import { ChipInput } from './ChipInput';
+import { addOnEnter } from './keys';
 import type { ReviewCopy } from './copy';
 import { ADD_BUTTON, chipClass, ENTER, useExitRemove } from './motion';
 import { AnimatedItem } from './motion-parts';
@@ -115,7 +116,7 @@ function CriteriaList({
   const prefix = kind === 'inclusion' ? 'I' : 'E';
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" data-review-target={kind}>
       <p className={cn('eyebrow', kind === 'inclusion' ? 'text-include' : 'text-exclude')}>
         {kind === 'inclusion' ? copy.inclusion : copy.exclusion}
       </p>
@@ -134,6 +135,7 @@ function CriteriaList({
                 ),
               })
             }
+            onKeyDown={addOnEnter(() => onAdded(addCriterion(kind)))}
             placeholder={copy.criterionPlaceholder}
             aria-label={`${prefix}${index + 1}`}
             autoFocus={criterion.id === focusId}
@@ -205,6 +207,7 @@ export function ProtocolPanel({ review, copy }: { review: ReviewState; copy: Rev
             </Label>
             <Input
               id="review-title"
+              data-review-target="title"
               value={review.title}
               onChange={(event) => update({ title: event.target.value })}
               placeholder={copy.titlePlaceholder}
@@ -217,6 +220,7 @@ export function ProtocolPanel({ review, copy }: { review: ReviewState; copy: Rev
             </Label>
             <Textarea
               id="review-objective"
+              data-review-target="objective"
               value={review.objective}
               onChange={(event) => update({ objective: event.target.value })}
               placeholder={copy.objectivePlaceholder}
@@ -226,7 +230,7 @@ export function ProtocolPanel({ review, copy }: { review: ReviewState; copy: Rev
           </div>
         </Block>
 
-        <Block title={copy.frameworkLabel}>
+        <Block title={copy.frameworkLabel} target="framework">
           <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={copy.frameworkLabel}>
             {FRAMEWORKS.map((framework: Framework) => (
               <button
@@ -261,7 +265,7 @@ export function ProtocolPanel({ review, copy }: { review: ReviewState; copy: Rev
           </div>
         </Block>
 
-        <Block title={copy.questionsLabel}>
+        <Block title={copy.questionsLabel} target="question">
           {review.questions.map((question, index) => (
             <AnimatedItem key={question.id} leaving={questions.isLeaving(question.id)} className="flex items-center gap-2">
               <span className="w-8 shrink-0 font-mono text-xs text-muted-foreground">Q{index + 1}</span>
@@ -274,6 +278,7 @@ export function ProtocolPanel({ review, copy }: { review: ReviewState; copy: Rev
                     ),
                   })
                 }
+                onKeyDown={addOnEnter(() => setFocusId(addQuestion()))}
                 placeholder={copy.questionPlaceholder}
                 aria-label={`Q${index + 1}`}
                 autoFocus={question.id === focusId}
@@ -296,7 +301,7 @@ export function ProtocolPanel({ review, copy }: { review: ReviewState; copy: Rev
 
       <div className="space-y-4">
         <ReadOnlyScope readOnly={readOnly}>
-          <Block title={copy.conceptsLabel} hint={copy.conceptsHint}>
+          <Block title={copy.conceptsLabel} hint={copy.conceptsHint} target="concept">
             {review.concepts.map((concept, index) => (
               <AnimatedItem key={concept.id} leaving={concepts.isLeaving(concept.id)} className="space-y-2">
                 {index > 0 && <p className="text-center font-mono text-[10px] text-muted-foreground">AND</p>}

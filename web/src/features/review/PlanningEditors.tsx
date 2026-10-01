@@ -12,6 +12,7 @@ import { EXTRACTION_FIELD_TYPES, type ExtractionFieldType, type ReviewState } fr
 import { useLocale } from '@/state/locale.store';
 import { useReview } from '@/state/review.store';
 import { ChipInput } from './ChipInput';
+import { addOnEnter } from './keys';
 import type { ReviewCopy } from './copy';
 import { ADD_BUTTON, ENTER, useExitRemove } from './motion';
 import { AnimatedItem } from './motion-parts';
@@ -31,6 +32,7 @@ export function QualityChecklistEditor({ review, copy }: { review: ReviewState; 
 
   return (
     <Block
+      target="quality-checklist"
       title={copy.qualityChecklist}
       hint={`${copy.qualityChecklistHint}${review.type === 'scoping' ? ` ${copy.qualityOptional}` : ''}`}
     >
@@ -46,6 +48,7 @@ export function QualityChecklistEditor({ review, copy }: { review: ReviewState; 
                 ),
               })
             }
+            onKeyDown={addOnEnter(() => setFocusId(addQualityQuestion(() => defaultQualityAnswers(locale))))}
             placeholder={copy.qualityQuestionPlaceholder}
             aria-label={`Q${index + 1}`}
             autoFocus={question.id === focusId}
@@ -82,6 +85,7 @@ export function QualityChecklistEditor({ review, copy }: { review: ReviewState; 
                     ),
                   })
                 }
+                onKeyDown={addOnEnter(() => setFocusId(addQualityAnswer()))}
                 placeholder={copy.answerPlaceholder}
                 aria-label={copy.answerPlaceholder}
                 autoFocus={answer.id === focusId}
@@ -165,7 +169,7 @@ export function ExtractionFormEditor({ review, copy }: { review: ReviewState; co
     update({ extractionFields: review.extractionFields.map((field) => (field.id === id ? { ...field, ...patch } : field)) });
 
   return (
-    <Block title={copy.extractionForm} hint={copy.extractionFormHint}>
+    <Block title={copy.extractionForm} hint={copy.extractionFormHint} target="extraction-form">
       {review.extractionFields.map((field) => (
         <AnimatedItem key={field.id} leaving={fields.isLeaving(field.id)}>
         <div className="space-y-2 rounded-lg border border-border/60 p-3 transition-[border-color,box-shadow] duration-300 focus-within:border-highlight/50 focus-within:shadow-[0_0_24px_-14px_var(--highlight)]">
@@ -173,6 +177,7 @@ export function ExtractionFormEditor({ review, copy }: { review: ReviewState; co
             <Input
               value={field.label}
               onChange={(event) => patchField(field.id, { label: event.target.value })}
+              onKeyDown={addOnEnter(() => setFocusId(addExtractionField()))}
               placeholder={copy.fieldPlaceholder}
               aria-label={copy.fieldPlaceholder}
               autoFocus={field.id === focusId}

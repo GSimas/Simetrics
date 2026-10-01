@@ -12,29 +12,30 @@ import { useDataset } from './dataset.store';
  * um termo — clicar numa barra, num nó, numa palavra da nuvem. E, por ser global, a
  * busca sobrevive à troca de abas.
  */
-/** As três abas do workspace. */
-export type WorkspaceTab = 'bibliometrics' | 'search' | 'review';
+/** As telas do workspace: Dados primeiro; os módulos só com uma base carregada. */
+export type WorkspaceTab = 'data' | 'bibliometrics' | 'search' | 'review';
 /** As vistas dentro da aba Análise Bibliométrica. */
 export type BibliometricView = 'overview' | 'networks' | 'advanced' | 'report';
 
 const BIBLIOMETRIC_VIEWS: readonly string[] = ['overview', 'networks', 'advanced', 'report'] satisfies BibliometricView[];
 
-/** Escopo do seletor de tipo: um tipo de entidade ou todos juntos. */
-export type SearchScope = SearchEntityType | 'Todos';
-
 interface NavigationState {
   activeTab: WorkspaceTab;
   bibliometricView: BibliometricView;
-  searchScope: SearchScope;
-  /** Tipo concreto do termo aberto — em "Todos", vem do item escolhido. */
+  /** Tipo do termo aberto no dossiê. */
   searchType: SearchEntityType;
   searchTerm: string | null;
+  /** Consulta enviada na caixa do Motor de Busca (resultados textuais). */
+  searchQuery: string;
+  /** Motor de Busca no modo conversa com a Simi, em vez de resultados e dossiê. */
+  chatOpen: boolean;
   /**
    * Abre uma aba — ou, com o nome de uma vista bibliométrica (`overview`, `networks`,
-   * `advanced`, `report`), a aba Análise Bibliométrica já nessa vista.
+   * `advanced`, `report`), a aba Análise Bibliométrica já nessa vista. Sem base
+   * carregada, os módulos ficam bloqueados: só Dados e a Revisão (pelo protocolo) abrem.
    */
   setActiveTab: (tab: string) => void;
-  /** Abre um termo; o escopo vira "Todos" se o atual não comportar o tipo do termo. */
+  /** Abre o dossiê de um termo. */
   selectEntity: (type: SearchEntityType, term: string) => void;
   /**
    * Abre no Motor de Busca o perfil do termo, se ele existir no acervo sob algum dos
@@ -45,23 +46,22 @@ interface NavigationState {
 }
 
 export const useNavigation = create<NavigationState>()((set, get) => ({
-  activeTab: 'bibliometrics',
+  activeTab: 'data',
   bibliometricView: 'overview',
-  searchScope: 'Todos',
   searchType: 'Autor',
   searchTerm: null,
-  setActiveTab: (tab) =>
+  searchQuery: '',
+  chatOpen: false,
+  setActiveTab: (tab) => {
+    // A revisão abre sem base: o protocolo se escreve antes da busca.
+    if (tab !== 'data' && tab !== 'review' && !useDataset.getState().active) return;
     set(
       BIBLIOMETRIC_VIEWS.includes(tab)
         ? { activeTab: 'bibliometrics', bibliometricView: tab as BibliometricView }
         : { activeTab: tab as WorkspaceTab },
-    ),
-  selectEntity: (type, term) =>
-    set((state) => ({
-      searchScope: state.searchScope === type ? type : 'Todos',
-      searchType: type,
-      searchTerm: term,
-    })),
+    );
+  },
+  selectEntity: (type, term) => set({ searchType: type, searchTerm: term, chatOpen: false }),
   openInSearch(term, types) {
     const match = resolveEntity(term, types);
     if (!match) return false;
@@ -109,10 +109,26 @@ export function resolveEntity(
 // Outra base carregada: o termo aberto no Motor de Busca pertencia à anterior.
 useDataset.subscribe(
   (state) => state.original,
-  () => useNavigation.setState({ searchTerm: null }),
+  () => useNavigation.setState({ searchTerm: null, searchQuery: '', chatOpen: false }),
+);
+
+// Base descarregada (limpar, trocar de projeto): os módulos voltam a bloquear.
+useDataset.subscribe(
+  (state) => state.active,
+  (active) => {
+    if (!active) useNavigation.setState({ activeTab: 'data' });
+  },
 );
 
 /** Atalho para handlers de clique em gráficos, fora do ciclo de render. */
 export function openInSearch(term: unknown, types: readonly SearchEntityType[]): boolean {
   return useNavigation.getState().openInSearch(term, types);
+}
+
+/** Abre o dossiê de uma entidade no Motor de Busca, de qualquer tela (sai do modo conversa). */
+export function openDossier(type: SearchEntityType, term: string): void {
+  const navigation = useNavigation.getState();
+  navigation.selectEntity(type, term);
+  navigation.setActiveTab('search');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }

@@ -12,6 +12,7 @@ import {
   Gauge,
   GitBranch,
   Globe2,
+  ListFilter,
   HelpCircle,
   LayoutGrid,
   Layers,
@@ -32,11 +33,13 @@ import {
 } from 'lucide-react';
 
 import { optionsForType } from '@/core/search';
+import { collectColumns, pickColumn, splitTokens } from '@/core/text';
+import { FIELD_CANDIDATES } from '@/lib/schema';
 import { useDataset } from '@/state/dataset.store';
 import { resolveEntity, useNavigation } from '@/state/navigation.store';
 import { useReviewNav, type ReviewStep } from '@/state/review.store';
 
-export type TourTab = 'overview' | 'networks' | 'advanced' | 'search' | 'report' | 'review';
+export type TourTab = 'data' | 'overview' | 'networks' | 'advanced' | 'search' | 'report' | 'review';
 
 /** Abre uma etapa da revisão sistematizada antes de procurar o alvo. */
 function openReviewStep(step: ReviewStep): () => void {
@@ -71,7 +74,7 @@ function openTopAuthor(): void {
   const { tables, searchOptions } = useDataset.getState();
   const navigation = useNavigation.getState();
   if (navigation.searchTerm) {
-    useNavigation.setState({ activeTab: 'search' });
+    useNavigation.setState({ activeTab: 'search', chatOpen: false });
     return;
   }
   const candidate =
@@ -81,13 +84,43 @@ function openTopAuthor(): void {
   useNavigation.setState({ activeTab: 'search' });
 }
 
+/** A palavra-chave mais frequente da base — uma consulta que certamente traz resultados. */
+function topKeyword(): string {
+  const active = useDataset.getState().active ?? [];
+  const column = pickColumn(collectColumns(active), FIELD_CANDIDATES.keywords);
+  if (!column) return '';
+  const counts = new Map<string, { term: string; count: number }>();
+  for (const doc of active) {
+    for (const term of splitTokens(doc[column])) {
+      const key = term.toLowerCase();
+      const entry = counts.get(key) ?? { term, count: 0 };
+      entry.count += 1;
+      counts.set(key, entry);
+    }
+  }
+  let best = { term: '', count: 0 };
+  for (const entry of counts.values()) if (entry.count > best.count) best = entry;
+  return best.term;
+}
+
+/** Abre no Motor de Busca os resultados de uma consulta de exemplo. */
+function showSampleResults(): void {
+  const { searchQuery } = useNavigation.getState();
+  useNavigation.setState({
+    activeTab: 'search',
+    searchQuery: searchQuery || topKeyword(),
+    searchTerm: null,
+    chatOpen: false,
+  });
+}
+
 export const TOUR_STEPS: TourStep[] = [
   {
     id: 'welcome',
     Icon: Compass,
     pt: {
       title: 'Tour guiado pelo Simetrics',
-      body: 'Vamos percorrer o Simetrics inteiro, bloco a bloco: importação, indicadores, gráficos, redes, Motor de Busca, relatório, revisão sistematizada e a assistente de IA. Cada parada destaca uma parte da tela e explica como ler e usar.',
+      body: 'Vamos percorrer o Simetrics inteiro, bloco a bloco: dados, Motor de Busca e conversa com a IA, indicadores, gráficos, redes, relatório e revisão sistematizada. Cada parada destaca uma parte da tela e explica como ler e usar.',
       bullets: [
         'Sem base aberta, o tour carrega a base de exemplo (973 documentos reais).',
         'Navegue com os botões, com as setas ← → do teclado, ou saia com Esc.',
@@ -96,7 +129,7 @@ export const TOUR_STEPS: TourStep[] = [
     },
     en: {
       title: 'Guided tour of Simetrics',
-      body: 'We will walk through all of Simetrics, block by block: import, indicators, charts, networks, Search Engine, report, systematized review and the AI assistant. Each stop highlights part of the screen and explains how to read and use it.',
+      body: 'We will walk through all of Simetrics, block by block: data, Search Engine and AI conversation, indicators, charts, networks, report and systematized review. Each stop highlights part of the screen and explains how to read and use it.',
       bullets: [
         'With no dataset open, the tour loads the demo dataset (973 real documents).',
         'Move with the buttons or the ← → keys, and leave with Esc.',
@@ -108,49 +141,25 @@ export const TOUR_STEPS: TourStep[] = [
     id: 'tabs',
     Icon: LayoutGrid,
     target: 'tabs',
-    tab: 'overview',
+    tab: 'data',
     pt: {
-      title: 'As três áreas',
-      body: 'O trabalho se divide em três abas: a análise bibliométrica, o Motor de Busca e a revisão sistematizada, todas sobre a mesma base.',
+      title: 'A barra lateral',
+      body: 'O trabalho segue uma jornada, de cima para baixo nesta barra: primeiro os dados, depois a exploração e as análises, todas sobre a mesma base. Recolha a barra para ganhar espaço.',
       bullets: [
-        '01 Análise Bibliométrica — Informações Principais, Redes, Análises Avançadas e Relatório, na ordem natural de uma análise.',
-        '02 Motor de Busca — o dossiê de qualquer autor, país, venue, termo ou documento.',
-        '03 Revisão Sistematizada — protocolo, triagem, qualidade, extração, síntese e PRISMA.',
+        '01 Dados — importação e deduplicação. Os módulos abaixo abrem com uma base carregada; a Revisão já abre sem ela, pelo protocolo.',
+        '02 Motor de Busca — busca nos documentos, dossiês e conversa com a IA sobre a base.',
+        '03 Análise Bibliométrica — Informações Principais, Redes, Análises Avançadas e Relatório.',
+        '04 Revisão Sistematizada — protocolo, triagem, qualidade, extração, síntese e PRISMA, com o progresso de cada etapa.',
       ],
     },
     en: {
-      title: 'The three areas',
-      body: 'Work is split into three tabs: the bibliometric analysis, the Search Engine and the systematized review, all over the same dataset.',
+      title: 'The sidebar',
+      body: 'Work follows a journey, top to bottom in this bar: data first, then exploration and analyses, all over the same dataset. Collapse the bar to gain space.',
       bullets: [
-        '01 Bibliometric Analysis — Main Information, Networks, Advanced Analyses and Report, in the natural order of an analysis.',
-        '02 Search Engine — the dossier of any author, country, venue, term or document.',
-        '03 Systematized Review — protocol, screening, quality, extraction, synthesis and PRISMA.',
-      ],
-    },
-  },
-  {
-    id: 'bibliometric-views',
-    Icon: BarChart3,
-    target: 'bibliometric-views',
-    tab: 'overview',
-    pt: {
-      title: 'Análise Bibliométrica',
-      body: 'A primeira aba reúne a análise bibliométrica em quatro vistas, que você alterna por estes botões.',
-      bullets: [
-        '1 Informações Principais — importação, indicadores, rankings e tabelas analíticas.',
-        '2 Redes — coocorrência, comunidades e colaboração internacional.',
-        '3 Análises Avançadas — Sankey, boxplot, mapas conceitual e temático, historiograph e Lotka.',
-        '4 Relatório — um documento PDF ou Word com o que você escolher.',
-      ],
-    },
-    en: {
-      title: 'Bibliometric Analysis',
-      body: 'The first tab gathers the bibliometric analysis in four views, which you switch with these buttons.',
-      bullets: [
-        '1 Main Information — import, indicators, rankings and analytical tables.',
-        '2 Networks — co-occurrence, communities and international collaboration.',
-        '3 Advanced Analyses — Sankey, boxplot, concept and thematic maps, historiograph and Lotka.',
-        '4 Report — a PDF or Word document with whatever you select.',
+        '01 Data — import and deduplication. The modules below open once a dataset is loaded; the Review opens without one, starting with the protocol.',
+        '02 Search Engine — document search, dossiers and AI conversation about the dataset.',
+        '03 Bibliometric Analysis — Main Information, Networks, Advanced Analyses and Report.',
+        '04 Systematized Review — protocol, screening, quality, extraction, synthesis and PRISMA, with the progress of each stage.',
       ],
     },
   },
@@ -158,7 +167,7 @@ export const TOUR_STEPS: TourStep[] = [
     id: 'upload',
     Icon: Database,
     target: 'upload',
-    tab: 'overview',
+    tab: 'data',
     pt: {
       title: 'Base de dados',
       body: 'Tudo começa aqui. Envie um ou vários arquivos de uma vez: o Simetrics reconhece a origem de cada um e une as bases num só acervo, processado 100% no seu navegador.',
@@ -182,7 +191,7 @@ export const TOUR_STEPS: TourStep[] = [
     id: 'dedup',
     Icon: Copy,
     target: 'dedup',
-    tab: 'overview',
+    tab: 'data',
     needsData: true,
     pt: {
       title: 'Deduplicação',
@@ -200,6 +209,156 @@ export const TOUR_STEPS: TourStep[] = [
         'By DOI — removes records sharing a DOI.',
         'By similarity — compares titles (Jaccard) and catches duplicates without a DOI.',
         'Both — applies both criteria. The report lists what was removed and what was kept.',
+      ],
+    },
+  },
+  {
+    id: 'search-picker',
+    Icon: Search,
+    target: 'search-picker',
+    tab: 'search',
+    needsData: true,
+    prepare: showSampleResults,
+    pt: {
+      title: 'Motor de Busca',
+      body: 'Uma caixa só, como num buscador: enquanto você digita, ela sugere autores, países, venues, palavras-chave, temas e títulos; Enter busca o texto nos documentos, do mais ao menos relevante. Todo nome clicável no Simetrics (barras, nós, países, linhas de tabela) também traz você para cá. Buscamos a palavra-chave mais frequente da base como exemplo.',
+    },
+    en: {
+      title: 'Search Engine',
+      body: 'A single box, like a search engine: as you type it suggests authors, countries, venues, keywords, themes and titles; Enter searches the text of the documents, most relevant first. Every clickable name in Simetrics (bars, nodes, countries, table rows) also brings you here. We searched the most frequent keyword in the dataset as an example.',
+    },
+  },
+  {
+    id: 'search-results',
+    Icon: ListFilter,
+    target: 'search-results',
+    tab: 'search',
+    needsData: true,
+    prepare: showSampleResults,
+    pt: {
+      title: 'Resultados da busca',
+      body: 'Enter traz os documentos mais relevantes para a frase, como num buscador: autores, ano e periódico, o título e um trecho do resumo com os termos em destaque. Acima, as entidades com esse nome. Qualquer título abre o dossiê do documento.',
+    },
+    en: {
+      title: 'Search results',
+      body: 'Enter brings the documents most relevant to the phrase, like a search engine: authors, year and venue, the title and an abstract excerpt with the terms highlighted. Above them, the entities with that name. Any title opens the document dossier.',
+    },
+  },
+  {
+    id: 'search-ask',
+    Icon: Sparkles,
+    target: 'search-ask',
+    tab: 'search',
+    needsData: true,
+    prepare: showSampleResults,
+    pt: {
+      title: 'Perguntar à IA',
+      body: 'Quando a busca não basta, a mesma frase vira uma pergunta à Simi, sobre a base inteira. A conversa abre em tela cheia e cada resposta lista os documentos em que se apoiou.',
+      bullets: [
+        'Só os documentos mais relevantes para a pergunta e um panorama agregado vão ao provedor de IA; o restante fica no navegador.',
+        'Há perguntas gratuitas; depois, entre com o OpenRouter ou informe sua chave.',
+      ],
+    },
+    en: {
+      title: 'Ask AI',
+      body: 'When search is not enough, the same phrase becomes a question to Simi about the whole dataset. The conversation opens full screen, and each answer lists the documents it relied on.',
+      bullets: [
+        'Only the documents most relevant to the question and an aggregate overview go to the AI provider; everything else stays in the browser.',
+        'A few questions are free; after that, sign in with OpenRouter or enter your key.',
+      ],
+    },
+  },
+  {
+    id: 'search-dossier',
+    Icon: UserRound,
+    target: 'search-dossier',
+    tab: 'search',
+    needsData: true,
+    prepare: openTopAuthor,
+    pt: {
+      title: 'Dossiê da entidade',
+      body: 'O perfil reúne documentos, coautores, citações, índices h, g, i10 e m, período de atividade e a especialização temática. Os coautores e países também são clicáveis — dá para navegar de perfil em perfil. Abrimos o autor de maior destaque da base como exemplo.',
+    },
+    en: {
+      title: 'Entity dossier',
+      body: 'The profile gathers documents, co-authors, citations, h, g, i10 and m indices, active period and thematic specialisation. Co-authors and countries are clickable too — you can hop from profile to profile. We opened the most prominent author in the dataset as an example.',
+    },
+  },
+  {
+    id: 'search-lexico',
+    Icon: TextSearch,
+    target: 'search-lexico',
+    tab: 'search',
+    needsData: true,
+    optional: true,
+    prepare: openTopAuthor,
+    pt: {
+      title: 'Léxico e trajetória',
+      body: 'A nuvem de palavras mostra o vocabulário da entidade; a linha do tempo, como a produção se distribui nos anos; e, quando há países, o mapa das suas colaborações.',
+    },
+    en: {
+      title: 'Lexicon and trajectory',
+      body: "The word cloud shows the entity's vocabulary; the timeline, how its output spreads over the years; and, when countries are present, the map of its collaborations.",
+    },
+  },
+  {
+    id: 'search-similar',
+    Icon: Users,
+    target: 'search-similar',
+    tab: 'search',
+    needsData: true,
+    optional: true,
+    prepare: openTopAuthor,
+    pt: {
+      title: 'Entidades semelhantes',
+      body: 'Perfis com "DNA acadêmico" parecido, pela similaridade de Jaccard entre coautores, venues e vocabulário. Ótimo para descobrir pares, revisores ou grupos que você ainda não conhecia.',
+    },
+    en: {
+      title: 'Similar entities',
+      body: 'Profiles with a similar "academic DNA", by Jaccard similarity across co-authors, venues and vocabulary. Great for discovering peers, reviewers or groups you did not know yet.',
+    },
+  },
+  {
+    id: 'search-docs',
+    Icon: FileText,
+    target: 'search-docs',
+    tab: 'search',
+    needsData: true,
+    optional: true,
+    prepare: openTopAuthor,
+    pt: {
+      title: 'Documentos da entidade',
+      body: 'Todos os documentos ligados ao perfil, com ano, citações e link do DOI, prontos para filtrar, ordenar e exportar.',
+    },
+    en: {
+      title: "Entity's documents",
+      body: 'Every document linked to the profile, with year, citations and DOI link, ready to filter, sort and export.',
+    },
+  },
+  {
+    id: 'bibliometric-views',
+    Icon: BarChart3,
+    target: 'bibliometric-views',
+    tab: 'overview',
+    needsData: true,
+    pt: {
+      title: 'Análise Bibliométrica',
+      body: 'A análise bibliométrica tem quatro vistas, aninhadas na barra lateral.',
+      bullets: [
+        '1 Informações Principais — indicadores, rankings e tabelas analíticas.',
+        '2 Redes — coocorrência, comunidades e colaboração internacional.',
+        '3 Análises Avançadas — Sankey, boxplot, mapas conceitual e temático, historiograph e Lotka.',
+        '4 Relatório — um documento PDF ou Word com o que você escolher.',
+      ],
+    },
+    en: {
+      title: 'Bibliometric Analysis',
+      body: 'The bibliometric analysis has four views, nested in the sidebar.',
+      bullets: [
+        '1 Main Information — indicators, rankings and analytical tables.',
+        '2 Networks — co-occurrence, communities and international collaboration.',
+        '3 Advanced Analyses — Sankey, boxplot, concept and thematic maps, historiograph and Lotka.',
+        '4 Report — a PDF or Word document with whatever you select.',
       ],
     },
   },
@@ -255,11 +414,11 @@ export const TOUR_STEPS: TourStep[] = [
     needsData: true,
     pt: {
       title: 'Faixa de indicadores',
-      body: 'Os números-chave da base ficam sempre à vista no cabeçalho, em qualquer aba: bases de origem, documentos, período, autores, países, venues e crescimento. Clique na faixa para pausar a rolagem.',
+      body: 'Os números-chave da base ficam sempre à vista no cabeçalho, em qualquer tela: bases de origem, documentos, período, autores, países, venues e crescimento. Clique na faixa para pausar a rolagem.',
     },
     en: {
       title: 'Indicator strip',
-      body: 'The key numbers of the dataset stay visible in the header on every tab: source databases, documents, period, authors, countries, venues and growth. Click the strip to pause the scrolling.',
+      body: 'The key numbers of the dataset stay visible in the header on every screen: source databases, documents, period, authors, countries, venues and growth. Click the strip to pause the scrolling.',
     },
   },
   {
@@ -467,7 +626,7 @@ export const TOUR_STEPS: TourStep[] = [
     needsData: true,
     pt: {
       title: 'Análises visuais avançadas',
-      body: 'Sete visualizações clássicas da bibliometria, agora numa aba própria, cada uma com seu "Como ler".',
+      body: 'Sete visualizações clássicas da bibliometria, numa vista própria, cada uma com seu "Como ler".',
       bullets: [
         'Sankey — evolução dos temas entre períodos (ajuste os cortes nos controles deslizantes).',
         'Boxplot — distribuição de citações entre grupos.',
@@ -478,7 +637,7 @@ export const TOUR_STEPS: TourStep[] = [
     },
     en: {
       title: 'Advanced visual analyses',
-      body: 'Seven classic bibliometric visualisations, now in their own tab, each with its own "How to read".',
+      body: 'Seven classic bibliometric visualisations, in their own view, each with its own "How to read".',
       bullets: [
         'Sankey — how themes evolve across periods (adjust the cuts with the sliders).',
         'Boxplot — citation distribution across groups.',
@@ -486,89 +645,6 @@ export const TOUR_STEPS: TourStep[] = [
         'Historiograph — the citation lineage between documents.',
         "Lotka's law — author productivity.",
       ],
-    },
-  },
-  {
-    id: 'search-picker',
-    Icon: Search,
-    target: 'search-picker',
-    tab: 'search',
-    needsData: true,
-    prepare: openTopAuthor,
-    pt: {
-      title: 'Motor de Busca',
-      body: 'Escolha o tipo de entidade — autor, país, venue, palavra-chave, tema ou documento — e digite para buscar. Todo nome clicável no Simetrics (barras, nós, países, linhas de tabela) também traz você para cá. Abrimos o autor de maior destaque da base como exemplo.',
-    },
-    en: {
-      title: 'Search Engine',
-      body: 'Pick an entity type — author, country, venue, keyword, theme or document — and type to search. Every clickable name in Simetrics (bars, nodes, countries, table rows) also brings you here. We opened the most prominent author in the dataset as an example.',
-    },
-  },
-  {
-    id: 'search-dossier',
-    Icon: UserRound,
-    target: 'search-dossier',
-    tab: 'search',
-    needsData: true,
-    prepare: openTopAuthor,
-    pt: {
-      title: 'Dossiê da entidade',
-      body: 'O perfil reúne documentos, coautores, citações, índices h, g, i10 e m, período de atividade e a especialização temática. Os coautores e países também são clicáveis — dá para navegar de perfil em perfil.',
-    },
-    en: {
-      title: 'Entity dossier',
-      body: 'The profile gathers documents, co-authors, citations, h, g, i10 and m indices, active period and thematic specialisation. Co-authors and countries are clickable too — you can hop from profile to profile.',
-    },
-  },
-  {
-    id: 'search-lexico',
-    Icon: TextSearch,
-    target: 'search-lexico',
-    tab: 'search',
-    needsData: true,
-    optional: true,
-    prepare: openTopAuthor,
-    pt: {
-      title: 'Léxico e trajetória',
-      body: 'A nuvem de palavras mostra o vocabulário da entidade; a linha do tempo, como a produção se distribui nos anos; e, quando há países, o mapa das suas colaborações.',
-    },
-    en: {
-      title: 'Lexicon and trajectory',
-      body: "The word cloud shows the entity's vocabulary; the timeline, how its output spreads over the years; and, when countries are present, the map of its collaborations.",
-    },
-  },
-  {
-    id: 'search-similar',
-    Icon: Users,
-    target: 'search-similar',
-    tab: 'search',
-    needsData: true,
-    optional: true,
-    prepare: openTopAuthor,
-    pt: {
-      title: 'Entidades semelhantes',
-      body: 'Perfis com "DNA acadêmico" parecido, pela similaridade de Jaccard entre coautores, venues e vocabulário. Ótimo para descobrir pares, revisores ou grupos que você ainda não conhecia.',
-    },
-    en: {
-      title: 'Similar entities',
-      body: 'Profiles with a similar "academic DNA", by Jaccard similarity across co-authors, venues and vocabulary. Great for discovering peers, reviewers or groups you did not know yet.',
-    },
-  },
-  {
-    id: 'search-docs',
-    Icon: FileText,
-    target: 'search-docs',
-    tab: 'search',
-    needsData: true,
-    optional: true,
-    prepare: openTopAuthor,
-    pt: {
-      title: 'Documentos da entidade',
-      body: 'Todos os documentos ligados ao perfil, com ano, citações e link do DOI, prontos para filtrar, ordenar e exportar.',
-    },
-    en: {
-      title: "Entity's documents",
-      body: 'Every document linked to the profile, with year, citations and DOI link, ready to filter, sort and export.',
     },
   },
   {
@@ -610,8 +686,9 @@ export const TOUR_STEPS: TourStep[] = [
     prepare: openReviewStep('protocol'),
     pt: {
       title: 'Revisão sistematizada',
-      body: 'Revisão sistemática, de escopo, integrativa, rápida, guarda-chuva ou mapeamento sistemático, sobre a mesma base da análise bibliométrica. São seis etapas, da pergunta ao PRISMA, no fluxo de ferramentas como o Parsifal.',
+      body: 'Revisão sistemática, de escopo, integrativa, rápida, guarda-chuva ou mapeamento sistemático, sobre a mesma base da análise bibliométrica. São seis etapas, da pergunta ao PRISMA, no fluxo de ferramentas como o Parsifal — subpáginas na barra lateral.',
       bullets: [
+        'Este painel mostra o avanço: o total da revisão e a completude de cada etapa, que se atualiza a cada decisão. Os anéis na barra lateral acompanham.',
         'O exemplo traz uma revisão de escopo de amostra sobre memética, só para visualização.',
         '"Fazer cópia editável" transforma o exemplo num projeto seu, com a revisão junto.',
         'Tudo fica salvo no projeto, no seu navegador.',
@@ -619,8 +696,9 @@ export const TOUR_STEPS: TourStep[] = [
     },
     en: {
       title: 'Systematized review',
-      body: 'Systematic, scoping, integrative, rapid, umbrella review or systematic mapping, over the same dataset as the bibliometric analysis. Six stages, from the question to PRISMA, following tools like Parsifal.',
+      body: 'Systematic, scoping, integrative, rapid, umbrella review or systematic mapping, over the same dataset as the bibliometric analysis. Six stages, from the question to PRISMA, following tools like Parsifal — subpages in the sidebar.',
       bullets: [
+        'This panel shows the progress: the review total and how complete each stage is, updated with every decision. The rings in the sidebar follow along.',
         'The demo ships a sample scoping review on memetics, view only.',
         '"Make an editable copy" turns the demo into your own project, review included.',
         'Everything is saved in the project, in your browser.',
@@ -719,14 +797,15 @@ export const TOUR_STEPS: TourStep[] = [
     id: 'chat',
     Icon: Bot,
     target: 'chat',
+    tab: 'review',
     needsData: true,
     pt: {
       title: 'Simi, a assistente científica',
-      body: 'Converse com a sua base: a Simi busca os documentos relevantes e responde citando-os. Está disponível em qualquer aba. Na primeira vez, informe a chave do seu provedor (Gemini, OpenAI, Claude, OpenRouter ou um modelo local) — ela fica só no seu navegador.',
+      body: 'Converse com a sua base: a Simi busca os documentos relevantes e responde a partir deles, listando as fontes. No Motor de Busca, use ✦ Perguntar à IA; nas análises, este botão — é a mesma conversa. Há perguntas gratuitas; depois, entre com o OpenRouter ou informe a chave do seu provedor, que fica só no seu navegador.',
     },
     en: {
       title: 'Simi, the scientific assistant',
-      body: 'Chat with your dataset: Simi retrieves the relevant documents and answers citing them. It is available on every tab. The first time, enter your provider key (Gemini, OpenAI, Claude, OpenRouter or a local model) — it stays in your browser only.',
+      body: 'Chat with your dataset: Simi retrieves the relevant documents and answers from them, listing the sources. In the Search Engine use ✦ Ask AI; in the analyses, this button — it is the same conversation. A few questions are free; after that, sign in with OpenRouter or enter your provider key, which stays in your browser only.',
     },
   },
   {

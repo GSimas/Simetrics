@@ -3,16 +3,20 @@ import { ExternalLink } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
+/** Transforma um trecho de texto puro (fora de código e links) — ex.: ligar entidades da base. */
+export type RenderText = (text: string) => ReactNode;
+
 export interface MarkdownContentProps {
   content: string;
   className?: string;
+  renderText?: RenderText | undefined;
 }
 
 /**
  * Renderizador de Markdown leve, seguro e reativo para mensagens de IA.
  * Suporta cabeçalhos, listas, tabelas estruturadas, negrito, itálico, blocos de código e links.
  */
-export function MarkdownContent({ content, className }: MarkdownContentProps) {
+export function MarkdownContent({ content, className, renderText = plain }: MarkdownContentProps) {
   if (!content) return null;
 
   const normalized = normalizeMarkdownText(content);
@@ -21,7 +25,7 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
   return (
     <div className={cn('space-y-2 text-xs leading-relaxed break-words', className)}>
       {blocks.map((block, index) => (
-        <Fragment key={index}>{renderBlock(block)}</Fragment>
+        <Fragment key={index}>{renderBlock(block, renderText)}</Fragment>
       ))}
     </div>
   );
@@ -249,26 +253,26 @@ function parseMarkdownBlocks(raw: string): Block[] {
   return blocks;
 }
 
-function renderBlock(block: Block): ReactNode {
+function renderBlock(block: Block, renderText: RenderText): ReactNode {
   switch (block.type) {
     case 'heading': {
       if (block.level === 1) {
         return (
           <h3 className="mt-2.5 mb-1 text-sm font-extrabold text-foreground tracking-tight border-b border-border/60 pb-1">
-            {renderInline(block.text)}
+            {renderInline(block.text, renderText)}
           </h3>
         );
       }
       if (block.level === 2) {
         return (
           <h4 className="mt-2 mb-1 text-xs font-bold text-foreground tracking-tight">
-            {renderInline(block.text)}
+            {renderInline(block.text, renderText)}
           </h4>
         );
       }
       return (
         <h5 className="mt-1.5 mb-0.5 text-xs font-semibold text-foreground/90">
-          {renderInline(block.text)}
+          {renderInline(block.text, renderText)}
         </h5>
       );
     }
@@ -290,7 +294,7 @@ function renderBlock(block: Block): ReactNode {
                         align === 'right' && 'text-right',
                       )}
                     >
-                      {renderInline(header)}
+                      {renderInline(header, renderText)}
                     </th>
                   );
                 })}
@@ -313,7 +317,7 @@ function renderBlock(block: Block): ReactNode {
                           align === 'right' && 'text-right font-mono',
                         )}
                       >
-                        {renderInline(cell)}
+                        {renderInline(cell, renderText)}
                       </td>
                     );
                   })}
@@ -344,7 +348,7 @@ function renderBlock(block: Block): ReactNode {
           <ol className="my-1.5 pl-4 list-decimal space-y-1 text-foreground/90">
             {block.items.map((item, itemIdx) => (
               <li key={itemIdx} className="pl-0.5">
-                {renderInline(item)}
+                {renderInline(item, renderText)}
               </li>
             ))}
           </ol>
@@ -354,7 +358,7 @@ function renderBlock(block: Block): ReactNode {
         <ul className="my-1.5 pl-4 list-disc space-y-1 text-foreground/90 marker:text-emerald-500">
           {block.items.map((item, itemIdx) => (
             <li key={itemIdx} className="pl-0.5">
-              {renderInline(item)}
+              {renderInline(item, renderText)}
             </li>
           ))}
         </ul>
@@ -364,7 +368,7 @@ function renderBlock(block: Block): ReactNode {
     case 'quote':
       return (
         <blockquote className="my-2 border-l-2 border-emerald-500 pl-3 italic text-muted-foreground bg-emerald-50/30 dark:bg-emerald-950/20 py-1 rounded-r-md">
-          {renderInline(block.text)}
+          {renderInline(block.text, renderText)}
         </blockquote>
       );
 
@@ -375,7 +379,7 @@ function renderBlock(block: Block): ReactNode {
     default:
       return (
         <p className="my-1 text-foreground/90 leading-relaxed">
-          {renderInline(block.text)}
+          {renderInline(block.text, renderText)}
         </p>
       );
   }
@@ -384,7 +388,11 @@ function renderBlock(block: Block): ReactNode {
 /**
  * Processador de formatação inline: **negrito**, *itálico*, `código`, [link](url).
  */
-function renderInline(text: string): ReactNode {
+function plain(text: string): ReactNode {
+  return text;
+}
+
+function renderInline(text: string, renderText: RenderText): ReactNode {
   if (!text) return null;
 
   // Regex para capturar tags inline
@@ -399,7 +407,7 @@ function renderInline(text: string): ReactNode {
       const content = part.slice(2, -2);
       return (
         <strong key={index} className="font-bold text-foreground">
-          {content}
+          {renderText(content)}
         </strong>
       );
     }
@@ -439,11 +447,11 @@ function renderInline(text: string): ReactNode {
       const content = part.slice(1, -1);
       return (
         <em key={index} className="italic text-foreground/90">
-          {content}
+          {renderText(content)}
         </em>
       );
     }
 
-    return <span key={index}>{part}</span>;
+    return <span key={index}>{renderText(part)}</span>;
   });
 }

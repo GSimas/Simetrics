@@ -1,3 +1,4 @@
+import type { NextActionKind } from '@/core/review/progress';
 import type { Framework, ReviewType } from '@/core/review/types';
 
 /**
@@ -6,6 +7,37 @@ import type { Framework, ReviewType } from '@/core/review/types';
  */
 export const REVIEW_COPY = {
   pt: {
+    nextTitle: 'Próximo passo',
+    nextGo: 'Ir para lá',
+    nextActions: {
+      title: 'Dê um título à revisão',
+      objective: 'Descreva o objetivo da revisão',
+      framework: 'Preencha os campos da estrutura da pergunta',
+      question: 'Escreva ao menos uma pergunta de pesquisa',
+      concept: 'Monte a busca: um conceito com seus sinônimos',
+      inclusion: 'Defina os critérios de inclusão',
+      exclusion: 'Defina os critérios de exclusão',
+      import: 'Protocolo pronto: importe em Dados os registros da sua busca',
+      'screen-ta': 'Faça a triagem por título e resumo — {count} pendentes',
+      'screen-ft': 'Faça a triagem do texto completo — {count} pendentes',
+      quality: 'Avalie a qualidade dos estudos incluídos — {count} pendentes',
+      'extraction-form': 'Defina no protocolo o formulário de extração',
+      extraction: 'Extraia os dados dos estudos — {count} pendentes',
+      report: 'Tudo pronto: veja a síntese e exporte o PRISMA e o relatório',
+    } satisfies Record<NextActionKind, string>,
+    progressNeedsData: 'Requer a base importada em Dados',
+    progressTitle: 'Progresso da revisão',
+    progressHint: 'Protocolo, triagem, qualidade e extração contam para o total; qualidade e extração só depois de configuradas no protocolo.',
+    progressItems: '{done}/{total} itens',
+    progressDecisions: '{done}/{total} decisões',
+    progressStudies: '{done}/{total} estudos',
+    progressNoRecords: 'Sem registros na base',
+    progressAwaitingIncluded: 'Aguardando estudos incluídos',
+    progressNoChecklist: 'Sem checklist no protocolo',
+    progressNoForm: 'Sem formulário no protocolo',
+    progressReady: 'Pronta',
+    progressBuilding: 'Em construção',
+    progressAfterScreening: 'Após a triagem',
     eyebrow: 'Revisão sistematizada',
     intro:
       'Planeje o protocolo, faça a triagem da base importada em duas etapas, avalie a qualidade e extraia os dados dos estudos incluídos, e gere a síntese, o fluxo PRISMA e o relatório. Tudo fica salvo no projeto, no seu navegador.',
@@ -92,7 +124,7 @@ export const REVIEW_COPY = {
 
     // Triagem
     noDataset:
-      'Importe em Análise Bibliométrica › Informações Principais os arquivos exportados das bases com a sua string de busca. A triagem trabalha sobre a base ativa, já deduplicada.',
+      'Importe na tela Dados os arquivos exportados das bases com a sua string de busca. A triagem trabalha sobre a base ativa, já deduplicada.',
     goToImport: 'Ir para a importação',
     stageTitleAbstract: 'Título e resumo',
     stageFullText: 'Texto completo',
@@ -154,7 +186,7 @@ export const REVIEW_COPY = {
     pendingWarning:
       'A triagem não terminou: {ta} registro(s) pendente(s) em título e resumo e {ft} no texto completo. As contagens abaixo refletem o que já foi decidido.',
     dedupHint:
-      'As duplicatas vêm da deduplicação aplicada em Análise Bibliométrica › Informações Principais. Sem deduplicação, registros repetidos entram na triagem.',
+      'As duplicatas vêm da deduplicação aplicada na tela Dados. Sem deduplicação, registros repetidos entram na triagem.',
     exportTitle: 'Exportar',
     exportPrisma: 'Arquivo para o PRISMALab (.json)',
     exportPrismaHint:
@@ -242,6 +274,37 @@ export const REVIEW_COPY = {
     generating: 'Gerando…',
   },
   en: {
+    nextTitle: 'Next step',
+    nextGo: 'Go there',
+    nextActions: {
+      title: 'Give the review a title',
+      objective: 'Describe the review objective',
+      framework: 'Fill in the question framework fields',
+      question: 'Write at least one research question',
+      concept: 'Build the search: a concept with its synonyms',
+      inclusion: 'Define the inclusion criteria',
+      exclusion: 'Define the exclusion criteria',
+      import: 'Protocol ready: import your search records in Data',
+      'screen-ta': 'Screen by title and abstract — {count} pending',
+      'screen-ft': 'Screen the full texts — {count} pending',
+      quality: 'Assess the quality of the included studies — {count} pending',
+      'extraction-form': 'Define the extraction form in the protocol',
+      extraction: 'Extract data from the studies — {count} pending',
+      report: 'All set: see the synthesis and export PRISMA and the report',
+    } satisfies Record<NextActionKind, string>,
+    progressNeedsData: 'Needs the dataset imported in Data',
+    progressTitle: 'Review progress',
+    progressHint: 'Protocol, screening, quality and extraction count toward the total; quality and extraction only once set up in the protocol.',
+    progressItems: '{done}/{total} items',
+    progressDecisions: '{done}/{total} decisions',
+    progressStudies: '{done}/{total} studies',
+    progressNoRecords: 'No records in the dataset',
+    progressAwaitingIncluded: 'Waiting for included studies',
+    progressNoChecklist: 'No checklist in the protocol',
+    progressNoForm: 'No form in the protocol',
+    progressReady: 'Ready',
+    progressBuilding: 'In progress',
+    progressAfterScreening: 'After screening',
     eyebrow: 'Systematized review',
     intro:
       'Plan the protocol, screen the imported dataset in two stages, assess quality and extract data from the included studies, then produce the synthesis, the PRISMA flow and the report. Everything is saved in the project, in your browser.',
@@ -326,7 +389,7 @@ export const REVIEW_COPY = {
     remove: 'Remove',
 
     noDataset:
-      'Import, under Bibliometric Analysis › Main Information, the files exported from the databases with your search string. Screening works on the active, deduplicated dataset.',
+      'Import, in the Data screen, the files exported from the databases with your search string. Screening works on the active, deduplicated dataset.',
     goToImport: 'Go to import',
     stageTitleAbstract: 'Title & abstract',
     stageFullText: 'Full text',
@@ -387,7 +450,7 @@ export const REVIEW_COPY = {
     pendingWarning:
       'Screening is not finished: {ta} pending record(s) in title and abstract and {ft} in full text. The counts below reflect what has been decided so far.',
     dedupHint:
-      'Duplicates come from the deduplication applied under Bibliometric Analysis › Main Information. Without deduplication, repeated records go to screening.',
+      'Duplicates come from the deduplication applied in the Data screen. Without deduplication, repeated records go to screening.',
     exportTitle: 'Export',
     exportPrisma: 'File for PRISMALab (.json)',
     exportPrismaHint:

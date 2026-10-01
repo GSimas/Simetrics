@@ -2,6 +2,15 @@
 @import 'tw-animate-css';
 
 @custom-variant dark (&:is(.dark *));
+/* `motion-reduce:` vale pelo sistema ou pela opção "Reduzir movimento" das Configurações. */
+@custom-variant motion-reduce {
+  @media (prefers-reduced-motion: reduce) {
+    @slot;
+  }
+  &:where([data-motion='reduce'] *) {
+    @slot;
+  }
+}
 
 /*
  * Identidade visual Scientata (https://scientata.com), família à qual o Simetrics pertence.
@@ -461,7 +470,8 @@ body:has([data-tab-fallback]) .app-footer {
   animation-timing-function: ease-out;
 }
 
-/* Quem pede menos movimento no sistema não recebe animações. */
+/* Quem pede menos movimento — no sistema ou nas Configurações (`data-motion`) — não
+   recebe animações. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -471,6 +481,14 @@ body:has([data-tab-fallback]) .app-footer {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+html[data-motion='reduce'] *,
+html[data-motion='reduce'] *::before,
+html[data-motion='reduce'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
 }
 
 /* Tamanho da letra (Configurações): tudo em rem acompanha a raiz. */
@@ -528,6 +546,12 @@ html[data-contrast='high'] :focus-visible {
   .ticker {
     overflow-x: auto;
   }
+}
+html[data-motion='reduce'] .ticker-track {
+  animation: none;
+}
+html[data-motion='reduce'] .ticker {
+  overflow-x: auto;
 }
 
 /* Fundo animado da tela inicial (LandingScreen). Quase tudo é transform e opacity, que
@@ -786,4 +810,50 @@ input::-ms-clear {
 }
 input[type='search']::-webkit-search-cancel-button {
   -webkit-appearance: none;
+}
+
+/* "Próximo passo" da revisão: o alvo pisca em destaque para o olho achar onde preencher. */
+@keyframes target-flash {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  35% {
+    box-shadow:
+      0 0 0 3px var(--highlight),
+      0 0 36px -2px var(--highlight);
+  }
+}
+.target-flash {
+  animation: target-flash 0.9s ease-out 3;
+}
+@media (prefers-reduced-motion: reduce) {
+  .target-flash {
+    animation: none;
+    box-shadow: 0 0 0 3px var(--highlight);
+  }
+}
+html[data-motion='reduce'] .target-flash {
+  animation: none;
+  box-shadow: 0 0 0 3px var(--highlight);
+}
+/* Rolar até um alvo do "próximo passo" deixa espaço para o cabeçalho fixo. */
+[data-review-target],
+[data-tour='upload'],
+[data-tour^='review-step-'],
+[data-tour='review-export'] {
+  scroll-margin-top: 8rem;
+}
+
+/* O fundo animado da tela inicial atrás do workspace, desfocado (WorkspaceBackdrop). A
+   borda negativa evita o halo claro que o blur deixa nas beiradas da tela.
+   ponytail: o blur repinta a camada inteira a cada quadro da animação; se pesar em
+   máquinas fracas, trocar por um blur só nas órbitas ou parar a grade. */
+.workspace-backdrop {
+  position: fixed;
+  inset: -24px;
+  z-index: -1;
+  pointer-events: none;
+  filter: blur(5px);
+  opacity: 0.85;
 }

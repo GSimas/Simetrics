@@ -111,7 +111,57 @@ const TUTORIAL_STEPS_PT: TutorialStep[] = [
     previewType: 'upload',
   },
   {
-    title: '2. Indicadores & Análises Visuais',
+    title: '2. Motor de Busca & Conversa',
+    badge: 'Dossiê & Exploração',
+    subtitle: 'Investigação profunda de autores, periódicos e termos',
+    description:
+      'Consulte dossiês detalhados de qualquer autor, instituição ou termo e descubra perfis com DNA acadêmico similar.',
+    highlights: [
+      {
+        icon: Search,
+        label: 'Dossiê Acadêmico',
+        text: 'Gere instantaneamente o perfil com métricas, nuvem de palavras e documentos mais citados.',
+      },
+      {
+        icon: Zap,
+        label: 'Entidades Semelhantes',
+        text: 'Similaridade de Jaccard calculada sobre coautores, venues e vocabulário.',
+      },
+      {
+        icon: CheckCircle2,
+        label: 'Uma Caixa, Como um Buscador',
+        text: 'Sugere autores, países, venues e termos enquanto você digita; Enter traz os documentos mais relevantes, e ✦ Perguntar à IA leva a mesma frase à Simi.',
+      },
+    ],
+    previewType: 'search-ai',
+  },
+  {
+    title: '3. IA em Modo BYOK (Traga sua Chave)',
+    badge: 'Bring Your Own Key',
+    subtitle: 'Use sua chave de API própria com total privacidade e liberdade',
+    description:
+      'Algumas perguntas à Simi são gratuitas. Depois, entre com o OpenRouter em um clique ou configure sua chave de API preferida (Google Gemini, OpenAI ChatGPT, Anthropic Claude, OpenRouter ou endpoint local compatível). Sua chave nunca sai do seu navegador.',
+    highlights: [
+      {
+        icon: KeyRound,
+        label: 'Múltiplos Provedores',
+        text: 'Suporte nativo a Gemini 2.5, GPT-4o, Claude 3.5, OpenRouter e modelos locais via Ollama.',
+      },
+      {
+        icon: Sparkles,
+        label: 'Clusterização Temática',
+        text: 'A IA lê os artigos representativos e dá nomes aos agrupamentos de pesquisa.',
+      },
+      {
+        icon: Bot,
+        label: 'Simi - Assistente Científica Flutuante',
+        text: 'Pergunte no Motor de Busca (✦ Perguntar à IA) ou, nas análises, pelo botão flutuante — é a mesma conversa.',
+      },
+    ],
+    previewType: 'byok',
+  },
+  {
+    title: '4. Indicadores & Análises Visuais',
     badge: 'Métricas Cientométricas',
     subtitle: 'Estatística descritiva completa e modelos de impacto',
     description:
@@ -136,7 +186,7 @@ const TUTORIAL_STEPS_PT: TutorialStep[] = [
     previewType: 'kpis',
   },
   {
-    title: '3. Redes de Grafos & Colaboração',
+    title: '5. Redes de Grafos & Colaboração',
     badge: 'Grafos & Comunidades',
     subtitle: 'Descubra comunidades científicas e especializações temáticas',
     description:
@@ -159,56 +209,6 @@ const TUTORIAL_STEPS_PT: TutorialStep[] = [
       },
     ],
     previewType: 'networks',
-  },
-  {
-    title: '4. IA em Modo BYOK (Traga sua Chave)',
-    badge: 'Bring Your Own Key',
-    subtitle: 'Use sua chave de API própria com total privacidade e liberdade',
-    description:
-      'Configure sua chave de API preferida (Google Gemini, OpenAI ChatGPT, Anthropic Claude, OpenRouter ou endpoint local compatível). Sua chave nunca sai do seu navegador.',
-    highlights: [
-      {
-        icon: KeyRound,
-        label: 'Múltiplos Provedores',
-        text: 'Suporte nativo a Gemini 2.5, GPT-4o, Claude 3.5, OpenRouter e modelos locais via Ollama.',
-      },
-      {
-        icon: Sparkles,
-        label: 'Clusterização Temática',
-        text: 'A IA lê os artigos representativos e dá nomes aos agrupamentos de pesquisa.',
-      },
-      {
-        icon: Bot,
-        label: 'Simi - Assistente Científica Flutuante',
-        text: 'Acesse a Simi via widget flutuante no canto inferior direito a partir de qualquer aba.',
-      },
-    ],
-    previewType: 'byok',
-  },
-  {
-    title: '5. Motor de Busca & Dossiês',
-    badge: 'Dossiê & Exploração',
-    subtitle: 'Investigação profunda de autores, periódicos e termos',
-    description:
-      'Consulte dossiês detalhados de qualquer autor, instituição ou termo e descubra perfis com DNA acadêmico similar.',
-    highlights: [
-      {
-        icon: Search,
-        label: 'Dossiê Acadêmico',
-        text: 'Gere instantaneamente o perfil com métricas, nuvem de palavras e documentos mais citados.',
-      },
-      {
-        icon: Zap,
-        label: 'Entidades Semelhantes',
-        text: 'Similaridade de Jaccard calculada sobre coautores, venues e vocabulário.',
-      },
-      {
-        icon: CheckCircle2,
-        label: 'Busca Multifacetada',
-        text: 'Filtre instantaneamente por autores, países, venues e termos com busca em tempo real.',
-      },
-    ],
-    previewType: 'search-ai',
   },
   {
     title: '6. Relatório Executivo Personalizado',
@@ -314,7 +314,57 @@ const TUTORIAL_STEPS_EN: TutorialStep[] = [
     previewType: 'upload',
   },
   {
-    title: '2. Indicators & Visual Analyses',
+    title: '2. Search Engine & Conversation',
+    badge: 'Dossier & Exploration',
+    subtitle: 'Deep investigation of authors, venues, and keywords',
+    description:
+      'Look up comprehensive profiles for any author or journal and discover peers with matching academic DNA.',
+    highlights: [
+      {
+        icon: Search,
+        label: 'Academic Dossier',
+        text: 'Generate output stats, word clouds, and most cited papers for any entity.',
+      },
+      {
+        icon: Zap,
+        label: 'Similar Profiles',
+        text: 'Jaccard similarity computed across co-authors, venues, and vocabulary.',
+      },
+      {
+        icon: CheckCircle2,
+        label: 'One Box, Like a Search Engine',
+        text: 'Suggests authors, countries, venues and terms as you type; Enter brings the most relevant documents, and ✦ Ask AI takes the same phrase to Simi.',
+      },
+    ],
+    previewType: 'search-ai',
+  },
+  {
+    title: '3. AI in BYOK Mode (Bring Your Own Key)',
+    badge: 'Bring Your Own Key',
+    subtitle: 'Use your favorite AI provider with maximum privacy and freedom',
+    description:
+      'A few questions to Simi are free. After that, sign in with OpenRouter in one click or bring your own API key (Google Gemini, OpenAI ChatGPT, Anthropic Claude, OpenRouter, or local models). Your key is stored strictly in your browser.',
+    highlights: [
+      {
+        icon: KeyRound,
+        label: 'Multiple Providers',
+        text: 'Native support for Gemini 2.5, GPT-4o, Claude 3.5, OpenRouter, and Ollama/LM Studio.',
+      },
+      {
+        icon: Sparkles,
+        label: 'Theme Labeling',
+        text: 'AI reads representative abstracts to synthesize high-level cluster names.',
+      },
+      {
+        icon: Bot,
+        label: 'Simi - Floating Scientific Assistant',
+        text: 'Ask from the Search Engine (✦ Ask AI) or, in the analyses, through the floating button — it is the same conversation.',
+      },
+    ],
+    previewType: 'byok',
+  },
+  {
+    title: '4. Indicators & Visual Analyses',
     badge: 'Scientometrics',
     subtitle: 'Comprehensive descriptive statistics and impact metrics',
     description:
@@ -339,7 +389,7 @@ const TUTORIAL_STEPS_EN: TutorialStep[] = [
     previewType: 'kpis',
   },
   {
-    title: '3. Knowledge Networks & Graphs',
+    title: '5. Knowledge Networks & Graphs',
     badge: 'Graphs & Communities',
     subtitle: 'Uncover scientific communities and research clusters',
     description:
@@ -362,56 +412,6 @@ const TUTORIAL_STEPS_EN: TutorialStep[] = [
       },
     ],
     previewType: 'networks',
-  },
-  {
-    title: '4. AI in BYOK Mode (Bring Your Own Key)',
-    badge: 'Bring Your Own Key',
-    subtitle: 'Use your favorite AI provider with maximum privacy and freedom',
-    description:
-      'Bring your own API key (Google Gemini, OpenAI ChatGPT, Anthropic Claude, OpenRouter, or local models). Your key is stored strictly in your browser.',
-    highlights: [
-      {
-        icon: KeyRound,
-        label: 'Multiple Providers',
-        text: 'Native support for Gemini 2.5, GPT-4o, Claude 3.5, OpenRouter, and Ollama/LM Studio.',
-      },
-      {
-        icon: Sparkles,
-        label: 'Theme Labeling',
-        text: 'AI reads representative abstracts to synthesize high-level cluster names.',
-      },
-      {
-        icon: Bot,
-        label: 'Simi - Floating Scientific Assistant',
-        text: 'Access Simi anytime via the floating widget in the bottom-right corner across all tabs.',
-      },
-    ],
-    previewType: 'byok',
-  },
-  {
-    title: '5. Search Engine & Academic Dossiers',
-    badge: 'Dossier & Exploration',
-    subtitle: 'Deep investigation of authors, venues, and keywords',
-    description:
-      'Look up comprehensive profiles for any author or journal and discover peers with matching academic DNA.',
-    highlights: [
-      {
-        icon: Search,
-        label: 'Academic Dossier',
-        text: 'Generate output stats, word clouds, and most cited papers for any entity.',
-      },
-      {
-        icon: Zap,
-        label: 'Similar Profiles',
-        text: 'Jaccard similarity computed across co-authors, venues, and vocabulary.',
-      },
-      {
-        icon: CheckCircle2,
-        label: 'Multifaceted Search',
-        text: 'Instantly filter across authors, countries, venues, and keywords with real-time feedback.',
-      },
-    ],
-    previewType: 'search-ai',
   },
   {
     title: '6. Custom Executive Report',

@@ -9,6 +9,7 @@ export function Block({
   title,
   hint,
   tour,
+  target,
   className,
   children,
 }: {
@@ -16,11 +17,13 @@ export function Block({
   hint?: string;
   /** Alvo do tour guiado (`data-tour`). */
   tour?: string;
+  /** Alvo do "próximo passo" (`data-review-target`), que o destaca ao ser escolhido. */
+  target?: string;
   className?: string;
   children: ReactNode;
 }) {
   return (
-    <section className={cn('space-y-3 p-4', BLOCK, className)} data-tour={tour}>
+    <section className={cn('space-y-3 p-4', BLOCK, className)} data-tour={tour} data-review-target={target}>
       <div className="space-y-1">
         <h3 className="text-sm font-semibold">{title}</h3>
         {hint && <p className="text-xs leading-relaxed text-muted-foreground">{hint}</p>}

@@ -1,5 +1,7 @@
 import { lazy, Suspense, useMemo, useState } from 'react';
 import {
+  ArrowLeft,
+  Sparkles,
   ExternalLink,
   FileText,
   User,
@@ -14,7 +16,6 @@ import TimeSeriesChart from '@/components/charts/TimeSeriesChart';
 
 import { SectionTitle } from '@/components/InfoTip';
 import { KpiCard } from '@/components/KpiCard';
-import { SearchableSelect, type SelectOption } from '@/components/SearchableSelect';
 import { Badge } from '@/components/ui/badge';
 import {
   Card,
@@ -23,14 +24,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -40,17 +33,17 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { availableTypes, filterByEntity, optionsForType } from '@/core/search';
+import { filterByEntity } from '@/core/search';
 import { computeIndices } from '@/core/scientometrics';
 import { cachedProfiles, findSimilar } from '@/core/similarity';
 import { mean, sum } from '@/core/stats';
 import { keywordFrequencies } from '@/core/wordcloud';
 import { FIELD, FIELD_CANDIDATES } from '@/lib/schema';
-import type { SearchEntityType } from '@/lib/types';
 import { collectColumns, isNullLike, pickColumn, splitTokens, toNumeric } from '@/core/text';
+import { useChat } from '@/state/chat.store';
 import { useDataset } from '@/state/dataset.store';
 import { useLocale } from '@/state/locale.store';
-import { openInSearch, resolveEntity, useNavigation, type SearchScope } from '@/state/navigation.store';
+import { openInSearch, resolveEntity, useNavigation } from '@/state/navigation.store';
 import { EmptyState } from '@/features/EmptyState';
 import { collaborationNetwork } from '@/core/viz/collaboration';
 import { cn } from '@/lib/utils';
@@ -59,13 +52,12 @@ import { PALETTE } from '@/features/overview/viz-shared';
 
 import { cleanDoiUrl } from './doi';
 import { DossierDocuments } from './DossierDocuments';
+import { ConversationView } from './ConversationView';
+import { SearchBar } from './SearchBar';
+import { SearchResults } from './SearchResults';
 
 const WordCloud = lazy(() => import('@/components/charts/WordCloud'));
 const WorldMap = lazy(() => import('@/components/charts/WorldMap'));
-
-/** Separa tipo e termo no valor dos itens em "Todos"; não aparece em textos da base. */
-const SCOPED_SEPARATOR = '\u0000';
-const ENTITY_COLLATOR = new Intl.Collator('pt-BR');
 
 /** Coautores à vista antes do "ver todos". */
 const VISIBLE_COAUTHORS = 12;
@@ -75,20 +67,16 @@ export default function SearchTab() {
   const searchOptions = useDataset((state) => state.searchOptions);
   const { t, locale } = useLocale();
 
-  // Tipo e termo vivem no store de navegação: gráficos de outras abas abrem perfis aqui,
-  // e a busca continua no lugar ao voltar para esta aba.
-  const scope = useNavigation((state) => state.searchScope);
+  // Consulta, tipo e termo vivem no store de navegação: gráficos de outras abas abrem
+  // perfis aqui, e a busca continua no lugar ao voltar para esta aba.
+  const query = useNavigation((state) => state.searchQuery);
+  const chatOpen = useNavigation((state) => state.chatOpen);
+  const hasConversation = useChat((state) => state.messages.length > 0);
   const type = useNavigation((state) => state.searchType);
   const term = useNavigation((state) => state.searchTerm);
   const selectEntity = useNavigation((state) => state.selectEntity);
   const typeLabel = entityTypeLabel(type, locale);
   const setTerm = (searchTerm: string | null): void => useNavigation.setState({ searchTerm });
-  const setScope = (searchScope: SearchScope): void =>
-    useNavigation.setState({
-      searchScope,
-      searchTerm: null,
-      ...(searchScope !== 'Todos' ? { searchType: searchScope } : {}),
-    });
   const [showAllCoauthors, setShowAllCoauthors] = useState(false);
 
   const renderAuthorChip = ({ author, count }: { author: string; count: number }) => (
@@ -107,30 +95,6 @@ export default function SearchTab() {
       <span className="tabular-nums text-muted-foreground">{count}</span>
     </button>
   );
-
-  const types = useMemo(
-    () => (searchOptions ? availableTypes(searchOptions) : []),
-    [searchOptions],
-  );
-
-  // Em "Todos", cada item leva o tipo no valor (o mesmo termo pode ser país e palavra-chave)
-  // e um selo com o tipo na lista.
-  const pickerOptions = useMemo((): (string | SelectOption)[] => {
-    if (!searchOptions) return [];
-    if (scope !== 'Todos') return optionsForType(searchOptions, scope);
-    return types
-      .flatMap((entityType) =>
-        optionsForType(searchOptions, entityType).map((entity) => ({
-          value: `${entityType}${SCOPED_SEPARATOR}${entity}`,
-          label: entity,
-          // Selo curto: o rótulo completo de venue ocupava metade da linha.
-          tag: entityType === 'Local de Publicação (Venue)' ? 'Venue' : entityTypeLabel(entityType, locale),
-        })),
-      )
-      .sort((a, b) => ENTITY_COLLATOR.compare(a.label, b.label));
-  }, [searchOptions, scope, types, locale]);
-  const pickerValue = scope === 'Todos' && term ? `${type}${SCOPED_SEPARATOR}${term}` : term;
-  const scopeLabel = scope === 'Todos' ? null : entityTypeLabel(scope, locale);
 
   const documents = useMemo(
     () => (active && term ? filterByEntity(active, term, type) : []),
@@ -275,6 +239,8 @@ export default function SearchTab() {
     return <EmptyState title={t('tab_search')} />;
   }
 
+  if (chatOpen) return <ConversationView />;
+
   const titleColumn = pickColumn(collectColumns(active), FIELD_CANDIDATES.title);
   const keywordsColumn = pickColumn(collectColumns(active), FIELD_CANDIDATES.keywords);
   const abstractColumn = pickColumn(collectColumns(active), FIELD_CANDIDATES.abstract);
@@ -282,66 +248,34 @@ export default function SearchTab() {
 
   return (
     <div className="space-y-6">
-      <Card data-tour="search-picker">
-        <CardHeader>
-          <SectionTitle title={t('search_title')} info={t('search_desc')} />
-        </CardHeader>
+      <SearchBar hero={!query && !term} />
 
-        <CardContent className="space-y-3">
-          <div className="grid gap-3 sm:grid-cols-[200px_1fr]">
-            <div className="space-y-1.5">
-              <Label htmlFor="search-type">{t('search_type_label')}</Label>
-              <Select value={scope} onValueChange={(value) => setScope(value as SearchScope)}>
-                <SelectTrigger id="search-type" className="h-10 rounded-xl">
-                  <SelectValue>{entityTypeLabel(scope, locale)}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {(['Todos', ...types] as const).map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {entityTypeLabel(option, locale)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+      {query && !term && <SearchResults active={active} />}
 
-            <div className="space-y-1.5">
-              <Label>
-                {locale === 'en'
-                  ? `Select ${scopeLabel ?? 'item'}`
-                  : `Selecionar ${scopeLabel ?? 'item'}`}
-              </Label>
-              <SearchableSelect
-                options={pickerOptions}
-                value={pickerValue}
-                onChange={(val) => {
-                  if (val === null || scope !== 'Todos') {
-                    setTerm(val);
-                    return;
-                  }
-                  const [entityType, ...rest] = val.split(SCOPED_SEPARATOR);
-                  selectEntity(entityType as SearchEntityType, rest.join(SCOPED_SEPARATOR));
-                }}
-                placeholder={
-                  locale === 'en'
-                    ? `Click to select ${scopeLabel?.toLowerCase() ?? 'an author, country, venue…'}`
-                    : `Clique para selecionar ${scopeLabel?.toLowerCase() ?? 'autor, país, venue…'}`
-                }
-                searchPlaceholder={
-                  locale === 'en'
-                    ? `Type to filter ${scopeLabel?.toLowerCase() ?? 'all items'}...`
-                    : `Digite para filtrar ${scopeLabel?.toLowerCase() ?? 'todos os itens'}...`
-                }
-                emptyText={
-                  locale === 'en'
-                    ? 'No matching entity found.'
-                    : 'Nenhuma entidade encontrada.'
-                }
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {term && (query || hasConversation) && (
+        <div className="flex flex-wrap gap-x-5 gap-y-2">
+          {query && (
+            <button
+              type="button"
+              onClick={() => setTerm(null)}
+              className="eyebrow inline-flex cursor-pointer items-center gap-1.5 transition-colors hover:text-highlight"
+            >
+              <ArrowLeft className="size-3.5" aria-hidden />
+              {t('search_back_results')}
+            </button>
+          )}
+          {hasConversation && (
+            <button
+              type="button"
+              onClick={() => useNavigation.setState({ chatOpen: true })}
+              className="eyebrow inline-flex cursor-pointer items-center gap-1.5 transition-colors hover:text-highlight"
+            >
+              <Sparkles className="size-3.5" aria-hidden />
+              {t('search_back_chat')}
+            </button>
+          )}
+        </div>
+      )}
 
       {term && dossier && (
         // Chave por perfil: trocar de entidade remonta o dossiê, que entra com um fade curto.

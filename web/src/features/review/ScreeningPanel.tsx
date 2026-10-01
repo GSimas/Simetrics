@@ -246,7 +246,7 @@ export function ScreeningPanel({ review, copy }: { review: ReviewState; copy: Re
     return (
       <div className="flex flex-col items-center gap-4 rounded-xl border border-dashed border-border p-10 text-center animate-in fade-in-0 duration-300">
         <p className="max-w-xl text-sm text-muted-foreground">{copy.noDataset}</p>
-        <Button type="button" variant="outline" className="active:scale-[0.97]" onClick={() => setActiveTab('overview')}>
+        <Button type="button" variant="outline" className="active:scale-[0.97]" onClick={() => setActiveTab('data')}>
           {copy.goToImport}
         </Button>
       </div>
@@ -268,6 +268,7 @@ export function ScreeningPanel({ review, copy }: { review: ReviewState; copy: Re
               type="button"
               role="tab"
               aria-selected={stage === value}
+              data-review-target={value === 'title-abstract' ? 'screen-ta' : 'screen-ft'}
               onClick={() => {
                 setStage(value);
                 setFilter('pending');

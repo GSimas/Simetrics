@@ -157,3 +157,58 @@ export function availableTypes(options: SearchOptions): SearchEntityType[] {
   if (options.themes.length > 0) types.push('Tema');
   return types;
 }
+
+export interface EntityMatch {
+  type: SearchEntityType;
+  term: string;
+}
+
+/** Minúsculas e sem acentos: "Análise" casa com "analise". */
+function fold(text: string): string {
+  return text.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+}
+
+// Grafias dobradas por conjunto de opções: dobrar ~30 mil termos a cada tecla custaria caro.
+const foldedCache = new WeakMap<SearchOptions, Map<SearchEntityType, string[]>>();
+
+function foldedFor(options: SearchOptions, type: SearchEntityType): string[] {
+  let byType = foldedCache.get(options);
+  if (!byType) foldedCache.set(options, (byType = new Map()));
+  let folded = byType.get(type);
+  if (!folded) byType.set(type, (folded = optionsForType(options, type).map(fold)));
+  return folded;
+}
+
+/**
+ * Entidades cujo nome contém a consulta, em todos os tipos — as sugestões da caixa de
+ * busca. Começo do nome primeiro, depois começo de palavra, depois qualquer posição; no
+ * empate, o nome mais curto (o mais próximo do que foi digitado).
+ */
+export function matchEntities(options: SearchOptions, query: string, limit = 8): EntityMatch[] {
+  const needle = fold(query.trim());
+  if (needle.length < 2) return [];
+
+  const ranked: { match: EntityMatch; rank: number; length: number }[] = [];
+  for (const type of availableTypes(options)) {
+    const originals = optionsForType(options, type);
+    const folded = foldedFor(options, type);
+    // Palavra-chave casa sem diferenciar maiúsculas (`filterByEntity`): "Memetic algorithm"
+    // e "MEMETIC ALGORITHM" abrem o mesmo dossiê, então viram uma sugestão só.
+    const seen = new Set<string>();
+    folded.forEach((name, index) => {
+      const at = name.indexOf(needle);
+      if (at < 0) return;
+      if (type === 'Palavra-chave') {
+        const key = originals[index]!.toLowerCase().trim();
+        if (seen.has(key)) return;
+        seen.add(key);
+      }
+      const rank = at === 0 ? 0 : /[\s,.;:(\-/]/.test(name[at - 1] ?? '') ? 1 : 2;
+      ranked.push({ match: { type, term: originals[index]! }, rank, length: name.length });
+    });
+  }
+  return ranked
+    .sort((left, right) => left.rank - right.rank || left.length - right.length)
+    .slice(0, limit)
+    .map((entry) => entry.match);
+}
