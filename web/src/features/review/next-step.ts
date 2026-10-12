@@ -33,7 +33,7 @@ function fieldIn(target: HTMLElement): HTMLElement | null {
  * põe o cursor no campo a preencher. A etapa troca de painel e as telas chegam em chunks,
  * então procura o alvo por até 2 s.
  */
-function highlightTarget(selector: string, focus: boolean): void {
+export function highlightTarget(selector: string, focus = false): void {
   const reduced = prefersReducedMotion();
   const deadline = performance.now() + 2000;
   const seek = (): void => {

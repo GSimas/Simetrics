@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/accordion';
 import { AmbientBackground, HeroOrbits } from '@/components/AmbientBackdrop';
 import { Button } from '@/components/ui/button';
+import { BrandMark } from '@/components/BrandMark';
 import { SettingsButton } from '@/components/HeaderActions';
 import { EmptyState } from '@/features/EmptyState';
 import { ProjectCard } from '@/features/landing/ProjectCard';
@@ -85,7 +86,9 @@ export function LandingScreen({ navigate, onOpenTutorial }: LandingScreenProps) 
       <AmbientBackground />
       <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-md">
         <div className="container flex items-center justify-between gap-4 py-4">
-          <span className="brand-mark h-9 text-foreground" role="img" aria-label="Simetrics" />
+          <span role="img" aria-label="Simetrics" className="inline-flex text-foreground">
+            <BrandMark className="h-9" />
+          </span>
           <div className="flex items-center gap-2">
             <a
               href="https://scientata.com/"
@@ -104,7 +107,6 @@ export function LandingScreen({ navigate, onOpenTutorial }: LandingScreenProps) 
       <section className="relative overflow-hidden border-b border-border">
         <HeroOrbits />
         <div className="container relative flex flex-col items-center gap-8 py-20 text-center sm:py-28">
-          <div className="eyebrow absolute left-6 top-6 hidden sm:block">SMTR / 001</div>
           <div className="eyebrow absolute right-6 top-6 hidden sm:block">27°35′ S — 48°32′ W</div>
 
           <p className="eyebrow flex items-center gap-3">
@@ -157,10 +159,16 @@ export function LandingScreen({ navigate, onOpenTutorial }: LandingScreenProps) 
             {HIGHLIGHTS.map(({ labelKey, textKey }, index) => (
               <div
                 key={labelKey}
-                className="flex flex-col gap-2 border-border py-6 text-left sm:px-6 sm:[&:not(:first-child)]:border-l [&:not(:first-child)]:border-t sm:[&:not(:first-child)]:border-t-0"
+                // A luz segue o ponteiro: o gradiente do `spotlight` lê --x/--y.
+                onPointerMove={(event) => {
+                  const rect = event.currentTarget.getBoundingClientRect();
+                  event.currentTarget.style.setProperty('--x', `${event.clientX - rect.left}px`);
+                  event.currentTarget.style.setProperty('--y', `${event.clientY - rect.top}px`);
+                }}
+                className="spotlight group flex flex-col gap-2 border-border py-6 text-left sm:px-6 sm:[&:not(:first-child)]:border-l [&:not(:first-child)]:border-t sm:[&:not(:first-child)]:border-t-0"
               >
                 <p className="flex items-baseline gap-3 text-sm font-semibold">
-                  <span className="font-mono text-[11px] font-normal text-highlight">
+                  <span className="font-mono text-[11px] font-normal text-highlight transition-[text-shadow] duration-300 group-hover:[text-shadow:0_0_10px_var(--highlight)]">
                     {String(index + 1).padStart(2, '0')}
                   </span>
                   {t(labelKey)}

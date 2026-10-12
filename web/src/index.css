@@ -418,6 +418,53 @@ body:has([data-tab-fallback]) .app-footer {
   mask: url('/simetrics-mark.svg') center / contain no-repeat;
 }
 
+/* Logotipo do cabeçalho (BrandMark): ao passar o mouse, os botões dos dois interruptores
+   trocam de lado — o de cima vai para a esquerda, o de baixo para a direita. */
+.brand-switch {
+  display: inline-block;
+  aspect-ratio: 2130 / 928;
+}
+.brand-knob-top,
+.brand-knob-bottom {
+  transition: transform 450ms cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+.brand-knob-bottom {
+  transition-delay: 60ms;
+}
+.brand-switch:hover .brand-knob-top,
+.group:hover > .brand-switch .brand-knob-top,
+.group:focus-visible > .brand-switch .brand-knob-top {
+  transform: translateX(-288px);
+}
+.brand-switch:hover .brand-knob-bottom,
+.group:hover > .brand-switch .brand-knob-bottom,
+.group:focus-visible > .brand-switch .brand-knob-bottom {
+  transform: translateX(288px);
+}
+
+/* Bloco que acende onde o ponteiro está (--x/--y vêm do onPointerMove). */
+.spotlight {
+  position: relative;
+  isolation: isolate;
+}
+.spotlight::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 300ms ease;
+  background: radial-gradient(
+    18rem circle at var(--x, 50%) var(--y, 50%),
+    color-mix(in oklab, var(--highlight) 20%, transparent),
+    transparent 70%
+  );
+}
+.spotlight:hover::before {
+  opacity: 1;
+}
+
 /* Controles do cabeçalho — "EXPLORAR ECOSSISTEMA": DM Mono caixa-alta, contorno fino. */
 @utility header-chip {
   display: inline-flex;
@@ -839,6 +886,7 @@ html[data-motion='reduce'] .target-flash {
 }
 /* Rolar até um alvo do "próximo passo" deixa espaço para o cabeçalho fixo. */
 [data-review-target],
+[data-report-item],
 [data-tour='upload'],
 [data-tour^='review-step-'],
 [data-tour='review-export'] {

@@ -1,15 +1,8 @@
-import { Suspense, useState, type ReactNode } from 'react';
-import { KeyRound, Settings } from 'lucide-react';
+import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
+import { KeyRound, Moon, Settings, Sun } from 'lucide-react';
 
 import { lazyWithPreload } from '@/lib/lazy';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import type { Locale } from '@/lib/i18n/translations';
 import { cn } from '@/lib/utils';
 import { useAiConfig } from '@/state/ai-config.store';
@@ -33,7 +26,8 @@ function Segmented<T extends string>({
 }: {
   label: string;
   value: T;
-  options: readonly { value: T; label: string }[];
+  /** Com `icon`, o botão mostra só o ícone; o rótulo vira nome acessível e dica. */
+  options: readonly { value: T; label: string; icon?: ReactNode }[];
   onChange: (value: T) => void;
 }) {
   return (
@@ -44,15 +38,17 @@ function Segmented<T extends string>({
           type="button"
           role="radio"
           aria-checked={value === option.value}
+          aria-label={option.icon ? option.label : undefined}
+          title={option.icon ? option.label : undefined}
           onClick={() => onChange(option.value)}
           className={cn(
-            'flex-1 cursor-pointer px-3 py-1.5 text-sm transition-colors',
+            'flex h-9 flex-1 cursor-pointer items-center justify-center px-3 text-sm transition-colors',
             value === option.value
               ? 'bg-primary text-primary-foreground'
               : 'text-muted-foreground hover:text-foreground',
           )}
         >
-          {option.label}
+          {option.icon ?? option.label}
         </button>
       ))}
     </div>
@@ -98,6 +94,24 @@ function Switch({
   );
 }
 
+/** Sigla do idioma no traço mono dos rótulos — um ícone de bandeira trocaria idioma por país. */
+function LangCode({ code }: { code: string }) {
+  return (
+    <span className="font-mono text-xs tracking-wider" aria-hidden>
+      {code}
+    </span>
+  );
+}
+
+/** "A" no tamanho que a opção aplica: o próprio ícone mostra a diferença. */
+function FontGlyph({ className }: { className: string }) {
+  return (
+    <span className={cn('font-semibold leading-none', className)} aria-hidden>
+      A
+    </span>
+  );
+}
+
 function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return (
     <div className="space-y-2">
@@ -130,25 +144,57 @@ export function SettingsButton() {
   // Montado desde a primeira abertura, para a animação de fechar continuar funcionando.
   const [aiMounted, setAiMounted] = useState(false);
 
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  // Dropdown: fecha com clique fora ou Esc (e devolve o foco à engrenagem).
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setOpen(false);
+      triggerRef.current?.focus();
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open]);
+
   return (
-    <>
+    <div ref={rootRef} className="relative">
       <button
+        ref={triggerRef}
         type="button"
-        onClick={() => setOpen(true)}
-        className={ICON_BUTTON}
+        onClick={() => setOpen((value) => !value)}
+        className={cn(ICON_BUTTON, 'group', open && 'border-highlight text-highlight')}
         data-tour="settings"
         title={t('settings_btn')}
         aria-label={t('settings_btn')}
+        aria-haspopup="dialog"
+        aria-expanded={open}
       >
-        <Settings className="size-4" aria-hidden />
+        <Settings
+          className={cn('size-4 transition-transform duration-500 group-hover:rotate-90', open && 'rotate-90')}
+          aria-hidden
+        />
       </button>
 
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[90dvh] max-w-md overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{t('settings_title')}</DialogTitle>
-            <DialogDescription>{t('settings_desc')}</DialogDescription>
-          </DialogHeader>
+      {open && (
+        <div
+          role="dialog"
+          aria-label={t('settings_title')}
+          className="absolute right-0 top-full z-50 mt-2 max-h-[calc(100dvh-6rem)] w-[min(22rem,calc(100vw-2rem))] overflow-y-auto border border-border bg-card p-5 text-left shadow-xl duration-200 animate-in fade-in-0 slide-in-from-top-1"
+        >
+          <div className="mb-4 space-y-1">
+            <p className="text-base font-semibold">{t('settings_title')}</p>
+            <p className="text-xs text-muted-foreground">{t('settings_desc')}</p>
+          </div>
 
           <div className="space-y-5">
             <Field label={t('settings_theme')}>
@@ -157,8 +203,8 @@ export function SettingsButton() {
                 value={theme}
                 onChange={setTheme}
                 options={[
-                  { value: 'dark', label: t('settings_theme_dark') },
-                  { value: 'light', label: t('settings_theme_light') },
+                  { value: 'dark', label: t('settings_theme_dark'), icon: <Moon className="size-4" aria-hidden /> },
+                  { value: 'light', label: t('settings_theme_light'), icon: <Sun className="size-4" aria-hidden /> },
                 ]}
               />
             </Field>
@@ -169,8 +215,8 @@ export function SettingsButton() {
                 value={locale}
                 onChange={setLocale}
                 options={[
-                  { value: 'pt', label: 'Português' },
-                  { value: 'en', label: 'English' },
+                  { value: 'pt', label: 'Português', icon: <LangCode code="PT" /> },
+                  { value: 'en', label: 'English', icon: <LangCode code="EN" /> },
                 ]}
               />
             </Field>
@@ -181,9 +227,9 @@ export function SettingsButton() {
                 value={fontScale}
                 onChange={setFontScale}
                 options={[
-                  { value: 'min', label: t('settings_font_min') },
-                  { value: 'med', label: t('settings_font_med') },
-                  { value: 'max', label: t('settings_font_max') },
+                  { value: 'min', label: t('settings_font_min'), icon: <FontGlyph className="text-xs" /> },
+                  { value: 'med', label: t('settings_font_med'), icon: <FontGlyph className="text-base" /> },
+                  { value: 'max', label: t('settings_font_max'), icon: <FontGlyph className="text-xl" /> },
                 ]}
               />
             </Field>
@@ -224,6 +270,7 @@ export function SettingsButton() {
                   variant="outline"
                   className="gap-1.5"
                   onClick={() => {
+                    setOpen(false);
                     setAiMounted(true);
                     setAiOpen(true);
                   }}
@@ -235,14 +282,14 @@ export function SettingsButton() {
               </div>
             </Field>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
 
       {aiMounted && (
         <Suspense fallback={null}>
           <AiSettingsModal open={aiOpen} onOpenChange={setAiOpen} />
         </Suspense>
       )}
-    </>
+    </div>
   );
 }

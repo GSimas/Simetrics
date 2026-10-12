@@ -133,7 +133,9 @@ export function WorkspaceSidebar() {
             const isActive = activeTab === value;
             const label = t(labelKey);
             return (
-              <li key={value}>
+              // No trilho recolhido, uma divisória entre módulos deixa claro onde cada um
+              // começa — sem ela o módulo seguinte parecia mais uma subpágina do anterior.
+              <li key={value} className={cn(collapsed && index > 0 && 'border-t border-border/70 pt-1')}>
                 <button
                   type="button"
                   onClick={() => !isLocked && open(value)}
@@ -179,7 +181,13 @@ export function WorkspaceSidebar() {
                   <ul
                     data-tour={value === 'bibliometrics' ? 'bibliometric-views' : `${value}-pages`}
                     aria-label={label}
-                    className={cn('mt-1 flex flex-col gap-0.5', !collapsed && 'ml-[1.3rem] border-l border-border pl-2')}
+                    className={cn(
+                      'mt-1 flex flex-col gap-0.5',
+                      // Recolhida: bandeja recuada e mais estreita, contida sob o ícone do módulo.
+                      collapsed
+                        ? 'mx-auto mb-1 w-8 rounded-md border border-border/70 bg-muted/40 py-1'
+                        : 'ml-[1.3rem] border-l border-border pl-2',
+                    )}
                   >
                     {subItems[value].map((item) => {
                       const itemActive = isActive && item.active;

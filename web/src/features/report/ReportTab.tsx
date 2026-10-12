@@ -32,6 +32,7 @@ import type { CollaborationNetwork } from '@/core/viz/collaboration';
 import { hybridMethodsText } from '@/core/hybrid/report';
 import { hybridReportRows, hybridReportTitle } from '@/core/hybrid/report-rows';
 import { cn } from '@/lib/utils';
+import { highlightTarget } from '@/features/review/next-step';
 
 import { captureReportCharts } from './capture';
 import { reportNamedThemesChart, reportThemesChart } from './chart-renderer';
@@ -136,6 +137,13 @@ export default function ReportTab() {
   }
 
   const toggle = (id: ReportItemId) => setSelection((prev) => ({ ...prev, [id]: !prev[id] }));
+
+  // Leva a prévia até a seção e a faz piscar; desmarcada, entra no relatório antes
+  // (o highlightTarget espera o bloco aparecer).
+  const goTo = (id: ReportItemId) => {
+    if (!selection[id]) setSelection((prev) => ({ ...prev, [id]: true }));
+    highlightTarget(`[data-report-item="${id}"]`);
+  };
 
   // Um frame para o modal mostrar "Gerando…" antes do trabalho pesado ocupar a página.
   const nextPaint = (): Promise<void> =>
@@ -243,16 +251,31 @@ export default function ReportTab() {
             <fieldset key={group} className="space-y-1">
               <legend className="eyebrow mb-1.5 text-muted-foreground">{REPORT_GROUPS[group][locale]}</legend>
               {REPORT_ITEMS.filter((item) => item.group === group).map((item) => (
-                <label
+                // O checkbox inclui/exclui; o nome leva até a seção na prévia.
+                <div
                   key={item.id}
-                  className="flex cursor-pointer items-center gap-2.5 rounded-md px-1.5 py-1.5 text-sm transition-colors hover:bg-muted/60"
+                  className="flex items-center gap-2.5 rounded-md px-1.5 py-1.5 text-sm transition-colors hover:bg-muted/60"
                 >
-                  <Checkbox checked={selection[item.id]} onCheckedChange={() => toggle(item.id)} />
-                  <span className={cn('min-w-0 flex-1', !selection[item.id] && 'text-muted-foreground')}>{item.label[locale]}</span>
+                  <Checkbox
+                    checked={selection[item.id]}
+                    onCheckedChange={() => toggle(item.id)}
+                    aria-label={item.label[locale]}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => goTo(item.id)}
+                    title={isEn ? 'Go to this section in the preview' : 'Ir para esta seção na prévia'}
+                    className={cn(
+                      'min-w-0 flex-1 cursor-pointer text-left transition-colors hover:text-highlight focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                      !selection[item.id] && 'text-muted-foreground',
+                    )}
+                  >
+                    {item.label[locale]}
+                  </button>
                   {counts[item.id] && (
                     <span className="shrink-0 tabular-nums text-[11px] text-muted-foreground">{counts[item.id]}</span>
                   )}
-                </label>
+                </div>
               ))}
             </fieldset>
           ))}
@@ -274,7 +297,7 @@ export default function ReportTab() {
           <ReportHeader overview={overview} total={active.length} isEn={isEn} />
 
           {REPORT_ITEMS.filter((item) => selection[item.id]).map((item) => (
-            <div key={item.id} className="space-y-8">
+            <div key={item.id} data-report-item={item.id} className="space-y-8">
               {item.id === firstAdvanced && (
                 <SectionHeading>{isEn ? '9. Advanced Visual Analyses' : '9. Análises Visuais Avançadas'}</SectionHeading>
               )}

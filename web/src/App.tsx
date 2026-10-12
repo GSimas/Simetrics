@@ -2,6 +2,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { FolderOpen } from 'lucide-react';
 
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { BrandMark } from '@/components/BrandMark';
 import { SettingsButton } from '@/components/HeaderActions';
 import { KpiTicker } from '@/components/KpiTicker';
 import { TutorialTriggerButton } from '@/components/TutorialTriggerButton';
@@ -139,11 +140,11 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => navigate('landing')}
-                className="flex items-center gap-4 text-left cursor-pointer transition-opacity duration-200 hover:opacity-80 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                className="group flex items-center gap-4 text-left cursor-pointer focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                 aria-label={t('landing_projects_title')}
                 title={t('landing_projects_title')}
               >
-                <span className="brand-mark h-10 sm:h-11 text-foreground" aria-hidden />
+                <BrandMark className="h-10 sm:h-11 text-foreground" />
                 <h1 className="sr-only">{t('app_title')}</h1>
                 <span className="hidden 2xl:flex flex-col gap-1 border-l border-border pl-4">
                   <span className="eyebrow max-w-[22rem] leading-snug">{t('app_subtitle')}</span>
