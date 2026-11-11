@@ -112,12 +112,11 @@ function FontGlyph({ className }: { className: string }) {
   );
 }
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="space-y-2">
       <p className="eyebrow">{label}</p>
       {children}
-      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
     </div>
   );
 }
@@ -192,10 +191,7 @@ export function SettingsButton() {
           aria-label={t('settings_title')}
           className="absolute right-0 top-full z-50 mt-2 max-h-[calc(100dvh-6rem)] w-[min(22rem,calc(100vw-2rem))] overflow-y-auto border border-border bg-card p-5 text-left shadow-xl duration-200 animate-in fade-in-0 slide-in-from-top-1"
         >
-          <div className="mb-4 space-y-1">
-            <p className="text-base font-semibold">{t('settings_title')}</p>
-            <p className="text-xs text-muted-foreground">{t('settings_desc')}</p>
-          </div>
+          <p className="mb-4 text-base font-semibold">{t('settings_title')}</p>
 
           <div className="space-y-5">
             <Field label={t('settings_theme')}>
@@ -235,14 +231,11 @@ export function SettingsButton() {
               />
             </Field>
 
-            <Field label={t('settings_contrast')} hint={t('settings_contrast_desc')}>
+            <Field label={t('settings_contrast')}>
               <Switch label={t('settings_contrast')} checked={highContrast} onChange={setHighContrast} />
             </Field>
 
-            <Field
-              label={t('settings_motion')}
-              hint={systemMotion ? t('settings_motion_system') : t('settings_motion_desc')}
-            >
+            <Field label={t('settings_motion')}>
               <Switch
                 label={t('settings_motion_reduce')}
                 checked={reduceMotion || systemMotion}
@@ -251,7 +244,7 @@ export function SettingsButton() {
               />
             </Field>
 
-            <Field label={t('settings_ticker')} hint={t('settings_ticker_desc')}>
+            <Field label={t('settings_ticker')}>
               <div className="space-y-2">
                 <Switch label={t('settings_ticker_show')} checked={tickerVisible} onChange={setTickerVisible} />
                 <Switch
