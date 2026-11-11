@@ -9,7 +9,6 @@ import {
   FileText,
   Filter,
   FolderOpen,
-  Gauge,
   GitBranch,
   Globe2,
   ListFilter,
@@ -405,20 +404,6 @@ export const TOUR_STEPS: TourStep[] = [
     en: {
       title: 'AI thematic mapping',
       body: 'Clusters documents by similarity and asks the AI to name each cluster, creating the "Themes (AI)" category used in the production chart, the tables (Location Quotient) and the report. Requires your own AI key (BYOK), set up in the Simi assistant.',
-    },
-  },
-  {
-    id: 'ticker',
-    Icon: Gauge,
-    target: 'ticker',
-    needsData: true,
-    pt: {
-      title: 'Faixa de indicadores',
-      body: 'Os números-chave da base ficam sempre à vista no cabeçalho, em qualquer tela: bases de origem, documentos, período, autores, países, venues e crescimento. Clique na faixa para pausar a rolagem.',
-    },
-    en: {
-      title: 'Indicator strip',
-      body: 'The key numbers of the dataset stay visible in the header on every screen: source databases, documents, period, authors, countries, venues and growth. Click the strip to pause the scrolling.',
     },
   },
   {

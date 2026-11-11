@@ -19,6 +19,7 @@ import { useHashRoute } from '@/lib/use-hash-route';
 import { useDataset } from '@/state/dataset.store';
 import { useLocale } from '@/state/locale.store';
 import { useNavigation, type WorkspaceTab } from '@/state/navigation.store';
+import { usePreferences } from '@/state/preferences.store';
 import { useProjectStore } from '@/state/project.store';
 import { useTour } from '@/state/tour.store';
 
@@ -59,6 +60,7 @@ export default function App() {
   const [tutorialMounted, setTutorialMounted] = useState(false);
   const [route, navigate] = useHashRoute();
   const tourActive = useTour((state) => state.active);
+  const tickerVisible = usePreferences((state) => state.tickerVisible);
 
   const openTutorial = (): void => {
     setTutorialMounted(true);
@@ -178,9 +180,7 @@ export default function App() {
                 <SettingsButton />
               </div>
             </div>
-            <div data-tour="ticker">
-              <KpiTicker />
-            </div>
+            {tickerVisible && <KpiTicker />}
           </header>
 
           <DemoBanner />

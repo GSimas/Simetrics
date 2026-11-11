@@ -133,8 +133,9 @@ export function SettingsButton() {
   const fontScale = usePreferences((state) => state.fontScale);
   const highContrast = usePreferences((state) => state.highContrast);
   const tickerScroll = usePreferences((state) => state.tickerScroll);
+  const tickerVisible = usePreferences((state) => state.tickerVisible);
   const reduceMotion = usePreferences((state) => state.reduceMotion);
-  const { setTheme, setFontScale, setHighContrast, setTickerScroll, setReduceMotion } = usePreferences.getState();
+  const { setTheme, setFontScale, setHighContrast, setTickerScroll, setTickerVisible, setReduceMotion } = usePreferences.getState();
   // Pedido pelo sistema, vale sempre: a opção aparece ligada e travada.
   const systemMotion = systemReducesMotion();
   const isAiConfigured = useAiConfig((state) => state.isConfigured());
@@ -251,7 +252,15 @@ export function SettingsButton() {
             </Field>
 
             <Field label={t('settings_ticker')} hint={t('settings_ticker_desc')}>
-              <Switch label={t('settings_ticker_scroll')} checked={tickerScroll} onChange={setTickerScroll} />
+              <div className="space-y-2">
+                <Switch label={t('settings_ticker_show')} checked={tickerVisible} onChange={setTickerVisible} />
+                <Switch
+                  label={t('settings_ticker_scroll')}
+                  checked={tickerScroll}
+                  onChange={setTickerScroll}
+                  disabled={!tickerVisible}
+                />
+              </div>
             </Field>
 
             <Field label={t('settings_ai')}>
