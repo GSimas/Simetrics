@@ -16,6 +16,8 @@ interface PreferencesState {
   theme: Theme;
   fontScale: FontScale;
   highContrast: boolean;
+  /** Faixa de indicadores sob o cabeçalho; oculta por padrão. */
+  tickerVisible: boolean;
   /** Faixa de indicadores rolando sozinha; desligada, fica parada e rolável à mão. */
   tickerScroll: boolean;
   /** Menos movimento: animações, transições e o fundo animado param (como pede o sistema). */
@@ -24,6 +26,7 @@ interface PreferencesState {
   setFontScale: (scale: FontScale) => void;
   setHighContrast: (enabled: boolean) => void;
   setTickerScroll: (enabled: boolean) => void;
+  setTickerVisible: (visible: boolean) => void;
   setReduceMotion: (enabled: boolean) => void;
 }
 
@@ -32,6 +35,7 @@ const KEYS = {
   font: 'simetrics-font',
   contrast: 'simetrics-contrast',
   ticker: 'simetrics-ticker',
+  tickerVisible: 'simetrics-ticker-visible',
   motion: 'simetrics-motion',
 } as const;
 
@@ -51,7 +55,7 @@ function write(key: string, value: string): void {
   }
 }
 
-function initial(): Pick<PreferencesState, 'theme' | 'fontScale' | 'highContrast' | 'tickerScroll' | 'reduceMotion'> {
+function initial(): Pick<PreferencesState, 'theme' | 'fontScale' | 'highContrast' | 'tickerScroll' | 'tickerVisible' | 'reduceMotion'> {
   const font = read(KEYS.font);
   return {
     // Escuro por padrão, como o Scientata; o claro ("papel") é escolha explícita.
@@ -59,6 +63,7 @@ function initial(): Pick<PreferencesState, 'theme' | 'fontScale' | 'highContrast
     fontScale: font === 'min' || font === 'max' ? font : 'med',
     highContrast: read(KEYS.contrast) === 'high',
     tickerScroll: read(KEYS.ticker) !== 'static',
+    tickerVisible: read(KEYS.tickerVisible) === 'show',
     reduceMotion: read(KEYS.motion) === 'reduce',
   };
 }
@@ -122,6 +127,11 @@ export const usePreferences = create<PreferencesState>()((set, get) => ({
   setTickerScroll(tickerScroll) {
     write(KEYS.ticker, tickerScroll ? 'scroll' : 'static');
     set({ tickerScroll });
+  },
+
+  setTickerVisible(tickerVisible) {
+    write(KEYS.tickerVisible, tickerVisible ? 'show' : 'hide');
+    set({ tickerVisible });
   },
 
   setReduceMotion(reduceMotion) {

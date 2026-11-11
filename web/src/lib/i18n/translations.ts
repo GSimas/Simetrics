@@ -329,8 +329,9 @@ export const TRANSLATIONS = {
     settings_ai_configure: 'Configurar chave',
     settings_ai_missing: 'Nenhuma chave configurada',
     settings_ticker: 'Faixa de indicadores',
+    settings_ticker_show: 'Mostrar faixa',
     settings_ticker_scroll: 'Rolagem automática',
-    settings_ticker_desc: 'Desligada, a faixa sob o cabeçalho fica parada. Também dá para pausar ou retomar clicando nela.',
+    settings_ticker_desc: 'Mostra os números-chave da base sob o cabeçalho. Com a rolagem desligada, a faixa fica parada; também dá para pausar clicando nela.',
     network_show_all_metrics: 'Ver todas as métricas',
     network_show_less: 'Mostrar menos',
     network_layout_force: 'Grafo de rede',
@@ -454,8 +455,7 @@ export const TRANSLATIONS = {
     landing_hero_signal: 'inteligência',
     landing_projects_eyebrow: 'Seus projetos · salvos neste navegador',
     landing_faq_eyebrow: 'Dúvidas',
-    landing_pitch:
-      'O Simetrics transforma exports de bases bibliográficas (Scopus, Web of Science, SciELO e mais) em indicadores cientométricos, redes de colaboração e mapeamento temático por Inteligência Artificial — tudo processado no seu navegador, sem enviar seus dados a nenhum servidor.',
+    landing_about_button: 'Sobre o Simetrics',
     landing_highlight_1_label: '100% no seu navegador',
     landing_highlight_1_text:
       'Seus dados nunca saem do seu computador. Todo o processamento roda via Web Workers, direto no navegador.',
@@ -847,8 +847,9 @@ export const TRANSLATIONS = {
     settings_ai_configure: 'Configure key',
     settings_ai_missing: 'No key configured',
     settings_ticker: 'Indicator strip',
+    settings_ticker_show: 'Show strip',
     settings_ticker_scroll: 'Auto-scroll',
-    settings_ticker_desc: 'When off, the strip below the header stays still. You can also pause or resume it by clicking it.',
+    settings_ticker_desc: 'Shows the key dataset numbers below the header. With auto-scroll off the strip stays still; you can also pause it by clicking it.',
     network_show_all_metrics: 'Show all metrics',
     network_show_less: 'Show less',
     network_layout_force: 'Network graph',
@@ -971,8 +972,7 @@ export const TRANSLATIONS = {
     landing_hero_signal: 'intelligence',
     landing_projects_eyebrow: 'Your projects · saved in this browser',
     landing_faq_eyebrow: 'Questions',
-    landing_pitch:
-      'Simetrics turns exports from bibliographic databases (Scopus, Web of Science, SciELO, and more) into scientometric indicators, collaboration networks, and AI-driven thematic mapping — all processed in your browser, without sending your data to any server.',
+    landing_about_button: 'About Simetrics',
     landing_highlight_1_label: '100% in your browser',
     landing_highlight_1_text:
       'Your data never leaves your computer. All processing runs via Web Workers, right in the browser.',
