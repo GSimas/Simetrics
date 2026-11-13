@@ -23,7 +23,7 @@ function Stat({ label, value, index = 0 }: { label: string; value: string; index
       className="rounded-xl border border-border/80 px-3 py-2 transition-[border-color,box-shadow] duration-300 animate-in fade-in-0 slide-in-from-bottom-2 fill-mode-both hover:border-highlight/50 hover:shadow-[0_0_28px_-14px_var(--highlight)]"
       style={{ animationDelay: `${index * 60}ms` }}
     >
-      <p className="text-[10.5px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{label}</p>
+      <p className="text-[0.65625rem] font-medium uppercase tracking-[0.08em] text-muted-foreground">{label}</p>
       <p className="text-lg font-bold tabular-nums">{value}</p>
     </div>
   );
@@ -57,7 +57,7 @@ function SummaryBody({ summary, total, copy, nf }: { summary: FieldSummary; tota
   const fmt = (value: number) => value.toLocaleString(nf, { maximumFractionDigits: 2 });
   return (
     <div className="space-y-2">
-      <p className="text-[11px] text-muted-foreground">{filled}</p>
+      <p className="text-[0.6875rem] text-muted-foreground">{filled}</p>
       {summary.kind === 'counts' && <BarList items={summary.counts} nf={nf} />}
       {summary.kind === 'numeric' && (
         <p className="text-sm tabular-nums">

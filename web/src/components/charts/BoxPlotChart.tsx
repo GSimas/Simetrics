@@ -3,7 +3,7 @@ import { useMemo, useRef, useState } from 'react';
 import { expandedHeight } from '@/components/charts/ExpandChartButton';
 import { ChartFrame, TipRow } from '@/components/charts/svg/chart-kit';
 import { useElementWidth, useTooltip } from '@/components/charts/svg/hooks';
-import { fitText, FONT_MONO, FONT_SANS, measureText } from '@/components/charts/svg/text';
+import { fitText, FONT_MONO, FONT_SANS, measureText, useFontScale } from '@/components/charts/svg/text';
 import {
   formatNumber,
   formatTick,
@@ -87,6 +87,7 @@ function stats(values: readonly number[]): BoxStats | null {
 function BoxPlotChart(props: BoxPlotChartProps) {
   const { series, yLabel, log = false, height = 440, exportName, onSeriesClick, expanded, className } = props;
   const t = useLocale((state) => state.t);
+  const fontScale = useFontScale();
   const locale = useLocale((state) => state.locale);
   const svgRef = useRef<SVGSVGElement>(null);
   const [containerRef, width] = useElementWidth<HTMLDivElement>();
@@ -114,14 +115,14 @@ function BoxPlotChart(props: BoxPlotChartProps) {
     : niceDomain(Math.min(0, dataMin), dataMax, 5);
   if (log && yDomain[0] === yDomain[1]) yDomain[1] = yDomain[0] * 10;
   const yTicks = log ? logTicks(yDomain[0], yDomain[1]) : linearTicks(yDomain[0], yDomain[1], 5);
-  const tickWidth = Math.max(...yTicks.map((value) => measureText(formatTick(value, locale), 11, FONT_MONO)), 10);
+  const tickWidth = Math.max(...yTicks.map((value) => measureText(formatTick(value, locale), 11 * fontScale, FONT_MONO)), 10);
 
   const left = Math.round(tickWidth + 40);
   const right = 16;
   const plotWidth = Math.max(60, width - left - right);
   const band = plotWidth / Math.max(1, prepared.length);
   // Rótulos longos giram quando não cabem deitados na faixa de cada caixa.
-  const longest = Math.max(...prepared.map((entry) => measureText(entry.name, 11)), 0);
+  const longest = Math.max(...prepared.map((entry) => measureText(entry.name, 11 * fontScale)), 0);
   const rotate = longest > band - 8;
   const labelSpace = rotate ? Math.min(120, longest * 0.72 + 12) : 22;
   const top = 12;
@@ -169,7 +170,7 @@ function BoxPlotChart(props: BoxPlotChartProps) {
         }}
       >
         <desc>{summary}</desc>
-        <g fontFamily={FONT_MONO} fontSize={11} fill="var(--muted-foreground)" aria-hidden>
+        <g fontFamily={FONT_MONO} fontSize={11 * fontScale} fill="var(--muted-foreground)" aria-hidden>
           {yTicks.map((value) => (
             <g key={`y${value}`}>
               <line x1={left} x2={left + plotWidth} y1={sy(value)} y2={sy(value)} stroke="var(--border)" strokeWidth={0.6} />
@@ -182,7 +183,7 @@ function BoxPlotChart(props: BoxPlotChartProps) {
         <text
           transform={`translate(14 ${top + plotHeight / 2}) rotate(-90)`}
           textAnchor="middle"
-          fontSize={12}
+          fontSize={12 * fontScale}
           fill="var(--foreground)"
         >
           {yLabel}
@@ -193,7 +194,7 @@ function BoxPlotChart(props: BoxPlotChartProps) {
           const x = cx(index);
           const dimmed = hovered !== null && hovered !== entry.name;
           const random = seededRandom(index + 1);
-          const label = rotate ? fitText(entry.name, 120, 11) : fitText(entry.name, band - 6, 11);
+          const label = rotate ? fitText(entry.name, 120, 11 * fontScale) : fitText(entry.name, band - 6, 11 * fontScale);
           const describe = (event: { clientX: number; clientY: number }): void => {
             if (!s) return;
             setHovered(entry.name);
@@ -266,7 +267,7 @@ function BoxPlotChart(props: BoxPlotChartProps) {
                     : `translate(${x} ${top + plotHeight + 18})`
                 }
                 textAnchor={rotate ? 'end' : 'middle'}
-                fontSize={11}
+                fontSize={11 * fontScale}
                 fill="var(--foreground)"
                 // Nome inteiro na dica do app (o rótulo pode vir encurtado).
                 data-tip={entry.name}

@@ -35,7 +35,7 @@ export function TaxonomyEditor({ categories, support, onChange, copy }: Taxonomy
             <li key={position} className="space-y-2 rounded-xl border border-border/80 p-3">
               <div className="flex items-end gap-2">
                 <div className="min-w-0 flex-1 space-y-1">
-                  <Label htmlFor={`${fieldId}-name`} className="text-[11px] text-muted-foreground">
+                  <Label htmlFor={`${fieldId}-name`} className="text-[0.6875rem] text-muted-foreground">
                     {position + 1}. {copy.name}
                   </Label>
                   <Input
@@ -64,7 +64,7 @@ export function TaxonomyEditor({ categories, support, onChange, copy }: Taxonomy
               </div>
               <div className="grid gap-2 md:grid-cols-2">
                 <div className="space-y-1">
-                  <Label htmlFor={`${fieldId}-what`} className="text-[11px] text-muted-foreground">{copy.what}</Label>
+                  <Label htmlFor={`${fieldId}-what`} className="text-[0.6875rem] text-muted-foreground">{copy.what}</Label>
                   <Textarea
                     id={`${fieldId}-what`}
                     value={category.what}
@@ -74,7 +74,7 @@ export function TaxonomyEditor({ categories, support, onChange, copy }: Taxonomy
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor={`${fieldId}-not`} className="text-[11px] text-muted-foreground">{copy.notFor}</Label>
+                  <Label htmlFor={`${fieldId}-not`} className="text-[0.6875rem] text-muted-foreground">{copy.notFor}</Label>
                   <Textarea
                     id={`${fieldId}-not`}
                     value={category.notFor}
@@ -86,7 +86,7 @@ export function TaxonomyEditor({ categories, support, onChange, copy }: Taxonomy
               </div>
               {category.examples.length > 0 && (
                 <div className="space-y-1">
-                  <p className="text-[11px] text-muted-foreground">{copy.examples}</p>
+                  <p className="text-[0.6875rem] text-muted-foreground">{copy.examples}</p>
                   <ul className="space-y-0.5 text-xs text-muted-foreground">
                     {category.examples.map((example) => (
                       <li key={example} className="truncate" title={example}>

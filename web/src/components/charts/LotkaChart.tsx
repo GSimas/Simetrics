@@ -7,6 +7,7 @@ import { PALETTE } from '@/features/overview/viz-shared';
 import { imageFromSvgElement } from '@/lib/export-image';
 import { numberLocale } from '@/lib/i18n/labels';
 import { cn } from '@/lib/utils';
+import { useFontScale } from '@/components/charts/svg/text';
 import { useLocale } from '@/state/locale.store';
 import { withChartBoundary } from '@/components/with-chart-boundary';
 
@@ -49,6 +50,7 @@ const percent = (value: number, locale: string): string =>
 function LotkaChart(props: LotkaChartProps) {
   const { lotka, className, expanded } = props;
   const t = useLocale((state) => state.t);
+  const fontScale = useFontScale();
   const locale = useLocale((state) => state.locale);
   const exportName = props.exportName ?? (locale === 'en' ? 'lotka-law' : 'lei-de-lotka');
   const svgRef = useRef<SVGSVGElement>(null);
@@ -154,7 +156,7 @@ function LotkaChart(props: LotkaChartProps) {
           onPointerMove={handlePointerMove}
           onPointerLeave={() => setHovered(null)}
         >
-          <g fontFamily='"DM Mono", ui-monospace, monospace' fontSize={11} fill="var(--muted-foreground)">
+          <g fontFamily='"DM Mono", ui-monospace, monospace' fontSize={11 * fontScale} fill="var(--muted-foreground)">
             {chart.yTicks.map((value) => (
               <g key={`y${value}`}>
                 <line x1={MARGIN.left} x2={WIDTH - MARGIN.right} y1={chart.sy(value)} y2={chart.sy(value)} stroke="var(--border)" strokeWidth={value === 0 ? 1 : 0.6} />
@@ -170,13 +172,13 @@ function LotkaChart(props: LotkaChartProps) {
             ))}
           </g>
 
-          <text x={MARGIN.left + PLOT_W / 2} y={HEIGHT - 10} textAnchor="middle" fontSize={12} fill="var(--foreground)">
+          <text x={MARGIN.left + PLOT_W / 2} y={HEIGHT - 10} textAnchor="middle" fontSize={12 * fontScale} fill="var(--foreground)">
             {t('lotka_x_axis')}
           </text>
           <text
             transform={`translate(16 ${MARGIN.top + PLOT_H / 2}) rotate(-90)`}
             textAnchor="middle"
-            fontSize={12}
+            fontSize={12 * fontScale}
             fill="var(--foreground)"
           >
             {t('lotka_y_axis')}

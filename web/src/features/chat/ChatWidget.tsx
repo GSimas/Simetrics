@@ -128,7 +128,7 @@ export function ChatWidget() {
                   </h2>
                   <span className="size-2 rounded-full bg-emerald-500" title="Online" />
                 </div>
-                <p className="text-[10px] text-muted-foreground truncate max-w-[190px]">
+                <p className="text-[0.625rem] text-muted-foreground truncate max-w-[190px]">
                   {isAiConfigured
                     ? `${config.provider.toUpperCase()} · ${config.model}`
                     : freeSimi
@@ -193,7 +193,7 @@ export function ChatWidget() {
                   <p className="font-semibold text-foreground text-xs mb-1">
                     {isEn ? 'No active dataset' : 'Nenhuma base carregada'}
                   </p>
-                  <p className="text-[11px]">
+                  <p className="text-[0.6875rem]">
                     {t('empty_generic_desc')}
                   </p>
                 </div>

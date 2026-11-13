@@ -69,14 +69,14 @@ function EvidenceItem({
         className={cn('min-w-0 flex-1 rounded-sm text-left hover:text-foreground disabled:cursor-default', PRESS)}
         title={missing ? copy.locationHint['not-found'] : copy.goTo}
       >
-        <span className="font-mono text-[10.5px] text-muted-foreground">
+        <span className="font-mono text-[0.65625rem] text-muted-foreground">
           {copy.page} {item.page}
         </span>{' '}
         {item.quote ? <q className="italic leading-snug">{item.quote.length > 220 ? `${item.quote.slice(0, 220)}…` : item.quote}</q> : <span>{copy.areaLabel}</span>}
         {item.origin === 'ai' && (
           <span
             className={cn(
-              'mt-1 flex items-center gap-1 text-[10.5px]',
+              'mt-1 flex items-center gap-1 text-[0.65625rem]',
               missing ? 'text-exclude' : item.location === 'approximate' ? 'text-amber-600 dark:text-amber-300' : 'text-include',
             )}
             title={copy.locationHint[item.location]}
@@ -147,7 +147,7 @@ function TargetCard({
       <div className="flex items-start gap-2">
         <h4 className="min-w-0 flex-1 text-sm font-medium leading-snug">{item.label}</h4>
         {entry && (
-          <Badge key={entry.status} variant={STATUS_VARIANT[entry.status]} className="shrink-0 animate-in fade-in-0 zoom-in-90 px-1.5 py-0 text-[10px] duration-200">
+          <Badge key={entry.status} variant={STATUS_VARIANT[entry.status]} className="shrink-0 animate-in fade-in-0 zoom-in-90 px-1.5 py-0 text-[0.625rem] duration-200">
             {copy.status[entry.status]}
           </Badge>
         )}
@@ -166,7 +166,7 @@ function TargetCard({
               <span className="text-muted-foreground">{copy.aiSuggests}:</span>{' '}
               <strong className="font-semibold">{suggestionText(review, item.target, suggestion.value, words)}</strong>
               {suggestion.rationale && <span className="mt-0.5 block text-muted-foreground">{suggestion.rationale}</span>}
-              <span className="mt-0.5 block font-mono text-[10px] text-muted-foreground/80">{suggestion.model}</span>
+              <span className="mt-0.5 block font-mono text-[0.625rem] text-muted-foreground/80">{suggestion.model}</span>
             </span>
           </p>
           {pending && !readOnly && (
@@ -195,7 +195,7 @@ function TargetCard({
                 <X className="size-3.5" aria-hidden />
                 {copy.reject}
               </button>
-              {!acceptable && <span className="text-[10.5px] text-exclude">{copy.acceptBlocked}</span>}
+              {!acceptable && <span className="text-[0.65625rem] text-exclude">{copy.acceptBlocked}</span>}
             </div>
           )}
         </div>
@@ -204,7 +204,7 @@ function TargetCard({
       <ReadOnlyScope readOnly={readOnly}>
         {item.field ? (
           <div className="space-y-1">
-            <span id={`extraction-${item.field.id}-label`} className="block text-[11px] text-muted-foreground">
+            <span id={`extraction-${item.field.id}-label`} className="block text-[0.6875rem] text-muted-foreground">
               {copy.yourAnswer}
             </span>
             <FieldInput
@@ -252,9 +252,9 @@ function TargetCard({
           ))}
         </ul>
       ) : (
-        <p className="text-[11px] text-muted-foreground">{copy.noEvidence}</p>
+        <p className="text-[0.6875rem] text-muted-foreground">{copy.noEvidence}</p>
       )}
-      {active && !readOnly && <p className="text-[10.5px] text-highlight">{copy.activeHint}</p>}
+      {active && !readOnly && <p className="text-[0.65625rem] text-highlight">{copy.activeHint}</p>}
     </section>
   );
 }
@@ -293,9 +293,9 @@ function AiBar({ studyKey, scope, title, copy }: { studyKey: string; scope: 'ext
         </Button>
       </div>
       {blocked ? (
-        <p className="text-[11px] leading-relaxed text-amber-700 dark:text-amber-300">{blocked}</p>
+        <p className="text-[0.6875rem] leading-relaxed text-amber-700 dark:text-amber-300">{blocked}</p>
       ) : (
-        details && <p className="text-[11px] leading-relaxed text-muted-foreground">{fill(copy.aiDisclosure, details)}</p>
+        details && <p className="text-[0.6875rem] leading-relaxed text-muted-foreground">{fill(copy.aiDisclosure, details)}</p>
       )}
       {messages.map((message) => (
         <p
@@ -429,7 +429,7 @@ function EvidenceReader() {
 
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)_minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_minmax(22rem,30rem)] lg:grid-rows-1">
         <div className="flex min-h-0 flex-col border-b border-border/80 lg:border-b-0 lg:border-r">
-          <div className="flex flex-wrap items-center gap-2 border-b border-border/80 px-3 py-1.5 text-[11px] text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-2 border-b border-border/80 px-3 py-1.5 text-[0.6875rem] text-muted-foreground">
             {!readOnly && (
               <button
                 type="button"
@@ -490,7 +490,7 @@ function EvidenceReader() {
           {request.scope !== 'full-text' && !readOnly && (
             <AiBar studyKey={request.studyKey} scope={request.scope} title={study?.title ?? ''} copy={copy} />
           )}
-          {readOnly && request.scope !== 'full-text' && <p className="border-b border-border/80 px-4 py-2 text-[11px] text-muted-foreground">{copy.aiReadonly}</p>}
+          {readOnly && request.scope !== 'full-text' && <p className="border-b border-border/80 px-4 py-2 text-[0.6875rem] text-muted-foreground">{copy.aiReadonly}</p>}
           <div className="min-h-0 flex-1 space-y-2.5 overflow-y-auto p-4">
             <p className="eyebrow">{copy.questions}</p>
             {targets.map((item) => (

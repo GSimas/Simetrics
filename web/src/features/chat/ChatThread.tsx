@@ -20,7 +20,7 @@ const MessageMarkdown = memo(MarkdownContent);
 /** Três pontos pulsando + rótulo: "pensando" antes do texto chegar, "escrevendo" durante. */
 function TypingIndicator({ label, className }: { label: string; className?: string | undefined }) {
   return (
-    <span className={cn('flex items-center gap-2 text-[11px] text-muted-foreground', className)}>
+    <span className={cn('flex items-center gap-2 text-[0.6875rem] text-muted-foreground', className)}>
       <span className="flex items-center gap-1" aria-hidden>
         {[0, 150, 300].map((delay) => (
           <span
@@ -40,11 +40,11 @@ function Sources({ titles, compact }: { titles: string[]; compact: boolean }) {
   const t = useLocale((state) => state.t);
   return (
     <details className="group mt-2.5 border-t border-border/70 pt-2">
-      <summary className="eyebrow cursor-pointer list-none text-[10px] transition-colors hover:text-highlight">
+      <summary className="eyebrow cursor-pointer list-none text-[0.625rem] transition-colors hover:text-highlight">
         <FileText className="mr-1.5 inline size-3" aria-hidden />
         {t('chat_sources').replace('{count}', String(titles.length))}
       </summary>
-      <ol className={cn('mt-2 list-decimal space-y-1 pl-5 text-muted-foreground', compact ? 'text-[11px]' : 'text-xs')}>
+      <ol className={cn('mt-2 list-decimal space-y-1 pl-5 text-muted-foreground', compact ? 'text-[0.6875rem]' : 'text-xs')}>
         {titles.map((title) => (
           <li key={title}>
             <button
@@ -93,7 +93,7 @@ export function ChatThread({ compact = false, onConfigure }: { compact?: boolean
             <div
               className={cn(
                 'grid shrink-0 place-items-center rounded-full font-semibold shadow-2xs',
-                compact ? 'size-6.5 text-[10px]' : 'size-8 text-xs',
+                compact ? 'size-6.5 text-[0.625rem]' : 'size-8 text-xs',
                 isUser ? 'bg-primary text-primary-foreground' : 'bg-emerald-600 text-white',
               )}
             >
@@ -108,7 +108,7 @@ export function ChatThread({ compact = false, onConfigure }: { compact?: boolean
               )}
             >
               {!isUser && message.toolsExecuted && message.toolsExecuted.length > 0 && (
-                <div className="mb-2 flex items-center gap-1.5 rounded-md border border-emerald-200/80 bg-emerald-50/70 px-2 py-0.5 text-[10px] font-medium text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300">
+                <div className="mb-2 flex items-center gap-1.5 rounded-md border border-emerald-200/80 bg-emerald-50/70 px-2 py-0.5 text-[0.625rem] font-medium text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300">
                   <Database className="size-2.5 text-emerald-600 dark:text-emerald-400" />
                   <span>
                     {message.toolsExecuted.length === 1
@@ -143,7 +143,7 @@ export function ChatThread({ compact = false, onConfigure }: { compact?: boolean
 
       {messages.length === 0 && (
         <div className="mt-2 space-y-1.5">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <p className="text-[0.625rem] font-semibold uppercase tracking-wider text-muted-foreground">
             {t('chat_suggestions_label')}
           </p>
           <div className={cn('flex gap-1.5', compact ? 'flex-col' : 'flex-wrap')}>
@@ -153,7 +153,7 @@ export function ChatThread({ compact = false, onConfigure }: { compact?: boolean
                 type="button"
                 className={cn(
                   'rounded-lg border border-border/80 bg-card/80 px-2.5 py-1.5 text-left font-medium text-foreground transition-all hover:border-emerald-400 hover:bg-emerald-50/50 hover:text-emerald-950 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-300',
-                  compact ? 'text-[11px]' : 'text-xs',
+                  compact ? 'text-[0.6875rem]' : 'text-xs',
                 )}
                 onClick={() => void ask(suggestion)}
               >
@@ -165,7 +165,7 @@ export function ChatThread({ compact = false, onConfigure }: { compact?: boolean
       )}
 
       {error && (
-        <p className="rounded-lg border border-destructive/40 bg-destructive/10 p-2 text-[11px] text-destructive">
+        <p className="rounded-lg border border-destructive/40 bg-destructive/10 p-2 text-[0.6875rem] text-destructive">
           {error}
         </p>
       )}
@@ -180,7 +180,7 @@ export function PrivacyNote({ className }: { className?: string }) {
   const isConfigured = useAiConfig((state) => state.isConfigured());
   const provider = isConfigured ? config.provider.toUpperCase() : t('chat_privacy_free_provider');
   return (
-    <p className={cn('text-[10px] leading-snug text-muted-foreground', className)}>
+    <p className={cn('text-[0.625rem] leading-snug text-muted-foreground', className)}>
       {t('chat_privacy_note').replace('{count}', String(CONTEXT_SIZE)).replace('{provider}', provider)}
     </p>
   );

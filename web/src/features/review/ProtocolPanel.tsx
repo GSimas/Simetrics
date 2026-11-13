@@ -304,7 +304,7 @@ export function ProtocolPanel({ review, copy }: { review: ReviewState; copy: Rev
           <Block title={copy.conceptsLabel} hint={copy.conceptsHint} target="concept">
             {review.concepts.map((concept, index) => (
               <AnimatedItem key={concept.id} leaving={concepts.isLeaving(concept.id)} className="space-y-2">
-                {index > 0 && <p className="text-center font-mono text-[10px] text-muted-foreground">AND</p>}
+                {index > 0 && <p className="text-center font-mono text-[0.625rem] text-muted-foreground">AND</p>}
                 <ConceptEditor
                   concept={concept}
                   copy={copy}

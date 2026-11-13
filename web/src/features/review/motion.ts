@@ -48,7 +48,7 @@ const HOVER: Record<Tone, string> = {
 export function chipClass(active: boolean, tone: Tone = 'highlight', size: 'sm' | 'md' = 'md'): string {
   return cn(
     'rounded-md border disabled:cursor-not-allowed disabled:opacity-60',
-    size === 'sm' ? 'px-2 py-1 text-[11px]' : 'px-3 py-1 text-xs',
+    size === 'sm' ? 'px-2 py-1 text-[0.6875rem]' : 'px-3 py-1 text-xs',
     PRESS,
     active ? ACTIVE[tone] : cn('border-border text-muted-foreground', HOVER[tone]),
   );

@@ -558,7 +558,7 @@ export function TutorialModal({ open: isOpen, onOpenChange: handleOpenChange }: 
                     </div>
                     <span>{label}</span>
                   </div>
-                  <p className="text-[11px] leading-snug text-muted-foreground">
+                  <p className="text-[0.6875rem] leading-snug text-muted-foreground">
                     {text}
                   </p>
                 </div>
@@ -683,10 +683,10 @@ function FlowNode({
       >
         <Icon className="size-4" aria-hidden />
       </span>
-      <span className={cn('text-[11px] font-semibold', accent ? 'text-highlight' : 'text-foreground')}>
+      <span className={cn('text-[0.6875rem] font-semibold', accent ? 'text-highlight' : 'text-foreground')}>
         {title}
       </span>
-      <span className="eyebrow text-[9.5px]">{caption}</span>
+      <span className="eyebrow text-[0.59375rem]">{caption}</span>
     </div>
   );
 }
@@ -694,7 +694,7 @@ function FlowNode({
 /** Etiqueta com ícone — no lugar dos emojis das prévias. */
 function Tag({ Icon, children }: { Icon: LucideIcon; children: ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-1.5 border border-border px-2 py-1 font-mono text-[10.5px] uppercase tracking-[0.08em] text-muted-foreground">
+    <span className="inline-flex items-center gap-1.5 border border-border px-2 py-1 font-mono text-[0.65625rem] uppercase tracking-[0.08em] text-muted-foreground">
       <Icon className="size-3.5 text-highlight" aria-hidden />
       {children}
     </span>
@@ -792,7 +792,7 @@ function TutorialStepPreview({
         {kpis.map(({ Icon, label, value }) => (
           <div key={label} className="border border-border p-2.5">
             <div className="flex items-center justify-between gap-1">
-              <span className="eyebrow text-[9.5px]">{label}</span>
+              <span className="eyebrow text-[0.59375rem]">{label}</span>
               <Icon className="size-3.5 text-highlight" aria-hidden />
             </div>
             <p className="mt-1 text-lg font-semibold tabular-nums text-foreground">{value}</p>
@@ -833,7 +833,7 @@ function TutorialStepPreview({
             {stages.map((stage, index) => (
               <span key={stage} className="flex items-center gap-1">
                 {index > 0 && <ArrowRight className="size-3 text-muted-foreground" aria-hidden />}
-                <span className="eyebrow border border-border px-1.5 py-0.5 text-[9.5px]">{stage}</span>
+                <span className="eyebrow border border-border px-1.5 py-0.5 text-[0.59375rem]">{stage}</span>
               </span>
             ))}
           </div>

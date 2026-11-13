@@ -7,7 +7,7 @@ import { imageFromSvgElement } from '@/lib/export-image';
 import { cn } from '@/lib/utils';
 import { useLocale } from '@/state/locale.store';
 import type { TooltipState } from './hooks';
-import { LEGEND_FONT, type LegendLayout } from './legend';
+import type { LegendLayout } from './legend';
 import { FONT_SANS } from './text';
 
 /**
@@ -63,7 +63,7 @@ export function SvgLegend({
   const t = useLocale((state) => state.t);
   const [focused, setFocused] = useState<string | null>(null);
   return (
-    <g transform={`translate(${x} ${y})`} fontFamily={FONT_SANS} fontSize={LEGEND_FONT}>
+    <g transform={`translate(${x} ${y})`} fontFamily={FONT_SANS} fontSize={layout.font}>
       {layout.items.map(({ item, x: ix, y: iy, width, text }) => (
         <g
           key={item.key}

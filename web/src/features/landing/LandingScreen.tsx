@@ -234,7 +234,7 @@ export function LandingScreen({ navigate, onOpenTutorial }: LandingScreenProps) 
                       className="flex flex-col gap-2 border-border py-6 text-left sm:px-6 sm:first:pl-0 sm:last:pr-0 sm:[&:not(:first-child)]:border-l [&:not(:first-child)]:border-t sm:[&:not(:first-child)]:border-t-0"
                     >
                       <p className="flex items-baseline gap-3 text-sm font-semibold">
-                        <span className="font-mono text-[11px] font-normal text-highlight">
+                        <span className="font-mono text-[0.6875rem] font-normal text-highlight">
                           {String(index + 1).padStart(2, '0')}
                         </span>
                         {t(labelKey)}

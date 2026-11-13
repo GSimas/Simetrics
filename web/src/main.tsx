@@ -5,6 +5,7 @@ import App from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { RootErrorActions } from './components/RootErrorActions';
 import { TooltipLayer } from './components/TooltipLayer';
+import { installOverlayScrollbars } from './lib/overlay-scrollbars';
 import { completeOpenRouterLogin } from './lib/openrouter-oauth';
 import './fonts.css';
 import './index.css';
@@ -15,6 +16,7 @@ if (!container) {
 }
 
 void completeOpenRouterLogin();
+installOverlayScrollbars();
 
 createRoot(container).render(
   <StrictMode>

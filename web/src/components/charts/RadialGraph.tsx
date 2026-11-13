@@ -9,6 +9,7 @@ import { chordLayout } from '@/core/graph/chord';
 import { imageFromSvgElement } from '@/lib/export-image';
 import { numberLocale } from '@/lib/i18n/labels';
 import { cn } from '@/lib/utils';
+import { useFontScale } from '@/components/charts/svg/text';
 import { useLocale } from '@/state/locale.store';
 import { withChartBoundary } from '@/components/with-chart-boundary';
 
@@ -64,6 +65,7 @@ function truncate(text: string): string {
 function RadialGraph(props: RadialGraphProps) {
   const { nodes, edges, weightLabel, legend, onNodeClick, className, expanded } = props;
   const t = useLocale((state) => state.t);
+  const fontScale = useFontScale();
   const locale = useLocale((state) => state.locale);
   const exportName = props.exportName ?? (locale === 'en' ? 'radial-graph' : 'grafo-radial');
   const svgRef = useRef<SVGSVGElement>(null);
@@ -255,7 +257,7 @@ function RadialGraph(props: RadialGraphProps) {
                   x={flip ? -(r + LABEL_GAP) : r + LABEL_GAP}
                   dy="0.35em"
                   textAnchor={flip ? 'end' : 'start'}
-                  fontSize={layout.fontSize}
+                  fontSize={layout.fontSize * fontScale}
                   fill="var(--foreground)"
                   fontWeight={focus === item.key || matches?.has(item.key) ? 700 : 500}
                 >

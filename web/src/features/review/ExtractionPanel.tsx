@@ -136,7 +136,7 @@ export function ExtractionPanel({ review, copy, onEditProtocol }: { review: Revi
         isDone(study.key) ? (
           <Badge
             variant="success"
-            className="px-1.5 py-0 text-[9.5px] shadow-[0_0_10px_-3px_var(--glow-include)] animate-in fade-in-0 zoom-in-90 duration-200"
+            className="px-1.5 py-0 text-[0.59375rem] shadow-[0_0_10px_-3px_var(--glow-include)] animate-in fade-in-0 zoom-in-90 duration-200"
           >
             {copy.markedDone}
           </Badge>

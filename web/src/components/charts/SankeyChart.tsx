@@ -3,7 +3,7 @@ import { useMemo, useRef, useState } from 'react';
 import { expandedHeight } from '@/components/charts/ExpandChartButton';
 import { ChartFrame, TipRow } from '@/components/charts/svg/chart-kit';
 import { useElementWidth, useTooltip } from '@/components/charts/svg/hooks';
-import { fitText, FONT_MONO, FONT_SANS } from '@/components/charts/svg/text';
+import { fitText, FONT_MONO, FONT_SANS, useFontScale } from '@/components/charts/svg/text';
 import { formatNumber } from '@/components/charts/svg/scale';
 import { useLocale } from '@/state/locale.store';
 import { withChartBoundary } from '@/components/with-chart-boundary';
@@ -203,6 +203,8 @@ function layout(
 function SankeyChart(props: SankeyChartProps) {
   const { nodes, links, columnLabels, height = 620, exportName, onNodeClick, expanded, className } = props;
   const t = useLocale((state) => state.t);
+  const fontScale = useFontScale();
+  const labelFont = LABEL_FONT * fontScale;
   const locale = useLocale((state) => state.locale);
   const svgRef = useRef<SVGSVGElement>(null);
   const [containerRef, width] = useElementWidth<HTMLDivElement>();
@@ -259,7 +261,7 @@ function SankeyChart(props: SankeyChartProps) {
         onPointerLeave={reset}
       >
         <desc>{summary}</desc>
-        <g fontFamily={FONT_MONO} fontSize={11} fill="var(--muted-foreground)" aria-hidden>
+        <g fontFamily={FONT_MONO} fontSize={11 * fontScale} fill="var(--muted-foreground)" aria-hidden>
           {columnLabels.map((label, column) => (
             <text
               key={label}
@@ -348,7 +350,7 @@ function SankeyChart(props: SankeyChartProps) {
                   y={item.y + item.h / 2}
                   dy="0.35em"
                   textAnchor={onLeft ? 'end' : 'start'}
-                  fontSize={LABEL_FONT}
+                  fontSize={labelFont}
                   fill="var(--foreground)"
                   fontWeight={focusNode === item.index ? 700 : 500}
                   paintOrder="stroke"
@@ -356,7 +358,7 @@ function SankeyChart(props: SankeyChartProps) {
                   strokeWidth={3}
                   strokeOpacity={0.8}
                 >
-                  {fitText(item.node.term, labelWidth, LABEL_FONT)}
+                  {fitText(item.node.term, labelWidth, labelFont)}
                 </text>
               </g>
             );

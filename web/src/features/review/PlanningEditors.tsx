@@ -131,7 +131,7 @@ export function QualityChecklistEditor({ review, copy }: { review: ReviewState; 
                 className="w-28"
                 inputClassName="h-8 text-sm"
               />
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-[0.6875rem] text-muted-foreground">
                 {copy.cutoffHint.replace('{max}', max.toLocaleString(locale === 'en' ? 'en' : 'pt-BR'))}
               </p>
             </div>

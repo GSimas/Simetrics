@@ -151,14 +151,14 @@ export function AiSettingsModal({ open, onOpenChange }: AiSettingsModalProps) {
                   <Zap className="size-4 text-primary" aria-hidden />
                   {isEn ? 'Quickest way: OpenRouter' : 'Jeito mais rápido: OpenRouter'}
                 </h3>
-                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                <p className="text-[0.6875rem] leading-relaxed text-muted-foreground">
                   {isEn
                     ? 'Sign in with your OpenRouter account and Simi is ready to go: a key is created for you and the free models router is selected. No copying keys, no cost.'
                     : 'Entre com sua conta OpenRouter e a Simi fica pronta: a chave é criada para você e o roteador de modelos gratuitos é selecionado. Sem copiar chave, sem custo.'}
                 </p>
               </div>
               {openRouterConnected && (
-                <span className="flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
+                <span className="flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[0.625rem] font-semibold text-emerald-700 dark:text-emerald-300">
                   <Check className="size-3" aria-hidden />
                   {isEn ? 'Connected' : 'Conectado'}
                 </span>
@@ -177,7 +177,7 @@ export function AiSettingsModal({ open, onOpenChange }: AiSettingsModalProps) {
             </Button>
           </section>
 
-          <div className="flex items-center gap-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className="flex items-center gap-3 text-[0.625rem] font-semibold uppercase tracking-wider text-muted-foreground">
             <span className="h-px flex-1 bg-border" />
             {isEn ? 'or use your own key' : 'ou use sua própria chave'}
             <span className="h-px flex-1 bg-border" />
@@ -213,7 +213,7 @@ export function AiSettingsModal({ open, onOpenChange }: AiSettingsModalProps) {
                   href={selectedProviderOption.helpUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+                  className="flex items-center gap-1 text-[0.6875rem] font-medium text-primary hover:underline"
                 >
                   <span>{isEn ? 'Get API Key' : 'Obter chave de API'}</span>
                   <ExternalLink className="size-3" />
@@ -260,7 +260,7 @@ export function AiSettingsModal({ open, onOpenChange }: AiSettingsModalProps) {
                         <div className="flex items-center justify-between gap-2 w-full">
                           <span>{opt.name}</span>
                           {opt.badge && (
-                            <span className="rounded bg-primary/10 px-1.5 py-0.2 text-[10px] font-semibold text-primary">
+                            <span className="rounded bg-primary/10 px-1.5 py-0.2 text-[0.625rem] font-semibold text-primary">
                               {modelBadgeLabel(opt.badge, locale)}
                             </span>
                           )}
@@ -279,7 +279,7 @@ export function AiSettingsModal({ open, onOpenChange }: AiSettingsModalProps) {
               {/* Campo para Digitar Modelo Personalizado (se selecionado "Outro") */}
               {(isCustomModel || !isKnownModel) && (
                 <div className="pt-1 space-y-1 animate-in fade-in-0">
-                  <Label htmlFor="ai-custom-model" className="text-[11px] text-muted-foreground">
+                  <Label htmlFor="ai-custom-model" className="text-[0.6875rem] text-muted-foreground">
                     {isEn ? 'Enter custom model identifier:' : 'Digite o identificador do modelo:'}
                   </Label>
                   <Input
@@ -306,7 +306,7 @@ export function AiSettingsModal({ open, onOpenChange }: AiSettingsModalProps) {
                   placeholder="http://localhost:11434/v1"
                   className="h-10 font-mono text-xs rounded-xl"
                 />
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-[0.6875rem] text-muted-foreground">
                   {isEn
                     ? 'Default for Ollama is http://localhost:11434/v1, LM Studio is http://localhost:1234/v1'
                     : 'Padrão para Ollama é http://localhost:11434/v1 e LM Studio é http://localhost:1234/v1'}
@@ -333,7 +333,7 @@ export function AiSettingsModal({ open, onOpenChange }: AiSettingsModalProps) {
             )}
 
             {/* Nota de Privacidade */}
-            <div className="rounded-xl border border-border/80 bg-muted/40 p-3 flex items-start gap-2.5 text-[11px] leading-relaxed text-muted-foreground">
+            <div className="rounded-xl border border-border/80 bg-muted/40 p-3 flex items-start gap-2.5 text-[0.6875rem] leading-relaxed text-muted-foreground">
               <ShieldCheck className="size-4 shrink-0 text-emerald-600 mt-0.5" />
               <span>{t('ai_privacy_note')}</span>
             </div>

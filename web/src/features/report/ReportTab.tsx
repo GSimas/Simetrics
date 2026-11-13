@@ -273,7 +273,7 @@ export default function ReportTab() {
                     {item.label[locale]}
                   </button>
                   {counts[item.id] && (
-                    <span className="shrink-0 tabular-nums text-[11px] text-muted-foreground">{counts[item.id]}</span>
+                    <span className="shrink-0 tabular-nums text-[0.6875rem] text-muted-foreground">{counts[item.id]}</span>
                   )}
                 </div>
               ))}
@@ -312,7 +312,7 @@ export default function ReportTab() {
                 : 'Simetrics · Plataforma de Inteligência Bibliométrica · Desenvolvido por'}{' '}
               <span className="font-bold text-foreground">Gustavo Simas</span>
             </p>
-            <p className="text-[11px] italic">
+            <p className="text-[0.6875rem] italic">
               {isEn ? 'Document rendered client-side.' : 'Documento processado localmente no navegador.'}
             </p>
           </div>
@@ -495,7 +495,7 @@ export default function ReportTab() {
                 ] as const
               ).map(([label, value]) => (
                 <div key={label} className="border border-border bg-card p-2.5">
-                  <p className="text-[11px] font-semibold text-muted-foreground">{label}</p>
+                  <p className="text-[0.6875rem] font-semibold text-muted-foreground">{label}</p>
                   <p className="text-sm font-bold tabular-nums">{value}</p>
                 </div>
               ))}
@@ -606,9 +606,9 @@ function EntityTable({
     <div className="space-y-3">
       <SectionHeading>{title}</SectionHeading>
       <div className="overflow-hidden border border-border">
-        <Table>
+        <Table maxRows={false}>
           <TableHeader>
-            <TableRow className="bg-muted/60 text-[11px]">
+            <TableRow className="bg-muted/60 text-[0.6875rem]">
               <TableHead className="w-10">#</TableHead>
               {head.map((label, index) => (
                 <TableHead key={label} className={index === 0 ? undefined : 'text-right'}>
@@ -649,7 +649,7 @@ function ThemeCard({ name, share, children }: { name: string; share: number; chi
         <p className="truncate text-xs font-bold">{name}</p>
         <span className="eyebrow text-highlight">{share.toFixed(1)}%</span>
       </div>
-      <p className="text-[11px] text-muted-foreground">{children}</p>
+      <p className="text-[0.6875rem] text-muted-foreground">{children}</p>
     </div>
   );
 }

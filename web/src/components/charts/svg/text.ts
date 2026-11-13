@@ -1,5 +1,18 @@
 /** Fontes e medida de texto dos gráficos SVG. */
 
+import { usePreferences, type FontScale } from '@/state/preferences.store';
+
+/** Raiz de 14/16/18px do `index.css` (`html[data-font]`), relativa aos 16px de base. */
+const FONT_SCALE: Record<FontScale, number> = { min: 14 / 16, med: 1, max: 18 / 16 };
+
+/**
+ * Fator do tamanho da letra das Configurações para os textos dos gráficos. Eles medem em px
+ * (cortes, colisões, legendas), então o fator entra no tamanho e na medida.
+ */
+export function useFontScale(): number {
+  return FONT_SCALE[usePreferences((state) => state.fontScale)];
+}
+
 export const FONT_SANS = 'Manrope, system-ui, sans-serif';
 export const FONT_MONO = '"DM Mono", ui-monospace, monospace';
 

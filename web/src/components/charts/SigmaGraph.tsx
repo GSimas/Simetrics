@@ -11,6 +11,7 @@ import { ExpandChartButton, expandedHeight } from '@/components/charts/ExpandCha
 import { ExportImageButton } from '@/components/charts/ExportImageButton';
 import type { ChartImage } from '@/lib/export-image';
 import { cn } from '@/lib/utils';
+import { useFontScale } from '@/components/charts/svg/text';
 import { useLocale } from '@/state/locale.store';
 import { getGraphWorker } from '@/workers/client';
 import { withChartBoundary } from '@/components/with-chart-boundary';
@@ -142,6 +143,7 @@ function SigmaGraph(props: SigmaGraphProps) {
   const matchesRef = useRef<Set<string> | null>(null);
   const emphasisRef = useRef<Set<string> | null>(null);
   const t = useLocale((state) => state.t);
+  const fontScale = useFontScale();
   const en = useLocale((state) => state.locale === 'en');
   const exportName = props.exportName ?? (en ? 'network' : 'rede');
   const [layout, setLayout] = useState<{ nodes: readonly RenderNode[]; positions: Positions } | null>(null);
@@ -221,7 +223,7 @@ function SigmaGraph(props: SigmaGraphProps) {
       labelRenderedSizeThreshold: 3,
       labelFont: 'Manrope, system-ui, -apple-system, sans-serif',
       labelWeight: '600',
-      labelSize: 12,
+      labelSize: 12 * fontScale,
       labelColor: { color: labelColor },
       defaultEdgeColor: edgeColor,
       minEdgeThickness: 1.5,
@@ -301,7 +303,7 @@ function SigmaGraph(props: SigmaGraphProps) {
       renderer.kill();
       sigmaRef.current = null;
     };
-  }, [nodes, edges, isDark, positions]);
+  }, [nodes, edges, isDark, positions, fontScale]);
 
   // Destaque mudou: os reducers releem as refs no próximo quadro.
   useEffect(() => {

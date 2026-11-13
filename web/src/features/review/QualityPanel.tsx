@@ -35,7 +35,7 @@ export function ScoreBadge({ review, studyKey, copy }: { review: ReviewState; st
       key={`${score}-${passes}`}
       variant={passes === true ? 'success' : passes === false ? 'destructive' : complete ? 'secondary' : 'outline'}
       className={cn(
-        'px-1.5 py-0 text-[9.5px] animate-in fade-in-0 zoom-in-90 duration-200',
+        'px-1.5 py-0 text-[0.59375rem] animate-in fade-in-0 zoom-in-90 duration-200',
         passes === true && 'shadow-[0_0_10px_-3px_var(--glow-include)]',
         passes === false && 'shadow-[0_0_10px_-3px_var(--glow-exclude)]',
       )}
@@ -107,7 +107,7 @@ export function QualityPanel({ review, copy, onEditProtocol }: { review: ReviewS
                           onClick={() => answer(study.key, question.id, active ? null : item.id)}
                           className={chipClass(active, answerTone(item, review.qualityAnswers))}
                         >
-                          {item.label || '—'} <span className="font-mono text-[10px] opacity-70">({fmt(item.weight)})</span>
+                          {item.label || '—'} <span className="font-mono text-[0.625rem] opacity-70">({fmt(item.weight)})</span>
                         </button>
                       );
                     })}

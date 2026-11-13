@@ -306,7 +306,7 @@ function PdfPage({
           )}
         </div>
       )}
-      <span className="pointer-events-none absolute -bottom-0.5 right-1 z-[4] translate-y-full text-[10px] tabular-nums text-muted-foreground">
+      <span className="pointer-events-none absolute -bottom-0.5 right-1 z-[4] translate-y-full text-[0.625rem] tabular-nums text-muted-foreground">
         {number}
       </span>
     </div>

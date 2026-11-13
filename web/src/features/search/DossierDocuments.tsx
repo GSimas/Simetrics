@@ -102,7 +102,7 @@ export function DossierDocuments({ documents, columns, onOpenDocument, onOpenKey
 
   return (
     <div ref={scrollRef} className="max-h-[36rem] overflow-auto rounded-xl border">
-      <Table aria-rowcount={sorted.length + 1}>
+      <Table aria-rowcount={sorted.length + 1} maxRows={false}>
         <TableHeader>
           <TableRow aria-rowindex={1}>
             {/* No celular a tabela é mais larga que a tela e a coluna de título fica na largura
@@ -190,7 +190,7 @@ const DocumentRow = memo(function DocumentRow({
               href={doiUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 rounded-md border border-cyan-300 bg-cyan-50 px-2 py-0.5 text-[11px] font-medium text-cyan-800 hover:bg-cyan-100 dark:border-cyan-800 dark:bg-cyan-950/60 dark:text-cyan-300"
+              className="inline-flex items-center gap-1 rounded-md border border-cyan-300 bg-cyan-50 px-2 py-0.5 text-[0.6875rem] font-medium text-cyan-800 hover:bg-cyan-100 dark:border-cyan-800 dark:bg-cyan-950/60 dark:text-cyan-300"
               title={doiUrl}
             >
               <ExternalLink className="size-3" />
@@ -201,7 +201,7 @@ const DocumentRow = memo(function DocumentRow({
 
         {keywords && !isNullLike(keywords) && (
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
+            <span className="text-[0.6875rem] font-semibold text-muted-foreground flex items-center gap-1">
               <BookOpen className="size-3" />
               {t('search_keywords')}:
             </span>
@@ -215,7 +215,7 @@ const DocumentRow = memo(function DocumentRow({
               >
                 <Badge
                   variant="secondary"
-                  className="px-1.5 py-0 text-[10px] transition-colors hover:border-highlight hover:text-highlight"
+                  className="px-1.5 py-0 text-[0.625rem] transition-colors hover:border-highlight hover:text-highlight"
                 >
                   {kw}
                 </Badge>

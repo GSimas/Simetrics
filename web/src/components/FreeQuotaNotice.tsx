@@ -40,7 +40,7 @@ export function FreeQuotaNotice({ onConfigure, compact = false }: FreeQuotaNotic
         size="sm"
         onClick={() => void startOpenRouterLogin()}
         title={t('ai_openrouter_free_hint')}
-        className={cn('font-bold', compact ? 'h-7 text-[11px]' : 'h-8 text-xs')}
+        className={cn('font-bold', compact ? 'h-7 text-[0.6875rem]' : 'h-8 text-xs')}
       >
         <LogIn className="size-3.5" aria-hidden />
         {t('ai_openrouter_login')}
@@ -49,7 +49,7 @@ export function FreeQuotaNotice({ onConfigure, compact = false }: FreeQuotaNotic
         variant="outline"
         size="sm"
         onClick={onConfigure}
-        className={cn('font-semibold', compact ? 'h-7 text-[10px]' : 'h-8 text-xs')}
+        className={cn('font-semibold', compact ? 'h-7 text-[0.625rem]' : 'h-8 text-xs')}
       >
         <KeyRound className="size-3.5" aria-hidden />
         {t('ai_settings_btn')}
@@ -62,7 +62,7 @@ export function FreeQuotaNotice({ onConfigure, compact = false }: FreeQuotaNotic
       role={exhausted ? 'alert' : 'status'}
       className={cn(
         'rounded-xl border border-purple-200 bg-purple-50/70 text-purple-900 dark:border-purple-900 dark:bg-purple-950/40 dark:text-purple-300',
-        compact ? 'p-2.5 text-[11px]' : 'flex flex-wrap items-center justify-between gap-2 p-3 text-xs',
+        compact ? 'p-2.5 text-[0.6875rem]' : 'flex flex-wrap items-center justify-between gap-2 p-3 text-xs',
       )}
     >
       <div className="flex items-start gap-2">

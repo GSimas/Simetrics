@@ -72,7 +72,7 @@ export function StudyWorkspace({
       <div className="space-y-2">
         <div className="space-y-1">
           <Progress value={studies.length ? Math.round((done / studies.length) * 100) : 0} aria-label={copy.studyFilters.done} />
-          <p className="text-[11px] tabular-nums text-muted-foreground">
+          <p className="text-[0.6875rem] tabular-nums text-muted-foreground">
             {copy.studyProgress.replace('{done}', done.toLocaleString()).replace('{total}', studies.length.toLocaleString())}
           </p>
         </div>
@@ -127,7 +127,7 @@ export function StudyWorkspace({
                 )}
               >
                 <span className="line-clamp-2 text-xs font-medium leading-snug">{study.title || '—'}</span>
-                <span className="flex w-full items-center gap-2 text-[10.5px] text-muted-foreground">
+                <span className="flex w-full items-center gap-2 text-[0.65625rem] text-muted-foreground">
                   <span className="truncate">{[study.year, study.venue].filter(Boolean).join(' · ')}</span>
                   <span className="ml-auto shrink-0">{badge?.(study)}</span>
                 </span>
@@ -145,7 +145,7 @@ export function StudyWorkspace({
           key={selected.key}
           className="space-y-4 rounded-xl border border-border/80 p-5 animate-in fade-in-0 slide-in-from-right-2 duration-200"
         >
-          <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+          <div className="flex items-center gap-2 text-[0.6875rem] text-muted-foreground">
             <span className="tabular-nums">
               {copy.studyOf.replace('{n}', (position + 1).toLocaleString()).replace('{total}', visible.length.toLocaleString())}
             </span>

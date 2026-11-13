@@ -2,13 +2,48 @@ import * as React from 'react';
 
 import { cn } from '@/lib/utils';
 
-const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
-  ({ className, ...props }, ref) => (
+interface TableProps extends React.HTMLAttributes<HTMLTableElement> {
+  /** Linhas visíveis antes da rolagem vertical própria; `false` desliga (folha do relatório). */
+  maxRows?: number | false;
+}
+
+/**
+ * Com mais de `maxRows` linhas, o contêiner da tabela (o elemento pai) fica com a altura do
+ * cabeçalho + `maxRows` linhas e ganha rolagem vertical própria — a tabela não estica a
+ * página. Mede as linhas de verdade, porque a altura varia (chips de autores quebram).
+ */
+function capRows(table: HTMLTableElement, maxRows: number): void {
+  const box = table.parentElement;
+  if (!box) return;
+  const rows = table.tBodies[0]?.rows;
+  const limit = rows && rows.length > maxRows ? rows[maxRows] : undefined;
+  if (!limit) {
+    box.style.maxHeight = '';
+    box.style.overflowY = '';
+    return;
+  }
+  const height = limit.getBoundingClientRect().top - table.getBoundingClientRect().top;
+  box.style.maxHeight = `${Math.ceil(height + box.offsetHeight - box.clientHeight)}px`;
+  box.style.overflowY = 'auto';
+}
+
+const Table = React.forwardRef<HTMLTableElement, TableProps>(({ className, maxRows = 10, ...props }, ref) => {
+  const inner = React.useRef<HTMLTableElement>(null);
+  React.useImperativeHandle(ref, () => inner.current as HTMLTableElement);
+  React.useLayoutEffect(() => {
+    const table = inner.current;
+    if (!table || maxRows === false) return;
+    capRows(table, maxRows);
+    const observer = new ResizeObserver(() => capRows(table, maxRows));
+    observer.observe(table);
+    return () => observer.disconnect();
+  });
+  return (
     // O contêiner rolável é responsabilidade de quem usa: as tabelas analíticas têm
     // dezenas de colunas e precisam rolar horizontalmente sem empurrar a página.
-    <table ref={ref} className={cn('w-full caption-bottom text-sm', className)} {...props} />
-  ),
-);
+    <table ref={inner} className={cn('w-full caption-bottom text-sm', className)} {...props} />
+  );
+});
 Table.displayName = 'Table';
 
 const TableHeader = React.forwardRef<
@@ -17,7 +52,9 @@ const TableHeader = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <thead
     ref={ref}
-    className={cn('bg-slate-100/70 dark:bg-slate-900/60 [&_tr]:border-b', className)}
+    // Fixo no topo quando o contêiner rola na vertical; fundo opaco para as linhas não
+    // aparecerem por baixo.
+    className={cn('sticky top-0 z-10 bg-muted [&_tr]:border-b', className)}
     {...props}
   />
 ));

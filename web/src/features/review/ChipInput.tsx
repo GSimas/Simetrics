@@ -64,7 +64,7 @@ export function ChipInput({
             isLeaving(item) ? EXIT : cn(ENTER, 'zoom-in-95'),
           )}
         >
-          {separator && index > 0 && <span className="text-[10px] text-muted-foreground">{separator}</span>}
+          {separator && index > 0 && <span className="text-[0.625rem] text-muted-foreground">{separator}</span>}
           {item}
           <button
             type="button"

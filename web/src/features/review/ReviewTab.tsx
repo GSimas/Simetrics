@@ -146,7 +146,7 @@ function ReviewProgressPanel() {
                 )}
               >
                 <span className="flex items-center gap-2">
-                  <span className={cn('font-mono text-[10px] text-muted-foreground', active && 'text-highlight')}>
+                  <span className={cn('font-mono text-[0.625rem] text-muted-foreground', active && 'text-highlight')}>
                     {index + 1}
                   </span>
                   <Icon className={cn('size-4 text-muted-foreground', active && 'text-highlight')} aria-hidden />
@@ -162,7 +162,7 @@ function ReviewProgressPanel() {
                     style={{ width: `${Math.round(item.ratio * 100)}%` }}
                   />
                 </span>
-                <span className="text-[11px] leading-snug text-muted-foreground">{locked ? copy.progressNeedsData : stepDetail(value, item, copy)}</span>
+                <span className="text-[0.6875rem] leading-snug text-muted-foreground">{locked ? copy.progressNeedsData : stepDetail(value, item, copy)}</span>
               </button>
             </li>
           );

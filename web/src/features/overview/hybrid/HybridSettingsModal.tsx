@@ -82,7 +82,7 @@ function NumberField({ id, label, value, onChange, step = 1, min, max }: {
 }) {
   return (
     <div className="space-y-1">
-      <Label htmlFor={id} className="text-[11px] text-muted-foreground">{label}</Label>
+      <Label htmlFor={id} className="text-[0.6875rem] text-muted-foreground">{label}</Label>
       <NumberInput
         id={id}
         value={Number.isFinite(value) ? value : null}
@@ -175,7 +175,7 @@ function SettingsBody({ onClose }: { onClose: () => void }) {
               placeholder="sk-..."
               label={copy.showKey}
             />
-            <p className="text-[11px] text-muted-foreground">{copy.generativeKeyHint}</p>
+            <p className="text-[0.6875rem] text-muted-foreground">{copy.generativeKeyHint}</p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
@@ -224,7 +224,7 @@ function SettingsBody({ onClose }: { onClose: () => void }) {
                 placeholder="ts-..."
                 label={copy.showKey}
               />
-              <p className="text-[11px] text-muted-foreground">{copy.jevKeyHint.replace('{max}', freeMaxDocs.toLocaleString(locale === 'pt' ? 'pt-BR' : 'en'))}</p>
+              <p className="text-[0.6875rem] text-muted-foreground">{copy.jevKeyHint.replace('{max}', freeMaxDocs.toLocaleString(locale === 'pt' ? 'pt-BR' : 'en'))}</p>
             </div>
             <div className="space-y-1">
               <Label htmlFor="hybrid-jev-model" className="text-xs">{copy.model}</Label>
@@ -299,7 +299,7 @@ function SettingsBody({ onClose }: { onClose: () => void }) {
           </label>
         </section>
 
-        <div className="flex items-start gap-2.5 rounded-xl border border-border/80 bg-muted/40 p-3 text-[11px] leading-relaxed text-muted-foreground">
+        <div className="flex items-start gap-2.5 rounded-xl border border-border/80 bg-muted/40 p-3 text-[0.6875rem] leading-relaxed text-muted-foreground">
           <ShieldCheck className="mt-0.5 size-4 shrink-0 text-emerald-600" aria-hidden />
           <span>{copy.privacy}</span>
         </div>

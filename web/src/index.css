@@ -858,6 +858,57 @@ input::-ms-clear {
 input[type='search']::-webkit-search-cancel-button {
   -webkit-appearance: none;
 }
+/* Cursor de texto e qualquer controle nativo que sobrar (rádio, faixa, progresso) no
+   destaque da marca; triângulo do <details> fora (o resumo desenha o seu, se quiser). */
+:root {
+  accent-color: var(--highlight);
+  caret-color: var(--highlight);
+}
+summary::-webkit-details-marker {
+  display: none;
+}
+/* Preenchimento automático do navegador: sem o fundo amarelo/azul do sistema. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--foreground);
+  box-shadow: 0 0 0 1000px var(--background) inset;
+  transition: background-color 9999s;
+}
+
+/* Barras de rolagem Scientata, sobrepostas: as nativas somem (sem faixa reservada) e
+   `lib/overlay-scrollbars.ts` desenha no lugar uma alça reta, por cima do conteúdo, que só
+   aparece ao rolar ou com o mouse perto da borda. Firefox/Chrome por `scrollbar-width`;
+   Safari pelo pseudo-elemento. */
+* {
+  scrollbar-width: none;
+}
+::-webkit-scrollbar {
+  display: none;
+}
+.sm-scroll-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  pointer-events: none;
+}
+.sm-scroll-thumb {
+  position: fixed;
+  background-color: color-mix(in srgb, var(--highlight) 45%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.25s ease,
+    background-color 0.15s ease;
+}
+.sm-scroll-thumb[data-on] {
+  opacity: 1;
+  pointer-events: auto;
+}
+.sm-scroll-thumb:hover,
+.sm-scroll-thumb[data-drag] {
+  background-color: var(--highlight);
+}
 
 /* "Próximo passo" da revisão: o alvo pisca em destaque para o olho achar onde preencher. */
 @keyframes target-flash {

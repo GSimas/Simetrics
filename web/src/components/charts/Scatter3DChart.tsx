@@ -4,7 +4,7 @@ import { expandedHeight } from '@/components/charts/ExpandChartButton';
 import { ChartFrame, SvgLegend } from '@/components/charts/svg/chart-kit';
 import { useElementWidth, useTooltip } from '@/components/charts/svg/hooks';
 import { layoutLegend, type LegendItem } from '@/components/charts/svg/legend';
-import { fitText, FONT_MONO, FONT_SANS, measureText } from '@/components/charts/svg/text';
+import { fitText, FONT_MONO, FONT_SANS, measureText, useFontScale } from '@/components/charts/svg/text';
 import { clamp } from '@/components/charts/svg/scale';
 import { useLocale } from '@/state/locale.store';
 import { withChartBoundary } from '@/components/with-chart-boundary';
@@ -68,6 +68,8 @@ function normalize(values: readonly number[]): (value: number) => number {
 function Scatter3DChart(props: Scatter3DChartProps) {
   const { points, axisLabels, legend: legendItems = [], height = 620, exportName, ariaLabel, expanded, className } = props;
   const t = useLocale((state) => state.t);
+  const fontScale = useFontScale();
+  const labelFont = LABEL_FONT * fontScale;
   const svgRef = useRef<SVGSVGElement>(null);
   const [containerRef, width] = useElementWidth<HTMLDivElement>();
   const { tooltip, show, hide } = useTooltip(containerRef);
@@ -82,8 +84,9 @@ function Scatter3DChart(props: Scatter3DChartProps) {
       layoutLegend(
         legendItems.map((item) => ({ ...item, muted: hiddenGroups.has(item.key) })),
         Math.max(120, width - 24),
+        fontScale,
       ),
-    [legendItems, width, hiddenGroups],
+    [legendItems, width, hiddenGroups, fontScale],
   );
 
   const normalized = useMemo(() => {
@@ -129,10 +132,10 @@ function Scatter3DChart(props: Scatter3DChartProps) {
     const boxes: { x0: number; x1: number; y0: number; y1: number }[] = [];
     for (const item of [...projected].reverse()) {
       if (!item.point.label) continue;
-      const text = fitText(item.point.label, 130, LABEL_FONT);
-      const w = measureText(text, LABEL_FONT);
+      const text = fitText(item.point.label, 130, labelFont);
+      const w = measureText(text, labelFont);
       const y = item.sy - item.point.r - 4;
-      const box = { x0: item.sx - w / 2, x1: item.sx + w / 2, y0: y - LABEL_FONT, y1: y + 2 };
+      const box = { x0: item.sx - w / 2, x1: item.sx + w / 2, y0: y - labelFont, y1: y + 2 };
       if (boxes.some((o) => box.x0 < o.x1 && box.x1 > o.x0 && box.y0 < o.y1 && box.y1 > o.y0)) continue;
       boxes.push(box);
       labels.set(item.point.id, text);
@@ -252,7 +255,7 @@ function Scatter3DChart(props: Scatter3DChartProps) {
             return <line key={`${a}-${b}`} x1={p.sx} y1={p.sy} x2={q.sx} y2={q.sy} />;
           })}
         </g>
-        <g fontFamily={FONT_MONO} fontSize={11} fill="var(--muted-foreground)" aria-hidden>
+        <g fontFamily={FONT_MONO} fontSize={11 * fontScale} fill="var(--muted-foreground)" aria-hidden>
           {axisEnds.map(({ label, from, to }) => (
             <g key={label}>
               <line x1={from.sx} y1={from.sy} x2={to.sx} y2={to.sy} stroke="var(--muted-foreground)" strokeWidth={1.4} />
@@ -293,7 +296,7 @@ function Scatter3DChart(props: Scatter3DChartProps) {
                   x={sx}
                   y={sy - r - 4}
                   textAnchor="middle"
-                  fontSize={LABEL_FONT}
+                  fontSize={labelFont}
                   fill="var(--foreground)"
                   opacity={0.45 + 0.55 * near}
                   fontWeight={hovered === point.id ? 700 : 500}

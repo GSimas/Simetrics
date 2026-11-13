@@ -75,7 +75,7 @@ function FlowSummary({ flow, copy }: { flow: ReviewFlow; copy: ReviewCopy }) {
         phase={copy.identification}
         main={
           <FlowBox label={copy.identifiedFrom} value={flow.identified} order={0}>
-            <ul className="mt-1 space-y-0.5 text-[11px] text-muted-foreground">
+            <ul className="mt-1 space-y-0.5 text-[0.6875rem] text-muted-foreground">
               {flow.identifiedBySource.map((source) => (
                 <li key={source.name}>
                   {source.name}: {source.count.toLocaleString(nf)}
@@ -104,7 +104,7 @@ function FlowSummary({ flow, copy }: { flow: ReviewFlow; copy: ReviewCopy }) {
         main={<FlowBox label={copy.reportsAssessed} value={flow.fullText.eligible - flow.fullText.notRetrieved} order={6} />}
         side={
           <FlowBox label={copy.reportsExcluded} value={flow.fullText.exclude} tone="side" order={7}>
-            <ul className="mt-1 space-y-0.5 text-[11px] text-muted-foreground">
+            <ul className="mt-1 space-y-0.5 text-[0.6875rem] text-muted-foreground">
               {flow.fullTextExclusions.map((reason) => (
                 <li key={reason.id}>
                   {reason.label}: {reason.count.toLocaleString(nf)}
@@ -173,7 +173,7 @@ export function PrismaPanel({ review, copy }: { review: ReviewState; copy: Revie
           </p>
         )}
         <FlowSummary flow={flow} copy={copy} />
-        <p className="text-[11px] leading-relaxed text-muted-foreground">{copy.dedupHint}</p>
+        <p className="text-[0.6875rem] leading-relaxed text-muted-foreground">{copy.dedupHint}</p>
       </section>
 
       <section className={cn('space-y-4 p-4', BLOCK)} data-tour="review-export">

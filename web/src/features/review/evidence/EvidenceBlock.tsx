@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Download, FilesIcon, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { downloadCsv, toCsv } from '@/core/export';
 import { evidenceRows, matchPdfToStudy, pilotMetrics } from '@/core/review/evidence';
 import type { ScreeningRecord } from '@/core/review/records';
@@ -30,7 +31,7 @@ function Metric({ label, value, tone }: { label: string; value: string; tone?: '
       >
         {value}
       </p>
-      <p className="text-[11px] leading-snug text-muted-foreground">{label}</p>
+      <p className="text-[0.6875rem] leading-snug text-muted-foreground">{label}</p>
     </div>
   );
 }
@@ -133,7 +134,7 @@ export function EvidenceBlock({ review, studies }: { review: ReviewState; studie
           {copy.exportCsv}
         </Button>
         {usage !== null && documentCount > 0 && (
-          <span className="ml-auto text-[11px] text-muted-foreground">{fill(copy.storage, { used: `${(usage / 1_048_576).toFixed(1)} MB` })}</span>
+          <span className="ml-auto text-[0.6875rem] text-muted-foreground">{fill(copy.storage, { used: `${(usage / 1_048_576).toFixed(1)} MB` })}</span>
         )}
       </div>
       {result && <p className="text-xs animate-in fade-in-0 duration-200" role="status">{result}</p>}
@@ -145,23 +146,24 @@ export function EvidenceBlock({ review, studies }: { review: ReviewState; studie
               <span className="min-w-0 max-w-[40ch] truncate font-medium" title={item.file.name}>
                 {item.file.name}
               </span>
-              <select
-                className="h-8 min-w-0 max-w-full flex-1 rounded-md border border-input bg-background px-2 text-xs"
-                defaultValue=""
-                onChange={(event) => {
-                  if (!event.target.value) return;
-                  attachDocument(event.target.value, item.ingested.document);
+              <Select
+                onValueChange={(key) => {
+                  attachDocument(key, item.ingested.document);
                   setUnmatched((list) => list.filter((entry) => entry !== item));
                 }}
               >
-                <option value="">{copy.bulkPick}</option>
-                {studies.map((study) => (
-                  <option key={study.key} value={study.key}>
-                    {review.documents[study.key] ? '✓ ' : ''}
-                    {(study.title || study.key).slice(0, 110)}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="h-8 min-w-0 max-w-full flex-1 bg-background px-2 text-xs">
+                  <SelectValue placeholder={copy.bulkPick} />
+                </SelectTrigger>
+                <SelectContent className="max-w-[min(90vw,48rem)]">
+                  {studies.map((study) => (
+                    <SelectItem key={study.key} value={study.key} className="text-xs">
+                      {review.documents[study.key] ? '✓ ' : ''}
+                      {(study.title || study.key).slice(0, 110)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </label>
           ))}
         </div>
@@ -179,7 +181,7 @@ export function EvidenceBlock({ review, studies }: { review: ReviewState; studie
         <Metric label={copy.metrics.notFound} value={fmt(metrics.notFound)} tone={metrics.notFound > 0 ? 'exclude' : undefined} />
         <Metric label={copy.metrics.scanned} value={fmt(metrics.scanned)} tone={metrics.scanned > 0 ? 'warning' : undefined} />
       </div>
-      <p className="text-[11px] leading-relaxed text-muted-foreground">{copy.metricsHint}</p>
+      <p className="text-[0.6875rem] leading-relaxed text-muted-foreground">{copy.metricsHint}</p>
     </Block>
   );
 }

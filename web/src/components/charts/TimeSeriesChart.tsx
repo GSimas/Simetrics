@@ -9,7 +9,7 @@ import {
   type PlotArea,
 } from '@/components/charts/svg/hooks';
 import { layoutLegend } from '@/components/charts/svg/legend';
-import { FONT_MONO, FONT_SANS, measureText } from '@/components/charts/svg/text';
+import { FONT_MONO, FONT_SANS, measureText, useFontScale } from '@/components/charts/svg/text';
 import { formatNumber, formatTick, linearScale, linearTicks, niceDomain } from '@/components/charts/svg/scale';
 import { cn } from '@/lib/utils';
 import { useLocale } from '@/state/locale.store';
@@ -62,6 +62,7 @@ function TimeSeriesChart(props: TimeSeriesChartProps) {
     className,
   } = props;
   const t = useLocale((state) => state.t);
+  const fontScale = useFontScale();
   const locale = useLocale((state) => state.locale);
   const svgRef = useRef<SVGSVGElement>(null);
   const [containerRef, width] = useElementWidth<HTMLDivElement>();
@@ -101,8 +102,9 @@ function TimeSeriesChart(props: TimeSeriesChartProps) {
             }))
           : [],
         Math.max(120, width - 24),
+        fontScale,
       ),
-    [series, width, mode, hidden],
+    [series, width, mode, hidden, fontScale],
   );
 
   const stacked = mode === 'bars-stacked';
@@ -116,7 +118,7 @@ function TimeSeriesChart(props: TimeSeriesChartProps) {
   );
   const [, yMax] = niceDomain(0, yMaxRaw, 5);
   const yTicks = linearTicks(0, yMax, 5);
-  const tickWidth = Math.max(...yTicks.map((value) => measureText(formatTick(value, locale), 11, FONT_MONO)));
+  const tickWidth = Math.max(...yTicks.map((value) => measureText(formatTick(value, locale), 11 * fontScale, FONT_MONO)));
 
   const area: PlotArea = {
     left: Math.round(tickWidth + 40),
@@ -298,7 +300,7 @@ function TimeSeriesChart(props: TimeSeriesChartProps) {
           <desc>{summary}</desc>
           <SvgLegend layout={legend} x={12} y={4} onToggle={toggle} />
 
-          <g fontFamily={FONT_MONO} fontSize={11} fill="var(--muted-foreground)" aria-hidden>
+          <g fontFamily={FONT_MONO} fontSize={11 * fontScale} fill="var(--muted-foreground)" aria-hidden>
             {/* Grade secundária: meio-passos no eixo y (sem rótulo, para não poluir o eixo)
                 e uma vertical por ano rotulado. */}
             <g stroke="var(--muted-foreground)" strokeOpacity={0.22} strokeWidth={0.7} strokeDasharray="3 3">
@@ -340,7 +342,7 @@ function TimeSeriesChart(props: TimeSeriesChartProps) {
             x={area.left + area.width / 2}
             y={height - 8}
             textAnchor="middle"
-            fontSize={12}
+            fontSize={12 * fontScale}
             fill="var(--foreground)"
           >
             {xLabel}
@@ -348,7 +350,7 @@ function TimeSeriesChart(props: TimeSeriesChartProps) {
           <text
             transform={`translate(14 ${area.top + area.height / 2}) rotate(-90)`}
             textAnchor="middle"
-            fontSize={12}
+            fontSize={12 * fontScale}
             fill="var(--foreground)"
           >
             {yLabel}

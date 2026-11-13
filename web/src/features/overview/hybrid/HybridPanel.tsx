@@ -29,9 +29,9 @@ function formatPercent(value: number, locale: 'pt' | 'en'): string {
 function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="rounded-xl border border-border/80 px-3 py-2">
-      <p className="text-[10.5px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{label}</p>
+      <p className="text-[0.65625rem] font-medium uppercase tracking-[0.08em] text-muted-foreground">{label}</p>
       <p className="text-lg font-bold tabular-nums text-foreground">{value}</p>
-      {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
+      {hint && <p className="text-[0.6875rem] text-muted-foreground">{hint}</p>}
     </div>
   );
 }
@@ -294,7 +294,7 @@ export function HybridPanel() {
               {copy.manual}
             </Button>
           </div>
-          <p className="text-[11px] leading-relaxed text-muted-foreground">{copy.privacy}</p>
+          <p className="text-[0.6875rem] leading-relaxed text-muted-foreground">{copy.privacy}</p>
         </div>
       )}
 

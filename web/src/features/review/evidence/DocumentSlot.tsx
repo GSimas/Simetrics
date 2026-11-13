@@ -167,7 +167,7 @@ export function EvidenceInline({ studyKey, target, scope }: { studyKey: string; 
   if (!entry) return null;
   const pending = entry.status === 'suggested';
   return (
-    <div className="flex flex-wrap items-center gap-1.5 text-[11px] animate-in fade-in-0 duration-200">
+    <div className="flex flex-wrap items-center gap-1.5 text-[0.6875rem] animate-in fade-in-0 duration-200">
       <button
         type="button"
         disabled={!hasPdf}

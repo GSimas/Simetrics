@@ -305,7 +305,7 @@ export function DatePicker({ id, value, onValueChange, disabled, className, ...a
                 <abbr
                   key={day.getDay()}
                   title={formats.weekdayLong.format(day)}
-                  className="eyebrow py-1 text-[10px] no-underline"
+                  className="eyebrow py-1 text-[0.625rem] no-underline"
                 >
                   {formats.weekday.format(day)}
                 </abbr>

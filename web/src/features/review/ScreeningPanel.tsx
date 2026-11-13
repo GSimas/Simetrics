@@ -294,7 +294,7 @@ export function ScreeningPanel({ review, copy }: { review: ReviewState; copy: Re
         </div>
         <div className="min-w-[12rem] flex-1 space-y-1">
           <Progress value={counts.all ? Math.round((done / counts.all) * 100) : 0} aria-label={copy.steps.screening} />
-          <p className="text-[11px] tabular-nums text-muted-foreground">
+          <p className="text-[0.6875rem] tabular-nums text-muted-foreground">
             {copy.progress.replace('{done}', done.toLocaleString()).replace('{total}', counts.all.toLocaleString())}
           </p>
         </div>
@@ -367,7 +367,7 @@ export function ScreeningPanel({ review, copy }: { review: ReviewState; copy: Re
                         <span className="line-clamp-2 text-xs font-medium leading-snug text-foreground">
                           {record.title || '—'}
                         </span>
-                        <span className="flex w-full items-center gap-2 text-[10.5px] text-muted-foreground">
+                        <span className="flex w-full items-center gap-2 text-[0.65625rem] text-muted-foreground">
                           <span className="truncate">{[record.year, record.database].filter(Boolean).join(' · ')}</span>
                           {status !== 'pending' && (
                             <span className="ml-auto flex shrink-0 items-center gap-1.5">
@@ -375,7 +375,7 @@ export function ScreeningPanel({ review, copy }: { review: ReviewState; copy: Re
                               <Badge
                                 key={status}
                                 variant={STATUS_VARIANT[status]}
-                                className="px-1.5 py-0 text-[9.5px] animate-in fade-in-0 zoom-in-90 duration-200"
+                                className="px-1.5 py-0 text-[0.59375rem] animate-in fade-in-0 zoom-in-90 duration-200"
                               >
                                 {copy.decisionLabels[status]}
                               </Badge>
@@ -400,7 +400,7 @@ export function ScreeningPanel({ review, copy }: { review: ReviewState; copy: Re
                 className="space-y-4 rounded-xl border border-border/80 p-5 animate-in fade-in-0 slide-in-from-right-2 duration-200"
                 aria-live="polite"
               >
-                <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                <div className="flex flex-wrap items-center gap-2 text-[0.6875rem] text-muted-foreground">
                   <span className="tabular-nums">
                     {copy.recordOf.replace('{n}', (position + 1).toLocaleString()).replace('{total}', visible.length.toLocaleString())}
                   </span>
@@ -457,18 +457,18 @@ export function ScreeningPanel({ review, copy }: { review: ReviewState; copy: Re
                     <button type="button" className={decisionClass(currentStatus === 'include', 'include')} onClick={() => decide('include')}>
                       <Check aria-hidden />
                       {copy.include}
-                      <kbd className="font-mono text-[10px] opacity-60">I</kbd>
+                      <kbd className="font-mono text-[0.625rem] opacity-60">I</kbd>
                     </button>
                     <button type="button" className={decisionClass(currentStatus === 'exclude', 'exclude')} onClick={() => decide('exclude')}>
                       <X aria-hidden />
                       {copy.exclude}
-                      <kbd className="font-mono text-[10px] opacity-60">E</kbd>
+                      <kbd className="font-mono text-[0.625rem] opacity-60">E</kbd>
                     </button>
                     {stage === 'title-abstract' ? (
                       <button type="button" className={decisionClass(currentStatus === 'maybe', 'warning')} onClick={() => decide('maybe')}>
                         <CircleHelp aria-hidden />
                         {copy.maybe}
-                        <kbd className="font-mono text-[10px] opacity-60">T</kbd>
+                        <kbd className="font-mono text-[0.625rem] opacity-60">T</kbd>
                       </button>
                     ) : (
                       <button
@@ -478,7 +478,7 @@ export function ScreeningPanel({ review, copy }: { review: ReviewState; copy: Re
                       >
                         <Ban aria-hidden />
                         {copy.notRetrieved}
-                        <kbd className="font-mono text-[10px] opacity-60">N</kbd>
+                        <kbd className="font-mono text-[0.625rem] opacity-60">N</kbd>
                       </button>
                     )}
                     {currentStatus !== 'pending' && (
@@ -509,7 +509,7 @@ export function ScreeningPanel({ review, copy }: { review: ReviewState; copy: Re
                             onClick={() => decide('exclude', criterion.id)}
                             className={cn(chipClass(false, 'exclude'), 'inline-flex items-center gap-1.5')}
                           >
-                            <kbd className="font-mono text-[10px] opacity-60">{index + 1}</kbd>
+                            <kbd className="font-mono text-[0.625rem] opacity-60">{index + 1}</kbd>
                             {criterion.text}
                           </button>
                         ))}
@@ -569,7 +569,7 @@ export function ScreeningPanel({ review, copy }: { review: ReviewState; copy: Re
                   </div>
                 </ReadOnlyScope>
 
-                <p className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                <p className="flex items-center gap-2 text-[0.6875rem] text-muted-foreground">
                   <Keyboard className="size-3.5" aria-hidden />
                   {stage === 'title-abstract' ? copy.shortcutsTa : copy.shortcutsFt}
                 </p>

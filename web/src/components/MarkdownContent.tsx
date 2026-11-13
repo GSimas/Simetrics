@@ -1,6 +1,7 @@
 import { Fragment, type ReactNode } from 'react';
 import { ExternalLink } from 'lucide-react';
 
+import { Table } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 
 /** Transforma um trecho de texto puro (fora de código e links) — ex.: ligar entidades da base. */
@@ -280,8 +281,8 @@ function renderBlock(block: Block, renderText: RenderText): ReactNode {
     case 'table':
       return (
         <div className="my-2.5 overflow-x-auto rounded-xl border border-border/80 bg-card/90 shadow-2xs">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-slate-100/90 text-muted-foreground dark:bg-slate-800/80 border-b border-border font-semibold">
+          <Table className="w-full text-left text-xs border-collapse">
+            <thead className="sticky top-0 z-10 bg-muted text-muted-foreground border-b border-border font-semibold">
               <tr>
                 {block.headers.map((header, hIdx) => {
                   const align = block.alignments[hIdx] ?? 'left';
@@ -289,7 +290,7 @@ function renderBlock(block: Block, renderText: RenderText): ReactNode {
                     <th
                       key={hIdx}
                       className={cn(
-                        'px-3 py-2 text-[11px] font-bold text-foreground tracking-tight whitespace-nowrap',
+                        'px-3 py-2 text-[0.6875rem] font-bold text-foreground tracking-tight whitespace-nowrap',
                         align === 'center' && 'text-center',
                         align === 'right' && 'text-right',
                       )}
@@ -312,7 +313,7 @@ function renderBlock(block: Block, renderText: RenderText): ReactNode {
                       <td
                         key={cIdx}
                         className={cn(
-                          'px-3 py-2 text-[11px] text-foreground/90 leading-snug',
+                          'px-3 py-2 text-[0.6875rem] text-foreground/90 leading-snug',
                           align === 'center' && 'text-center',
                           align === 'right' && 'text-right font-mono',
                         )}
@@ -324,7 +325,7 @@ function renderBlock(block: Block, renderText: RenderText): ReactNode {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </Table>
         </div>
       );
 
@@ -332,11 +333,11 @@ function renderBlock(block: Block, renderText: RenderText): ReactNode {
       return (
         <div className="my-2 overflow-hidden rounded-lg border border-border/80 bg-slate-950 text-slate-100 dark:bg-black">
           {block.language && (
-            <div className="bg-slate-900 px-3 py-1 text-[10px] font-mono text-slate-400 border-b border-slate-800">
+            <div className="bg-slate-900 px-3 py-1 text-[0.625rem] font-mono text-slate-400 border-b border-slate-800">
               {block.language}
             </div>
           )}
-          <pre className="p-2.5 overflow-x-auto text-[11px] font-mono leading-relaxed">
+          <pre className="p-2.5 overflow-x-auto text-[0.6875rem] font-mono leading-relaxed">
             <code>{block.code}</code>
           </pre>
         </div>
@@ -418,7 +419,7 @@ function renderInline(text: string, renderText: RenderText): ReactNode {
       return (
         <code
           key={index}
-          className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] font-semibold text-primary"
+          className="rounded bg-muted px-1.5 py-0.5 font-mono text-[0.6875rem] font-semibold text-primary"
         >
           {content}
         </code>

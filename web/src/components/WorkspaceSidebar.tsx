@@ -156,7 +156,7 @@ export function WorkspaceSidebar() {
                   <Icon className={cn('size-4.5 shrink-0', isActive && 'text-highlight')} aria-hidden />
                   {!collapsed && (
                     <>
-                      <span className="font-mono text-[10px] tracking-[0.1em] text-muted-foreground">
+                      <span className="font-mono text-[0.625rem] tracking-[0.1em] text-muted-foreground">
                         {String(index + 1).padStart(2, '0')}
                       </span>
                       <span className="min-w-0 flex-1 truncate">{label}</span>
@@ -201,7 +201,7 @@ export function WorkspaceSidebar() {
                             aria-disabled={item.locked || undefined}
                             title={collapsed ? [item.label, item.hint].filter(Boolean).join(' — ') : item.hint}
                             className={cn(
-                              'flex w-full items-center gap-2.5 rounded-md py-1.5 text-left text-[13px] transition-colors',
+                              'flex w-full items-center gap-2.5 rounded-md py-1.5 text-left text-[0.8125rem] transition-colors',
                               'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring',
                               collapsed ? 'justify-center px-0' : 'px-2',
                               itemActive

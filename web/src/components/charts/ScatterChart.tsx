@@ -9,7 +9,7 @@ import {
   type PlotArea,
 } from '@/components/charts/svg/hooks';
 import { layoutLegend, type LegendItem } from '@/components/charts/svg/legend';
-import { fitText, FONT_MONO, FONT_SANS, measureText } from '@/components/charts/svg/text';
+import { fitText, FONT_MONO, FONT_SANS, measureText, useFontScale } from '@/components/charts/svg/text';
 import { formatNumber, formatTick, linearScale, linearTicks, niceStep } from '@/components/charts/svg/scale';
 import { useLocale } from '@/state/locale.store';
 import { withChartBoundary } from '@/components/with-chart-boundary';
@@ -107,6 +107,8 @@ function ScatterChart(props: ScatterChartProps) {
     className,
   } = props;
   const t = useLocale((state) => state.t);
+  const fontScale = useFontScale();
+  const labelFont = LABEL_FONT * fontScale;
   const locale = useLocale((state) => state.locale);
   const clipId = useId().replace(/:/g, '');
   const svgRef = useRef<SVGSVGElement>(null);
@@ -132,12 +134,13 @@ function ScatterChart(props: ScatterChartProps) {
       layoutLegend(
         legendItems.map((item) => ({ ...item, muted: hiddenGroups.has(item.key) })),
         Math.max(120, width - 24),
+        fontScale,
       ),
-    [legendItems, width, hiddenGroups],
+    [legendItems, width, hiddenGroups, fontScale],
   );
 
   const yTicks = hideYAxis ? [] : linearTicks(domain.y[0], domain.y[1], 6);
-  const tickWidth = hideYAxis ? 0 : Math.max(...yTicks.map((value) => measureText(formatTick(value, locale), 11, FONT_MONO)), 10);
+  const tickWidth = hideYAxis ? 0 : Math.max(...yTicks.map((value) => measureText(formatTick(value, locale), 11 * fontScale, FONT_MONO)), 10);
   const colorBarSpace = colorScale ? 78 : 0;
 
   const area: PlotArea = {
@@ -180,10 +183,10 @@ function ScatterChart(props: ScatterChartProps) {
       if (!point.label) continue;
       if (x < area.left || x > area.left + area.width || y < area.top || y > area.top + area.height) continue;
       const maxWidth = labelPlacement === 'center' ? Math.max(60, point.r * 2.6) : 150;
-      const lines = point.label.split('\n').map((line) => fitText(line, maxWidth, LABEL_FONT));
-      const w = Math.max(...lines.map((line) => measureText(line, LABEL_FONT)));
+      const lines = point.label.split('\n').map((line) => fitText(line, maxWidth, labelFont));
+      const w = Math.max(...lines.map((line) => measureText(line, labelFont)));
       const ly = labelPlacement === 'center' ? y : y - point.r - 4;
-      const box = { x0: x - w / 2 - 2, x1: x + w / 2 + 2, y0: ly - LABEL_FONT * lines.length, y1: ly + 2 };
+      const box = { x0: x - w / 2 - 2, x1: x + w / 2 + 2, y0: ly - labelFont * lines.length, y1: ly + 2 };
       const collides = boxes.some(
         (other) => box.x0 < other.x1 && box.x1 > other.x0 && box.y0 < other.y1 && box.y1 > other.y0,
       );
@@ -270,7 +273,7 @@ function ScatterChart(props: ScatterChartProps) {
 
         <SvgLegend layout={legend} x={12} y={4} onToggle={toggleGroup} />
 
-        <g fontFamily={FONT_MONO} fontSize={11} fill="var(--muted-foreground)" aria-hidden>
+        <g fontFamily={FONT_MONO} fontSize={11 * fontScale} fill="var(--muted-foreground)" aria-hidden>
           {yTicks.map((value) => (
             <g key={`y${value}`}>
               <line x1={area.left} x2={area.left + area.width} y1={sy(value)} y2={sy(value)} stroke="var(--border)" strokeWidth={0.6} />
@@ -290,14 +293,14 @@ function ScatterChart(props: ScatterChartProps) {
         </g>
         <rect x={area.left} y={area.top} width={area.width} height={area.height} fill="none" stroke="var(--border)" />
 
-        <text x={area.left + area.width / 2} y={height - 8} textAnchor="middle" fontSize={12} fill="var(--foreground)">
+        <text x={area.left + area.width / 2} y={height - 8} textAnchor="middle" fontSize={12 * fontScale} fill="var(--foreground)">
           {xLabel}
         </text>
         {yLabel && !hideYAxis && (
           <text
             transform={`translate(14 ${area.top + area.height / 2}) rotate(-90)`}
             textAnchor="middle"
-            fontSize={12}
+            fontSize={12 * fontScale}
             fill="var(--foreground)"
           >
             {yLabel}
@@ -379,7 +382,7 @@ function ScatterChart(props: ScatterChartProps) {
             );
           })}
 
-          <g fontSize={LABEL_FONT} fill="var(--foreground)" pointerEvents="none">
+          <g fontSize={labelFont} fill="var(--foreground)" pointerEvents="none">
             {ordered.map(({ x, y, point }) => {
               const label = shownLabels.get(point.id);
               const forced = hovered === point.id && !label && point.label;
@@ -416,7 +419,7 @@ function ScatterChart(props: ScatterChartProps) {
         </g>
 
         {quadrants && (
-          <g fontSize={11} fontWeight={700} fill="var(--muted-foreground)" pointerEvents="none">
+          <g fontSize={11 * fontScale} fontWeight={700} fill="var(--muted-foreground)" pointerEvents="none">
             <text x={area.left + 8} y={area.top + 16}>
               {quadrants.topLeft}
             </text>
@@ -433,7 +436,7 @@ function ScatterChart(props: ScatterChartProps) {
         )}
 
         {colorScale && (
-          <g transform={`translate(${area.left + area.width + 20} ${area.top})`} fontFamily={FONT_MONO} fontSize={10}>
+          <g transform={`translate(${area.left + area.width + 20} ${area.top})`} fontFamily={FONT_MONO} fontSize={10 * fontScale}>
             <rect width={12} height={area.height * 0.6} fill={`url(#${gradientId})`} rx={2} />
             <text x={18} y={8} fill="var(--muted-foreground)">
               {formatNumber(colorScale.max, 0, locale)}
@@ -445,7 +448,7 @@ function ScatterChart(props: ScatterChartProps) {
               transform={`translate(-6 ${area.height * 0.3}) rotate(-90)`}
               textAnchor="middle"
               fontFamily={FONT_SANS}
-              fontSize={11}
+              fontSize={11 * fontScale}
               fill="var(--foreground)"
             >
               {colorScale.label}

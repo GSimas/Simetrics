@@ -301,7 +301,7 @@ export function EntityTables({ tables }: EntityTablesProps) {
         {panels.map((panel) => (
           <TabsTrigger key={panel.value} value={panel.value} className="gap-1.5 text-xs sm:text-sm">
             <span>{panel.label}</span>
-            <span className="rounded-full bg-card px-2 py-0.2 text-[11px] font-semibold text-primary shadow-2xs tabular-nums">
+            <span className="rounded-full bg-card px-2 py-0.2 text-[0.6875rem] font-semibold text-primary shadow-2xs tabular-nums">
               {panel.rows.length.toLocaleString(numberLocale(locale))}
             </span>
           </TabsTrigger>

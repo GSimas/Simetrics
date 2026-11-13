@@ -107,7 +107,7 @@ export function SearchResults({ active }: { active: Dataset }) {
                 className="inline-flex max-w-full cursor-pointer items-center gap-2 border border-border px-2.5 py-1 text-xs text-foreground transition-colors hover:border-highlight hover:text-highlight"
               >
                 <span className="truncate">{match.term}</span>
-                <span className="eyebrow shrink-0 text-[9px]">
+                <span className="eyebrow shrink-0 text-[0.5625rem]">
                   {match.type === 'Local de Publicação (Venue)' ? 'Venue' : entityTypeLabel(match.type, locale)}
                 </span>
               </button>
