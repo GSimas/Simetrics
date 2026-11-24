@@ -1,0 +1,390 @@
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { Cloud, CloudOff, Loader2, LogIn, LogOut, RefreshCw } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useCloudSync } from '@/lib/cloud-sync';
+import { cn } from '@/lib/utils';
+import {
+  sendPasswordReset,
+  signInWithOAuth,
+  signInWithPassword,
+  signOut,
+  signUp,
+  updatePassword,
+  useAuth,
+  type OAuthProvider,
+} from '@/state/auth.store';
+import { useLocale } from '@/state/locale.store';
+import { ICON_BUTTON } from './HeaderActions';
+
+type Mode = 'signin' | 'signup' | 'reset';
+
+const MIN_PASSWORD = 8;
+
+function errorText(cause: unknown): string {
+  return cause instanceof Error ? cause.message : String(cause);
+}
+
+function GoogleIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="size-4" aria-hidden>
+      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z" />
+      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z" />
+      <path fill="#FBBC05" d="M5.84 14.1A6.6 6.6 0 0 1 5.5 12c0-.73.13-1.44.34-2.1V7.06H2.18A11 11 0 0 0 1 12c0 1.77.42 3.45 1.18 4.94l3.66-2.84z" />
+      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15A10.96 10.96 0 0 0 12 1 11 11 0 0 0 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+    </svg>
+  );
+}
+
+function MicrosoftIcon() {
+  return (
+    <svg viewBox="0 0 23 23" className="size-4" aria-hidden>
+      <path fill="#F25022" d="M1 1h10v10H1z" />
+      <path fill="#7FBA00" d="M12 1h10v10H12z" />
+      <path fill="#00A4EF" d="M1 12h10v10H1z" />
+      <path fill="#FFB900" d="M12 12h10v10H12z" />
+    </svg>
+  );
+}
+
+function AuthDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const t = useLocale((state) => state.t);
+  const redirectError = useAuth((state) => state.redirectError);
+  const [mode, setMode] = useState<Mode>('signin');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState<Mode | OAuthProvider | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const switchMode = (next: Mode) => {
+    setMode(next);
+    setError(null);
+    setNotice(null);
+  };
+
+  const oauth = async (provider: OAuthProvider) => {
+    setBusy(provider);
+    setError(null);
+    try {
+      await signInWithOAuth(provider); // redireciona para o provedor
+    } catch (cause) {
+      setError(errorText(cause));
+      setBusy(null);
+    }
+  };
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy(mode);
+    setError(null);
+    setNotice(null);
+    try {
+      if (mode === 'signin') {
+        await signInWithPassword(email.trim(), password);
+        onOpenChange(false);
+      } else if (mode === 'signup') {
+        const needsConfirmation = await signUp(email.trim(), password, name.trim());
+        if (needsConfirmation) setNotice(t('auth_confirm_email'));
+        else onOpenChange(false);
+      } else {
+        await sendPasswordReset(email.trim());
+        setNotice(t('auth_reset_sent'));
+      }
+    } catch (cause) {
+      setError(errorText(cause));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const title = { signin: t('auth_title_signin'), signup: t('auth_title_signup'), reset: t('auth_title_reset') }[mode];
+  const submitLabel = { signin: t('auth_submit_signin'), signup: t('auth_submit_signup'), reset: t('auth_submit_reset') }[mode];
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{mode === 'reset' ? t('auth_reset_desc') : t('auth_desc')}</DialogDescription>
+        </DialogHeader>
+
+        {mode !== 'reset' && (
+          <>
+            <div className="grid gap-2">
+              <Button type="button" variant="outline" disabled={busy !== null} onClick={() => void oauth('google')}>
+                {busy === 'google' ? <Loader2 className="size-4 animate-spin" /> : <GoogleIcon />}
+                {t('auth_google')}
+              </Button>
+              <Button type="button" variant="outline" disabled={busy !== null} onClick={() => void oauth('azure')}>
+                {busy === 'azure' ? <Loader2 className="size-4 animate-spin" /> : <MicrosoftIcon />}
+                {t('auth_microsoft')}
+              </Button>
+            </div>
+            <div className="eyebrow flex items-center gap-3 text-muted-foreground">
+              <span className="h-px flex-1 bg-border" />
+              {t('auth_or')}
+              <span className="h-px flex-1 bg-border" />
+            </div>
+          </>
+        )}
+
+        <form onSubmit={(event) => void submit(event)} className="grid gap-3">
+          {mode === 'signup' && (
+            <div className="grid gap-1.5">
+              <Label htmlFor="auth-name">{t('auth_name')}</Label>
+              <Input id="auth-name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+          )}
+          <div className="grid gap-1.5">
+            <Label htmlFor="auth-email">{t('auth_email')}</Label>
+            <Input
+              id="auth-email"
+              type="email"
+              required
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+          {mode !== 'reset' && (
+            <div className="grid gap-1.5">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="auth-password">{t('auth_password')}</Label>
+                {mode === 'signin' && (
+                  <button
+                    type="button"
+                    onClick={() => switchMode('reset')}
+                    className="cursor-pointer text-xs text-muted-foreground hover:text-highlight"
+                  >
+                    {t('auth_forgot')}
+                  </button>
+                )}
+              </div>
+              <Input
+                id="auth-password"
+                type="password"
+                required
+                minLength={mode === 'signup' ? MIN_PASSWORD : undefined}
+                autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              {mode === 'signup' && <p className="text-xs text-muted-foreground">{t('auth_password_min')}</p>}
+            </div>
+          )}
+
+          {(error ?? redirectError) && (
+            <p role="alert" className="text-sm text-destructive">
+              {error ?? redirectError}
+            </p>
+          )}
+          {notice && (
+            <p role="status" className="text-sm text-highlight">
+              {notice}
+            </p>
+          )}
+
+          <Button type="submit" disabled={busy !== null}>
+            {busy === mode && <Loader2 className="size-4 animate-spin" />}
+            {submitLabel}
+          </Button>
+        </form>
+
+        <div className="text-center text-sm text-muted-foreground">
+          {mode === 'signin' ? (
+            <button type="button" onClick={() => switchMode('signup')} className="cursor-pointer hover:text-highlight">
+              {t('auth_to_signup')}
+            </button>
+          ) : (
+            <button type="button" onClick={() => switchMode('signin')} className="cursor-pointer hover:text-highlight">
+              {t('auth_to_signin')}
+            </button>
+          )}
+        </div>
+        <p className="text-center text-xs text-muted-foreground">{t('auth_local_note')}</p>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Volta do link de "esqueci a senha": pede a senha nova. */
+function NewPasswordDialog() {
+  const t = useLocale((state) => state.t);
+  const recovering = useAuth((state) => state.recovering);
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      await updatePassword(password);
+    } catch (cause) {
+      setError(errorText(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={recovering} onOpenChange={(open) => !open && useAuth.setState({ recovering: false })}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t('auth_new_password_title')}</DialogTitle>
+          <DialogDescription>{t('auth_new_password_desc')}</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={(event) => void submit(event)} className="grid gap-3">
+          <div className="grid gap-1.5">
+            <Label htmlFor="auth-new-password">{t('auth_password')}</Label>
+            <Input
+              id="auth-new-password"
+              type="password"
+              required
+              minLength={MIN_PASSWORD}
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">{t('auth_password_min')}</p>
+          </div>
+          {error && (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          )}
+          <Button type="submit" disabled={busy}>
+            {busy && <Loader2 className="size-4 animate-spin" />}
+            {t('auth_new_password_save')}
+          </Button>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CloudStatusLine() {
+  const t = useLocale((state) => state.t);
+  const status = useCloudSync((state) => state.status);
+  if (status === 'off') return null;
+  const Icon = status === 'syncing' ? RefreshCw : status === 'error' ? CloudOff : Cloud;
+  const label = { syncing: t('cloud_status_syncing'), synced: t('cloud_status_synced'), error: t('cloud_status_error') }[status];
+  return (
+    <p className={cn('flex items-center gap-2 text-xs', status === 'error' ? 'text-destructive' : 'text-muted-foreground')}>
+      <Icon className={cn('size-3.5 shrink-0', status === 'syncing' && 'animate-spin')} aria-hidden />
+      {label}
+    </p>
+  );
+}
+
+/**
+ * Conta no cabeçalho: "Entrar" sem login; com login, as iniciais abrem um menu com a conta,
+ * o estado da nuvem e "Sair".
+ */
+export function AccountButton() {
+  const t = useLocale((state) => state.t);
+  const user = useAuth((state) => state.user);
+  const ready = useAuth((state) => state.ready);
+  const redirectError = useAuth((state) => state.redirectError);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = (event: PointerEvent | KeyboardEvent) => {
+      if (event instanceof KeyboardEvent ? event.key === 'Escape' : !rootRef.current?.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', close);
+    document.addEventListener('keydown', close);
+    return () => {
+      document.removeEventListener('pointerdown', close);
+      document.removeEventListener('keydown', close);
+    };
+  }, [menuOpen]);
+
+  if (!ready) return null;
+
+  if (!user) {
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => setDialogOpen(true)}
+          aria-label={t('auth_sign_in_btn')}
+          className="header-chip cursor-pointer"
+        >
+          <LogIn className="size-3.5" aria-hidden />
+          <span className="hidden sm:inline">{t('auth_sign_in_btn')}</span>
+        </button>
+        <AuthDialog
+          // Erro na volta do Google/Microsoft: o login reabre mostrando o motivo.
+          open={dialogOpen || Boolean(redirectError)}
+          onOpenChange={(open) => {
+            setDialogOpen(open);
+            if (!open) useAuth.setState({ redirectError: null });
+          }}
+        />
+      </>
+    );
+  }
+
+  const name = (user.user_metadata?.full_name as string | undefined) || user.email || '';
+  const initials = name
+    .split(/[\s@.]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]!.toUpperCase())
+    .join('');
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setMenuOpen((value) => !value)}
+        className={cn(ICON_BUTTON, 'text-xs font-semibold', menuOpen && 'border-highlight text-highlight')}
+        title={t('auth_account')}
+        aria-label={t('auth_account')}
+        aria-haspopup="dialog"
+        aria-expanded={menuOpen}
+      >
+        {initials || <LogIn className="size-4" aria-hidden />}
+      </button>
+      {menuOpen && (
+        <div
+          role="dialog"
+          aria-label={t('auth_account')}
+          className="absolute right-0 top-full z-50 mt-2 w-[min(18rem,calc(100vw-2rem))] space-y-3 border border-border bg-card p-4 text-left shadow-xl duration-200 animate-in fade-in-0 slide-in-from-top-1"
+        >
+          <div className="min-w-0">
+            {user.user_metadata?.full_name && <p className="truncate text-sm font-semibold">{name}</p>}
+            <p className="truncate text-xs text-muted-foreground">{user.email}</p>
+          </div>
+          <CloudStatusLine />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="w-full"
+            onClick={() => {
+              setMenuOpen(false);
+              void signOut();
+            }}
+          >
+            <LogOut className="size-3.5" />
+            {t('auth_sign_out')}
+          </Button>
+        </div>
+      )}
+      <NewPasswordDialog />
+    </div>
+  );
+}

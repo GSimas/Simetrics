@@ -1,5 +1,11 @@
 import { useLocale } from '@/state/locale.store';
+import { deleteCloudProject, scheduleProjectUpload } from './cloud-sync';
 import { toProjectMeta, type ProjectMeta, type ProjectRecord } from './project';
+
+/** `localOnly`: gravação vinda da própria nuvem (sincronização), que não volta para lá. */
+export interface LocalWriteOptions {
+  localOnly?: boolean;
+}
 
 /**
  * Persistência de projetos em IndexedDB — não `localStorage`: um `ProjectRecord` de
@@ -57,7 +63,7 @@ function wrapRequest<T>(request: IDBRequest<T>): Promise<T> {
 
 /** Grava o registro completo e sua versão leve numa única transação — ambos os stores
  * ficam sempre em sincronia, nunca um sem o outro. */
-export async function putProject(record: ProjectRecord): Promise<void> {
+export async function putProject(record: ProjectRecord, options: LocalWriteOptions = {}): Promise<void> {
   const db = await openDb();
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction([STORE_PROJECTS, STORE_META], 'readwrite');
@@ -67,6 +73,7 @@ export async function putProject(record: ProjectRecord): Promise<void> {
     tx.onerror = () => reject(tx.error ?? fail('Falha ao salvar o projeto.', 'Failed to save the project.'));
     tx.onabort = () => reject(tx.error ?? fail('Operação de salvamento cancelada.', 'Save operation aborted.'));
   });
+  if (!options.localOnly) scheduleProjectUpload(record.id);
 }
 
 export async function getProject(id: string): Promise<ProjectRecord | undefined> {
@@ -96,7 +103,7 @@ export async function getAllProjectMeta(): Promise<ProjectMeta[]> {
   });
 }
 
-export async function deleteProject(id: string): Promise<void> {
+export async function deleteProject(id: string, options: LocalWriteOptions = {}): Promise<void> {
   const db = await openDb();
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction([STORE_PROJECTS, STORE_META], 'readwrite');
@@ -106,4 +113,5 @@ export async function deleteProject(id: string): Promise<void> {
     tx.onerror = () => reject(tx.error ?? fail('Falha ao excluir o projeto.', 'Failed to delete the project.'));
     tx.onabort = () => reject(tx.error ?? fail('Operação de exclusão cancelada.', 'Delete operation aborted.'));
   });
+  if (!options.localOnly) deleteCloudProject(id);
 }
