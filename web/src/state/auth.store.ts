@@ -3,6 +3,7 @@ import { create } from 'zustand';
 
 import { setCloudUser, syncAll } from '@/lib/cloud-sync';
 import { supabase } from '@/lib/supabase';
+import { useLocale } from './locale.store';
 import { useProjectStore } from './project.store';
 
 /**
@@ -55,6 +56,11 @@ export async function signUp(email: string, password: string, fullName: string):
     options: { emailRedirectTo: returnUrl(), ...(fullName ? { data: { full_name: fullName } } : {}) },
   });
   if (error) throw error;
+  // E-mail já cadastrado (inclusive via Google/Microsoft): o Supabase responde "ok" sem
+  // enviar nada e devolve um usuário sem identidades. Avisa em vez de prometer um e-mail.
+  if (data.user && data.user.identities?.length === 0) {
+    throw new Error(useLocale.getState().t('auth_email_exists'));
+  }
   return !data.session;
 }
 
