@@ -15,12 +15,21 @@ export interface LocaleHookState {
   t: (key: TranslationKey) => string;
 }
 
+/** Sem escolha salva, segue o idioma do sistema: o primeiro suportado na lista de preferência. */
 function getInitialLocale(): Locale {
   if (typeof window === 'undefined') return 'pt';
-  const saved = localStorage.getItem('simetrics-locale') as Locale | null;
-  if (saved === 'pt' || saved === 'en') return saved;
-  const browserLang = (navigator.language || (navigator.languages && navigator.languages[0]) || '').toLowerCase();
-  return browserLang.startsWith('pt') ? 'pt' : 'en';
+  try {
+    const saved = localStorage.getItem('simetrics-locale');
+    if (saved === 'pt' || saved === 'en') return saved;
+  } catch {
+    // Armazenamento bloqueado (aba privada): cai no idioma do sistema.
+  }
+  const preferred = navigator.languages?.length ? navigator.languages : [navigator.language];
+  for (const lang of preferred) {
+    const code = lang?.toLowerCase().slice(0, 2);
+    if (code === 'pt' || code === 'en') return code;
+  }
+  return 'en';
 }
 
 export const useLocaleStore = create<LocaleStoreState>((set, get) => ({

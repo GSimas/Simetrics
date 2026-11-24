@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Sparkles,
@@ -43,6 +43,7 @@ import { collectColumns, isNullLike, pickColumn, splitTokens, toNumeric } from '
 import { useChat } from '@/state/chat.store';
 import { useDataset } from '@/state/dataset.store';
 import { useLocale } from '@/state/locale.store';
+import { prefersReducedMotion } from '@/state/preferences.store';
 import { openInSearch, resolveEntity, useNavigation } from '@/state/navigation.store';
 import { EmptyState } from '@/features/EmptyState';
 import { collaborationNetwork } from '@/core/viz/collaboration';
@@ -78,6 +79,18 @@ export default function SearchTab() {
   const typeLabel = entityTypeLabel(type, locale);
   const setTerm = (searchTerm: string | null): void => useNavigation.setState({ searchTerm });
   const [showAllCoauthors, setShowAllCoauthors] = useState(false);
+  const dossierCardRef = useRef<HTMLDivElement>(null);
+
+  // Perfil aberto (por clique aqui, nos resultados ou num gráfico): sobe a tela e o bloco
+  // com o nome pisca duas vezes, para o olho achar a troca.
+  useEffect(() => {
+    const card = dossierCardRef.current;
+    if (!term || !card) return;
+    window.scrollTo({ top: 0, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
+    card.classList.add('target-flash', 'target-flash--twice');
+    const timer = setTimeout(() => card.classList.remove('target-flash', 'target-flash--twice'), 1900);
+    return () => clearTimeout(timer);
+  }, [type, term]);
 
   const renderAuthorChip = ({ author, count }: { author: string; count: number }) => (
     <button
@@ -280,7 +293,7 @@ export default function SearchTab() {
       {term && dossier && (
         // Chave por perfil: trocar de entidade remonta o dossiê, que entra com um fade curto.
         <div key={`${type}:${term}`} className="space-y-4 duration-300 animate-in fade-in-0 slide-in-from-bottom-2">
-          <Card data-tour="search-dossier" className="border-t-2 border-t-highlight shadow-xs">
+          <Card ref={dossierCardRef} data-tour="search-dossier" className="border-t-2 border-t-highlight shadow-xs">
             <CardHeader>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <CardTitle className="text-lg font-bold text-foreground break-words">{term}</CardTitle>
