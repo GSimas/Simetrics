@@ -7,6 +7,7 @@ import { RootErrorActions } from './components/RootErrorActions';
 import { TooltipLayer } from './components/TooltipLayer';
 import { installOverlayScrollbars } from './lib/overlay-scrollbars';
 import { completeOpenRouterLogin } from './lib/openrouter-oauth';
+import { initAuth } from './state/auth.store';
 import './fonts.css';
 import './index.css';
 
@@ -16,6 +17,7 @@ if (!container) {
 }
 
 void completeOpenRouterLogin();
+void initAuth();
 installOverlayScrollbars();
 
 createRoot(container).render(

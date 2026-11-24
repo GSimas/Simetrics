@@ -3,6 +3,7 @@ import { FolderOpen } from 'lucide-react';
 
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { BrandMark } from '@/components/BrandMark';
+import { AccountButton } from '@/components/AccountButton';
 import { SettingsButton } from '@/components/HeaderActions';
 import { KpiTicker } from '@/components/KpiTicker';
 import { TutorialTriggerButton } from '@/components/TutorialTriggerButton';
@@ -177,6 +178,7 @@ export default function App() {
                 </button>
 
                 <TutorialTriggerButton onClick={openTutorial} />
+                <AccountButton />
                 <SettingsButton />
               </div>
             </div>

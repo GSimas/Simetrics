@@ -1,5 +1,8 @@
 import { useLocale } from '@/state/locale.store';
 
+import { deletePdfFromCloud, downloadPdfFromCloud, uploadPdfToCloud } from './cloud-sync';
+import type { LocalWriteOptions } from './project-db';
+
 /**
  * PDFs dos textos completos, num banco próprio do IndexedDB, endereçados pelo SHA-256 do
  * arquivo. Separados dos projetos de propósito: um projeto (e o arquivo de decisões trocado
@@ -57,18 +60,31 @@ export async function sha256(data: ArrayBuffer): Promise<string> {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-export function putPdf(pdf: StoredPdf): Promise<IDBValidKey> {
+export async function putPdf(pdf: StoredPdf, options: LocalWriteOptions = {}): Promise<IDBValidKey> {
   // PDFs ocupam espaço: pede ao navegador que não apague este banco sob pressão de disco.
   void navigator.storage?.persist?.().catch(() => false);
-  return run('readwrite', (store) => store.put(pdf));
+  const key = await run('readwrite', (store) => store.put(pdf));
+  if (!options.localOnly) uploadPdfToCloud(pdf);
+  return key;
 }
 
-export function getPdf(hash: string): Promise<StoredPdf | undefined> {
-  return run('readonly', (store) => store.get(hash) as IDBRequest<StoredPdf | undefined>);
+/** Sem o PDF neste navegador, busca a cópia da conta (quando logado) e a guarda aqui. */
+export async function getPdf(hash: string, options: LocalWriteOptions = {}): Promise<StoredPdf | undefined> {
+  const local = await run('readonly', (store) => store.get(hash) as IDBRequest<StoredPdf | undefined>);
+  if (local || options.localOnly) return local;
+  const remote = await downloadPdfFromCloud(hash).catch(() => undefined);
+  if (remote) await putPdf(remote, { localOnly: true });
+  return remote;
 }
 
-export function deletePdf(hash: string): Promise<undefined> {
-  return run('readwrite', (store) => store.delete(hash));
+export async function getAllPdfHashes(): Promise<string[]> {
+  return (await run('readonly', (store) => store.getAllKeys())) as string[];
+}
+
+export async function deletePdf(hash: string): Promise<undefined> {
+  await run('readwrite', (store) => store.delete(hash));
+  deletePdfFromCloud(hash);
+  return undefined;
 }
 
 /** Espaço usado e disponível para o site, quando o navegador informa. */
