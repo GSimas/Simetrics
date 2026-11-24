@@ -925,6 +925,9 @@ input:-webkit-autofill:focus {
 .target-flash {
   animation: target-flash 0.9s ease-out 3;
 }
+.target-flash--twice {
+  animation-iteration-count: 2;
+}
 @media (prefers-reduced-motion: reduce) {
   .target-flash {
     animation: none;
