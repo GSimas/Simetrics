@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Cloud, CloudOff, Loader2, LogIn, LogOut, RefreshCw } from 'lucide-react';
+import { Cloud, CloudOff, Loader2, LogIn, LogOut, MailCheck, RefreshCw } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -59,12 +59,13 @@ function AuthDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState<Mode | OAuthProvider | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  // Link enviado (confirmação de cadastro ou nova senha): a janela troca de tela.
+  const [sent, setSent] = useState<'signup' | 'reset' | null>(null);
 
   const switchMode = (next: Mode) => {
     setMode(next);
     setError(null);
-    setNotice(null);
+    setSent(null);
   };
 
   const oauth = async (provider: OAuthProvider) => {
@@ -82,18 +83,17 @@ function AuthDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open
     event.preventDefault();
     setBusy(mode);
     setError(null);
-    setNotice(null);
     try {
       if (mode === 'signin') {
         await signInWithPassword(email.trim(), password);
         onOpenChange(false);
       } else if (mode === 'signup') {
         const needsConfirmation = await signUp(email.trim(), password, name.trim());
-        if (needsConfirmation) setNotice(t('auth_confirm_email'));
+        if (needsConfirmation) setSent('signup');
         else onOpenChange(false);
       } else {
         await sendPasswordReset(email.trim());
-        setNotice(t('auth_reset_sent'));
+        setSent('reset');
       }
     } catch (cause) {
       setError(errorText(cause));
@@ -105,8 +105,46 @@ function AuthDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open
   const title = { signin: t('auth_title_signin'), signup: t('auth_title_signup'), reset: t('auth_title_reset') }[mode];
   const submitLabel = { signin: t('auth_submit_signin'), signup: t('auth_submit_signup'), reset: t('auth_submit_reset') }[mode];
 
+  const handleOpenChange = (next: boolean) => {
+    if (!next) setSent(null);
+    onOpenChange(next);
+  };
+
+  if (sent) {
+    // O endereço vai em destaque no meio da frase traduzida.
+    const [before, after] = t(sent === 'signup' ? 'auth_sent_signup' : 'auth_sent_reset').split('{email}');
+    return (
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="max-w-md">
+          <div className="flex flex-col items-center gap-4 py-4 text-center duration-300 animate-in fade-in-0 zoom-in-95">
+            <span className="grid size-14 place-items-center rounded-full border border-highlight/40 bg-highlight/10 text-highlight shadow-[0_0_32px_-8px_var(--highlight)]">
+              <MailCheck className="size-6" aria-hidden />
+            </span>
+            <DialogTitle className="text-xl">{t('auth_sent_title')}</DialogTitle>
+            <DialogDescription className="text-base leading-relaxed text-foreground/85">
+              {before}
+              <strong className="break-words font-semibold text-foreground">{email.trim()}</strong>
+              {after}
+            </DialogDescription>
+            <p className="text-sm text-muted-foreground">{t('auth_sent_hint')}</p>
+            <Button type="button" className="mt-2 w-full" onClick={() => handleOpenChange(false)}>
+              {t('auth_sent_done')}
+            </Button>
+            <button
+              type="button"
+              onClick={() => setSent(null)}
+              className="cursor-pointer text-sm text-muted-foreground hover:text-highlight"
+            >
+              {t('auth_sent_back')}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
@@ -181,11 +219,6 @@ function AuthDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open
           {(error ?? redirectError) && (
             <p role="alert" className="text-sm text-destructive">
               {error ?? redirectError}
-            </p>
-          )}
-          {notice && (
-            <p role="status" className="text-sm text-highlight">
-              {notice}
             </p>
           )}
 

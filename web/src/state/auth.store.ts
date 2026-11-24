@@ -1,7 +1,7 @@
 import type { User } from '@supabase/supabase-js';
 import { create } from 'zustand';
 
-import { setCloudUser, syncAll } from '@/lib/cloud-sync';
+import { releaseAccount, setCloudUser, syncAll } from '@/lib/cloud-sync';
 import { supabase } from '@/lib/supabase';
 import { useLocale } from './locale.store';
 import { useProjectStore } from './project.store';
@@ -85,7 +85,14 @@ export async function updatePassword(password: string): Promise<void> {
 }
 
 export async function signOut(): Promise<void> {
+  const removed = await releaseAccount().catch((cause) => {
+    console.error('Simetrics: falha ao guardar os projetos antes de sair', cause);
+    return [] as string[];
+  });
+  const projects = useProjectStore.getState();
+  if (projects.activeProjectId && removed.includes(projects.activeProjectId)) projects.startBlank();
   await supabase.auth.signOut();
+  await projects.refreshList();
 }
 
 /** Troca o `?code=` da volta pelo login. Só age na volta marcada (`?auth=`). */

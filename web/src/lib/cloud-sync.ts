@@ -73,7 +73,7 @@ async function uploadProject(uid: string, record: ProjectRecord): Promise<void> 
     .upload(projectPath(uid, record.id), body, { upsert: true, contentType: 'application/gzip' });
   if (uploadError) fail('upload do projeto', uploadError);
   const meta = toProjectMeta(record);
-  const { error } = await supabase.from('simetrics_projects').upsert({
+  const row = {
     id: meta.id,
     user_id: uid,
     name: meta.name,
@@ -82,7 +82,9 @@ async function uploadProject(uid: string, record: ProjectRecord): Promise<void> 
     doc_count: meta.docCount,
     source_files: meta.sourceFiles,
     dedup_strategy: meta.dedupStrategy,
-  });
+  };
+  // A chave é (user_id, id): o mesmo id pode existir em outra conta usada neste navegador.
+  const { error } = await supabase.from('simetrics_projects').upsert(row, { onConflict: 'user_id,id' });
   if (error) fail('metadados do projeto', error);
   markSynced(uid, record.id, true);
 }
@@ -124,10 +126,40 @@ export function deleteCloudProject(id: string): void {
   pendingUploads.delete(id);
   void Promise.all([
     supabase.storage.from(CLOUD_BUCKET).remove([projectPath(uid, id)]),
-    supabase.from('simetrics_projects').delete().eq('id', id),
+    supabase.from('simetrics_projects').delete().eq('user_id', uid).eq('id', id),
   ])
     .then(() => markSynced(uid, id, false))
     .catch((cause) => console.error('Simetrics: falha ao excluir projeto da nuvem', cause));
+}
+
+/**
+ * Ao sair da conta: sobe o que ainda não chegou à nuvem e tira deste navegador os projetos
+ * dessa conta. Assim quem entrar depois no mesmo navegador não herda nem envia para a
+ * própria conta os projetos de outra pessoa; eles descem de novo quando a dona voltar.
+ * Projetos que não conseguiram subir ficam aqui, para não se perderem.
+ * ponytail: os PDFs locais ficam (são endereçados por hash e não aparecem sem o projeto).
+ */
+export async function releaseAccount(): Promise<string[]> {
+  const uid = userId;
+  if (!uid) return [];
+  for (const timer of pendingUploads.values()) clearTimeout(timer);
+  pendingUploads.clear();
+
+  const synced = readSynced(uid);
+  const local = (await getAllProjectMeta()).filter((meta) => synced.has(meta.id));
+  const { data: rows, error } = await supabase.from('simetrics_projects').select('id, updated_at');
+  if (error) throw error;
+  const remote = new Map(rows.map((row) => [row.id as string, row.updated_at as string]));
+
+  const keep = new Set<string>();
+  for (const { id, action } of planSync(local, remote, new Set())) {
+    if (action !== 'upload') continue;
+    const record = await getProject(id);
+    if (record) await uploadProject(uid, record).catch(() => keep.add(id));
+  }
+  const removed = local.map((meta) => meta.id).filter((id) => !keep.has(id));
+  for (const id of removed) await deleteProject(id, { localOnly: true });
+  return removed;
 }
 
 async function uploadPdf(uid: string, pdf: StoredPdf): Promise<void> {
