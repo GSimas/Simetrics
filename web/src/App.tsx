@@ -62,6 +62,10 @@ export default function App() {
   const [route, navigate] = useHashRoute();
   const tourActive = useTour((state) => state.active);
   const tickerVisible = usePreferences((state) => state.tickerVisible);
+  // Nome do projeto aberto no cabeçalho; o exemplo não é um projeto salvo, mas tem nome.
+  const isDemo = useDataset((state) => state.isDemo);
+  const savedName = useProjectStore((state) => state.projects.find((p) => p.id === state.activeProjectId)?.name);
+  const projectName = isDemo ? t('demo_project_name') : savedName;
 
   const openTutorial = (): void => {
     setTutorialMounted(true);
@@ -149,10 +153,19 @@ export default function App() {
               >
                 <BrandMark className="h-10 sm:h-11 text-foreground" />
                 <h1 className="sr-only">{t('app_title')}</h1>
-                <span className="hidden 2xl:flex flex-col gap-1 border-l border-border pl-4">
-                  <span className="eyebrow max-w-[22rem] leading-snug">{t('app_subtitle')}</span>
-                </span>
+                {!projectName && (
+                  <span className="hidden 2xl:flex flex-col gap-1 border-l border-border pl-4">
+                    <span className="eyebrow max-w-[22rem] leading-snug">{t('app_subtitle')}</span>
+                  </span>
+                )}
               </button>
+
+              {projectName && (
+                <div className="hidden min-w-0 flex-1 flex-col gap-1 border-l border-border pl-4 md:flex" title={projectName}>
+                  <span className="eyebrow">{t('header_project_label')}</span>
+                  <span className="truncate text-base font-medium leading-tight tracking-[-0.02em]">{projectName}</span>
+                </div>
+              )}
 
               <div className="flex flex-wrap items-center gap-2">
                 {documentCount > 0 && (
