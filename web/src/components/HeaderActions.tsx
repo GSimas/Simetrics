@@ -1,21 +1,12 @@
-import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
-import { KeyRound, Moon, Settings, Sun } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { KeyRound, Moon, Sun } from 'lucide-react';
 
-import { lazyWithPreload } from '@/lib/lazy';
 import { Button } from '@/components/ui/button';
 import type { Locale } from '@/lib/i18n/translations';
 import { cn } from '@/lib/utils';
 import { useAiConfig } from '@/state/ai-config.store';
 import { useLocale } from '@/state/locale.store';
 import { systemReducesMotion, usePreferences, type FontScale, type Theme } from '@/state/preferences.store';
-
-// Só baixado quando alguém abre as configurações de IA.
-const AiSettingsModal = lazyWithPreload(() =>
-  import('@/components/AiSettingsModal').then((module) => ({ default: module.AiSettingsModal })),
-);
-
-export const ICON_BUTTON =
-  'inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-border text-foreground transition-colors hover:border-highlight hover:text-highlight focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring';
 
 /** Grupo de opções mutuamente exclusivas, no traço dos controles do cabeçalho. */
 function Segmented<T extends string>({
@@ -122,11 +113,10 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /**
- * Botão de engrenagem com as preferências do app: tema, idioma, tamanho da letra, alto
- * contraste, rolagem da faixa de indicadores e a chave de IA. Substitui os botões
- * soltos que ocupavam o cabeçalho.
+ * Preferências do app (tema, idioma, letra, contraste, movimento, faixa de indicadores e
+ * chave de IA), mostradas dentro do menu do cabeçalho (HeaderMenu).
  */
-export function SettingsButton() {
+export function SettingsPanel({ onConfigureAi, onPreloadAi }: { onConfigureAi: () => void; onPreloadAi: () => void }) {
   const { t, locale, setLocale } = useLocale();
   const theme = usePreferences((state) => state.theme);
   const fontScale = usePreferences((state) => state.fontScale);
@@ -139,159 +129,93 @@ export function SettingsButton() {
   const systemMotion = systemReducesMotion();
   const isAiConfigured = useAiConfig((state) => state.isConfigured());
 
-  const [open, setOpen] = useState(false);
-  const [aiOpen, setAiOpen] = useState(false);
-  // Montado desde a primeira abertura, para a animação de fechar continuar funcionando.
-  const [aiMounted, setAiMounted] = useState(false);
-
-  const rootRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-
-  // Dropdown: fecha com clique fora ou Esc (e devolve o foco à engrenagem).
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      setOpen(false);
-      triggerRef.current?.focus();
-    };
-    document.addEventListener('pointerdown', onPointerDown);
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown);
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, [open]);
-
   return (
-    <div ref={rootRef} className="relative">
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        className={cn(ICON_BUTTON, 'group', open && 'border-highlight text-highlight')}
-        data-tour="settings"
-        title={t('settings_btn')}
-        aria-label={t('settings_btn')}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-      >
-        <Settings
-          className={cn('size-4 transition-transform duration-500 group-hover:rotate-90', open && 'rotate-90')}
-          aria-hidden
+    <div className="space-y-5">
+      <Field label={t('settings_theme')}>
+        <Segmented<Theme>
+          label={t('settings_theme')}
+          value={theme}
+          onChange={setTheme}
+          options={[
+            { value: 'dark', label: t('settings_theme_dark'), icon: <Moon className="size-4" aria-hidden /> },
+            { value: 'light', label: t('settings_theme_light'), icon: <Sun className="size-4" aria-hidden /> },
+          ]}
         />
-      </button>
+      </Field>
 
-      {open && (
-        <div
-          role="dialog"
-          aria-label={t('settings_title')}
-          className="absolute right-0 top-full z-50 mt-2 max-h-[calc(100dvh-6rem)] w-[min(22rem,calc(100vw-2rem))] overflow-y-auto border border-border bg-card p-5 text-left shadow-xl duration-200 animate-in fade-in-0 slide-in-from-top-1"
-        >
-          <p className="mb-4 text-base font-semibold">{t('settings_title')}</p>
+      <Field label={t('settings_language')}>
+        <Segmented<Locale>
+          label={t('settings_language')}
+          value={locale}
+          onChange={setLocale}
+          options={[
+            { value: 'pt', label: 'Português', icon: <LangCode code="PT" /> },
+            { value: 'en', label: 'English', icon: <LangCode code="EN" /> },
+          ]}
+        />
+      </Field>
 
-          <div className="space-y-5">
-            <Field label={t('settings_theme')}>
-              <Segmented<Theme>
-                label={t('settings_theme')}
-                value={theme}
-                onChange={setTheme}
-                options={[
-                  { value: 'dark', label: t('settings_theme_dark'), icon: <Moon className="size-4" aria-hidden /> },
-                  { value: 'light', label: t('settings_theme_light'), icon: <Sun className="size-4" aria-hidden /> },
-                ]}
-              />
-            </Field>
+      <Field label={t('settings_font')}>
+        <Segmented<FontScale>
+          label={t('settings_font')}
+          value={fontScale}
+          onChange={setFontScale}
+          options={[
+            { value: 'min', label: t('settings_font_min'), icon: <FontGlyph className="text-xs" /> },
+            { value: 'med', label: t('settings_font_med'), icon: <FontGlyph className="text-base" /> },
+            { value: 'max', label: t('settings_font_max'), icon: <FontGlyph className="text-xl" /> },
+          ]}
+        />
+      </Field>
 
-            <Field label={t('settings_language')}>
-              <Segmented<Locale>
-                label={t('settings_language')}
-                value={locale}
-                onChange={setLocale}
-                options={[
-                  { value: 'pt', label: 'Português', icon: <LangCode code="PT" /> },
-                  { value: 'en', label: 'English', icon: <LangCode code="EN" /> },
-                ]}
-              />
-            </Field>
+      <Field label={t('settings_contrast')}>
+        <Switch label={t('settings_contrast')} checked={highContrast} onChange={setHighContrast} />
+      </Field>
 
-            <Field label={t('settings_font')}>
-              <Segmented<FontScale>
-                label={t('settings_font')}
-                value={fontScale}
-                onChange={setFontScale}
-                options={[
-                  { value: 'min', label: t('settings_font_min'), icon: <FontGlyph className="text-xs" /> },
-                  { value: 'med', label: t('settings_font_med'), icon: <FontGlyph className="text-base" /> },
-                  { value: 'max', label: t('settings_font_max'), icon: <FontGlyph className="text-xl" /> },
-                ]}
-              />
-            </Field>
+      <Field label={t('settings_motion')}>
+        <Switch
+          label={t('settings_motion_reduce')}
+          checked={reduceMotion || systemMotion}
+          onChange={setReduceMotion}
+          disabled={systemMotion}
+        />
+      </Field>
 
-            <Field label={t('settings_contrast')}>
-              <Switch label={t('settings_contrast')} checked={highContrast} onChange={setHighContrast} />
-            </Field>
-
-            <Field label={t('settings_motion')}>
-              <Switch
-                label={t('settings_motion_reduce')}
-                checked={reduceMotion || systemMotion}
-                onChange={setReduceMotion}
-                disabled={systemMotion}
-              />
-            </Field>
-
-            <Field label={t('settings_ticker')}>
-              <div className="space-y-2">
-                <Switch label={t('settings_ticker_show')} checked={tickerVisible} onChange={setTickerVisible} />
-                <Switch
-                  label={t('settings_ticker_scroll')}
-                  checked={tickerScroll}
-                  onChange={setTickerScroll}
-                  disabled={!tickerVisible}
-                />
-              </div>
-            </Field>
-
-            <Field label={t('settings_ai')}>
-              <div className="flex items-center justify-between gap-3 border border-border px-3 py-2">
-                <span className="flex items-center gap-2 text-sm">
-                  <span
-                    className={cn(
-                      'size-1.5 rounded-full',
-                      isAiConfigured ? 'bg-highlight shadow-[0_0_8px_var(--highlight)]' : 'bg-muted-foreground',
-                    )}
-                  />
-                  {isAiConfigured ? t('ai_configured') : t('settings_ai_missing')}
-                </span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="gap-1.5"
-                  onClick={() => {
-                    setOpen(false);
-                    setAiMounted(true);
-                    setAiOpen(true);
-                  }}
-                  onPointerEnter={() => void AiSettingsModal.preload()}
-                >
-                  <KeyRound className="size-3.5" aria-hidden />
-                  {t('settings_ai_configure')}
-                </Button>
-              </div>
-            </Field>
-          </div>
+      <Field label={t('settings_ticker')}>
+        <div className="space-y-2">
+          <Switch label={t('settings_ticker_show')} checked={tickerVisible} onChange={setTickerVisible} />
+          <Switch
+            label={t('settings_ticker_scroll')}
+            checked={tickerScroll}
+            onChange={setTickerScroll}
+            disabled={!tickerVisible}
+          />
         </div>
-      )}
+      </Field>
 
-      {aiMounted && (
-        <Suspense fallback={null}>
-          <AiSettingsModal open={aiOpen} onOpenChange={setAiOpen} />
-        </Suspense>
-      )}
+      <Field label={t('settings_ai')}>
+        <div className="flex items-center justify-between gap-3 border border-border px-3 py-2">
+          <span className="flex items-center gap-2 text-sm">
+            <span
+              className={cn(
+                'size-1.5 rounded-full',
+                isAiConfigured ? 'bg-highlight shadow-[0_0_8px_var(--highlight)]' : 'bg-muted-foreground',
+              )}
+            />
+            {isAiConfigured ? t('ai_configured') : t('settings_ai_missing')}
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5"
+            onClick={onConfigureAi}
+            onPointerEnter={onPreloadAi}
+          >
+            <KeyRound className="size-3.5" aria-hidden />
+            {t('settings_ai_configure')}
+          </Button>
+        </div>
+      </Field>
     </div>
   );
 }

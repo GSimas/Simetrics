@@ -309,6 +309,8 @@ export const TRANSLATIONS = {
 
     // Configurações
     settings_btn: 'Configurações',
+    menu_btn: 'Menu',
+    menu_sign_in_hint: 'Salve seus projetos na nuvem',
     settings_title: 'Configurações',
     settings_theme: 'Tema',
     settings_theme_dark: 'Escuro',
@@ -862,6 +864,8 @@ export const TRANSLATIONS = {
     // Landing Screen
     // Settings
     settings_btn: 'Settings',
+    menu_btn: 'Menu',
+    menu_sign_in_hint: 'Save your projects to the cloud',
     settings_title: 'Settings',
     settings_theme: 'Theme',
     settings_theme_dark: 'Dark',

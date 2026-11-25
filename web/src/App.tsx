@@ -1,12 +1,9 @@
 import { Suspense, useEffect, useState } from 'react';
-import { FolderOpen } from 'lucide-react';
 
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { BrandMark } from '@/components/BrandMark';
-import { AccountButton } from '@/components/AccountButton';
-import { SettingsButton } from '@/components/HeaderActions';
+import { HeaderMenu } from '@/components/HeaderMenu';
 import { KpiTicker } from '@/components/KpiTicker';
-import { TutorialTriggerButton } from '@/components/TutorialTriggerButton';
 import { BuyMeCoffeeButton } from '@/components/BuyMeCoffeeButton';
 import { DemoBanner } from '@/components/DemoBanner';
 import { WorkspaceSidebar } from '@/components/WorkspaceSidebar';
@@ -178,21 +175,7 @@ export default function App() {
 
                 <SaveStatus />
 
-                <button
-                  type="button"
-                  data-tour="projects"
-                  onClick={() => navigate('landing')}
-                  // No celular o texto some; o nome acessível não pode sumir junto.
-                  aria-label={t('nav_projects_btn')}
-                  className="header-chip cursor-pointer"
-                >
-                  <FolderOpen className="size-3.5" aria-hidden />
-                  <span className="hidden sm:inline">{t('nav_projects_btn')}</span>
-                </button>
-
-                <TutorialTriggerButton onClick={openTutorial} />
-                <AccountButton />
-                <SettingsButton />
+                <HeaderMenu onOpenProjects={() => navigate('landing')} onOpenTutorial={openTutorial} />
               </div>
             </div>
             {tickerVisible && <KpiTicker />}

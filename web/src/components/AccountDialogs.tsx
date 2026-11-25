@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Cloud, CloudOff, Loader2, LogIn, LogOut, MailCheck, RefreshCw } from 'lucide-react';
+import { useState, type FormEvent } from 'react';
+import { Cloud, CloudOff, Loader2, MailCheck, RefreshCw } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -11,14 +11,12 @@ import {
   sendPasswordReset,
   signInWithOAuth,
   signInWithPassword,
-  signOut,
   signUp,
   updatePassword,
   useAuth,
   type OAuthProvider,
 } from '@/state/auth.store';
 import { useLocale } from '@/state/locale.store';
-import { ICON_BUTTON } from './HeaderActions';
 
 type Mode = 'signin' | 'signup' | 'reset';
 
@@ -50,7 +48,7 @@ function MicrosoftIcon() {
   );
 }
 
-function AuthDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+export function AuthDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const t = useLocale((state) => state.t);
   const redirectError = useAuth((state) => state.redirectError);
   const [mode, setMode] = useState<Mode>('signin');
@@ -246,7 +244,7 @@ function AuthDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open
 }
 
 /** Volta do link de "esqueci a senha": pede a senha nova. */
-function NewPasswordDialog() {
+export function NewPasswordDialog() {
   const t = useLocale((state) => state.t);
   const recovering = useAuth((state) => state.recovering);
   const [password, setPassword] = useState('');
@@ -302,7 +300,7 @@ function NewPasswordDialog() {
   );
 }
 
-function CloudStatusLine() {
+export function CloudStatusLine() {
   const t = useLocale((state) => state.t);
   const status = useCloudSync((state) => state.status);
   if (status === 'off') return null;
@@ -313,111 +311,5 @@ function CloudStatusLine() {
       <Icon className={cn('size-3.5 shrink-0', status === 'syncing' && 'animate-spin')} aria-hidden />
       {label}
     </p>
-  );
-}
-
-/**
- * Conta no cabeçalho: "Entrar" sem login; com login, as iniciais abrem um menu com a conta,
- * o estado da nuvem e "Sair".
- */
-export function AccountButton() {
-  const t = useLocale((state) => state.t);
-  const user = useAuth((state) => state.user);
-  const ready = useAuth((state) => state.ready);
-  const redirectError = useAuth((state) => state.redirectError);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    const close = (event: PointerEvent | KeyboardEvent) => {
-      if (event instanceof KeyboardEvent ? event.key === 'Escape' : !rootRef.current?.contains(event.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    document.addEventListener('pointerdown', close);
-    document.addEventListener('keydown', close);
-    return () => {
-      document.removeEventListener('pointerdown', close);
-      document.removeEventListener('keydown', close);
-    };
-  }, [menuOpen]);
-
-  if (!ready) return null;
-
-  if (!user) {
-    return (
-      <>
-        <button
-          type="button"
-          onClick={() => setDialogOpen(true)}
-          aria-label={t('auth_sign_in_btn')}
-          className="header-chip cursor-pointer"
-        >
-          <LogIn className="size-3.5" aria-hidden />
-          <span className="hidden sm:inline">{t('auth_sign_in_btn')}</span>
-        </button>
-        <AuthDialog
-          // Erro na volta do Google/Microsoft: o login reabre mostrando o motivo.
-          open={dialogOpen || Boolean(redirectError)}
-          onOpenChange={(open) => {
-            setDialogOpen(open);
-            if (!open) useAuth.setState({ redirectError: null });
-          }}
-        />
-      </>
-    );
-  }
-
-  const name = (user.user_metadata?.full_name as string | undefined) || user.email || '';
-  const initials = name
-    .split(/[\s@.]+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]!.toUpperCase())
-    .join('');
-
-  return (
-    <div ref={rootRef} className="relative">
-      <button
-        type="button"
-        onClick={() => setMenuOpen((value) => !value)}
-        className={cn(ICON_BUTTON, 'text-xs font-semibold', menuOpen && 'border-highlight text-highlight')}
-        title={t('auth_account')}
-        aria-label={t('auth_account')}
-        aria-haspopup="dialog"
-        aria-expanded={menuOpen}
-      >
-        {initials || <LogIn className="size-4" aria-hidden />}
-      </button>
-      {menuOpen && (
-        <div
-          role="dialog"
-          aria-label={t('auth_account')}
-          className="absolute right-0 top-full z-50 mt-2 w-[min(18rem,calc(100vw-2rem))] space-y-3 border border-border bg-card p-4 text-left shadow-xl duration-200 animate-in fade-in-0 slide-in-from-top-1"
-        >
-          <div className="min-w-0">
-            {user.user_metadata?.full_name && <p className="truncate text-sm font-semibold">{name}</p>}
-            <p className="truncate text-xs text-muted-foreground">{user.email}</p>
-          </div>
-          <CloudStatusLine />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="w-full"
-            onClick={() => {
-              setMenuOpen(false);
-              void signOut();
-            }}
-          >
-            <LogOut className="size-3.5" />
-            {t('auth_sign_out')}
-          </Button>
-        </div>
-      )}
-      <NewPasswordDialog />
-    </div>
   );
 }
