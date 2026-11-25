@@ -449,11 +449,12 @@ export const TRANSLATIONS = {
     landing_hero_b: 'com',
     landing_hero_signal: 'inteligência',
     landing_projects_eyebrow: 'Seus projetos · salvos neste navegador',
-    landing_faq_eyebrow: 'Dúvidas',
     landing_about_button: 'Sobre o Simetrics',
-    landing_highlight_1_label: '100% no seu navegador',
+    landing_privacy_link: 'Política de privacidade',
+    landing_terms_link: 'Termos de serviço',
+    landing_highlight_1_label: 'Seus dados, sob seu controle',
     landing_highlight_1_text:
-      'Seus dados nunca saem do seu computador. Todo o processamento roda via Web Workers, direto no navegador.',
+      'Todo o processamento roda no seu navegador. Sem conta, nada sai do seu computador; com a conta Scientata, opcional, seus projetos também ficam salvos na nuvem.',
     landing_highlight_2_label: 'Ecologia do Conhecimento',
     landing_highlight_2_text:
       'Mapeie a estrutura intelectual da sua base através de grafos, métricas de rede, PCA e similaridade.',
@@ -478,16 +479,16 @@ export const TRANSLATIONS = {
       'Uma plataforma gratuita de bibliometria e cientometria. Ela transforma exports de bases acadêmicas (Scopus, Web of Science, SciELO e outras) em indicadores cientométricos, redes de colaboração e mapeamento temático por IA.',
     landing_faq_q2: 'O Simetrics é gratuito?',
     landing_faq_a2:
-      'Sim, totalmente gratuito e sem necessidade de cadastro. Os recursos de IA (categorização temática, assistente científica) são opcionais e usam a chave de API do próprio usuário (BYOK).',
+      'Sim, e não exige cadastro. A conta Scientata é opcional e serve para salvar os projetos na nuvem. Os recursos de IA (categorização temática, assistente científica) têm uma cota gratuita e podem usar a sua própria chave de API (BYOK).',
     landing_faq_q3: 'Meus dados ficam salvos onde? É seguro enviar minha base?',
     landing_faq_a3:
-      'Todo o processamento acontece no seu navegador — os documentos nunca são enviados a nenhum servidor. Os projetos que você salva ficam armazenados localmente, neste navegador e neste dispositivo, via IndexedDB.',
+      'Todo o processamento acontece no seu navegador. Sem conta, os projetos ficam só neste navegador (IndexedDB) e os documentos não vão para nenhum servidor. Com a conta Scientata, uma cópia dos projetos e PDFs fica na nuvem, acessível só por você. Os detalhes estão na política de privacidade.',
     landing_faq_q4: 'Quais formatos de arquivo o Simetrics aceita?',
     landing_faq_a4:
       'RIS (SciELO, Web of Science, Scopus, Mendeley, Cochrane), CSV (Scopus, Cochrane), Excel (Web of Science) e TXT/NBIB (PubMed).',
     landing_faq_q5: 'Preciso de conta ou chave de API para usar?',
     landing_faq_a5:
-      'Não. A análise bibliométrica completa funciona sem conta e sem chave de API. Uma chave própria (Gemini, OpenAI, Claude ou OpenRouter) só é necessária para os recursos opcionais de IA.',
+      'Não. A análise bibliométrica completa funciona sem conta e sem chave de API. A conta só serve para salvar os projetos na nuvem, e uma chave própria (Gemini, OpenAI, Claude ou OpenRouter) amplia os recursos de IA além da cota gratuita.',
 
     // Cartão de Projeto
     project_card_open: 'Abrir',
@@ -998,11 +999,12 @@ export const TRANSLATIONS = {
     landing_hero_b: 'with',
     landing_hero_signal: 'intelligence',
     landing_projects_eyebrow: 'Your projects · saved in this browser',
-    landing_faq_eyebrow: 'Questions',
     landing_about_button: 'About Simetrics',
-    landing_highlight_1_label: '100% in your browser',
+    landing_privacy_link: 'Privacy policy',
+    landing_terms_link: 'Terms of service',
+    landing_highlight_1_label: 'Your data, your control',
     landing_highlight_1_text:
-      'Your data never leaves your computer. All processing runs via Web Workers, right in the browser.',
+      'All processing runs in your browser. Without an account nothing leaves your computer; with the optional Scientata account, your projects are also saved to the cloud.',
     landing_highlight_2_label: 'Knowledge Ecology',
     landing_highlight_2_text:
       'Map the intellectual structure of your dataset through graphs, network metrics, PCA, and similarity.',
@@ -1027,16 +1029,16 @@ export const TRANSLATIONS = {
       'A free bibliometric and scientometric analysis platform. It turns exports from academic databases (Scopus, Web of Science, SciELO, and others) into scientometric indicators, collaboration networks, and AI-driven thematic mapping.',
     landing_faq_q2: 'Is Simetrics free?',
     landing_faq_a2:
-      'Yes, completely free and no account required. The AI features (thematic categorization, scientific assistant) are optional and use the user’s own API key (BYOK).',
+      'Yes, and no sign-up is required. The Scientata account is optional and saves your projects to the cloud. The AI features (thematic categorization, scientific assistant) include a free quota and can use your own API key (BYOK).',
     landing_faq_q3: 'Where is my data stored? Is it safe to upload my dataset?',
     landing_faq_a3:
-      'All processing happens in your browser — documents are never sent to any server. Projects you save are stored locally, in this browser and on this device, via IndexedDB.',
+      'All processing happens in your browser. Without an account, projects stay in this browser only (IndexedDB) and documents are not sent to any server. With a Scientata account, a copy of your projects and PDFs is kept in the cloud, accessible only to you. Details are in the privacy policy.',
     landing_faq_q4: 'Which file formats does Simetrics accept?',
     landing_faq_a4:
       'RIS (SciELO, Web of Science, Scopus, Mendeley, Cochrane), CSV (Scopus, Cochrane), Excel (Web of Science), and TXT/NBIB (PubMed).',
     landing_faq_q5: 'Do I need an account or an API key to use it?',
     landing_faq_a5:
-      'No. Full bibliometric analysis works without an account or an API key. Your own key (Gemini, OpenAI, Claude, or OpenRouter) is only needed for the optional AI features.',
+      'No. Full bibliometric analysis works without an account or an API key. The account only saves your projects to the cloud, and your own key (Gemini, OpenAI, Claude, or OpenRouter) extends the AI features beyond the free quota.',
 
     // Project Card
     project_card_open: 'Open',

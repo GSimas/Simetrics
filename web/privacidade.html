@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="pt-BR" data-lang="pt" data-title-pt="Privacidade · Simetrics" data-title-en="Privacy · Simetrics">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Privacidade · Simetrics</title>
+    <meta
+      name="description"
+      content="Como o Simetrics trata os seus dados: o que fica no navegador, o que vai para a nuvem com a conta Scientata e como pedir a exclusão."
+    />
+    <link rel="canonical" href="https://simetrics.app/privacidade.html" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="any" />
+    <meta name="theme-color" content="#07110f" />
+    <!-- Mesmas preferências do app, antes do primeiro paint (index.html). -->
+    <script>
+      (function () {
+        var root = document.documentElement;
+        try {
+          if (localStorage.getItem('simetrics-theme') !== 'light') root.classList.add('dark');
+          var font = localStorage.getItem('simetrics-font');
+          root.dataset.font = font === 'min' || font === 'max' ? font : 'med';
+          if (localStorage.getItem('simetrics-contrast') === 'high') root.dataset.contrast = 'high';
+        } catch (e) {
+          root.classList.add('dark');
+        }
+      })();
+    </script>
+    <style>
+      html { background: #f0eee6; color: #07110f; }
+      html.dark { background: #07110f; color: #f0eee6; }
+      html[data-lang='pt'] [lang='en'], html[data-lang='en'] [lang='pt'] { display: none; }
+    </style>
+    <script type="module" src="/src/static-page.ts"></script>
+  </head>
+  <body class="min-h-dvh bg-background text-foreground">
+    <header class="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-md">
+      <div class="container flex items-center justify-between gap-4 py-4">
+        <a href="/" aria-label="Simetrics" class="inline-flex text-foreground transition-colors hover:text-highlight">
+          <span class="brand-mark h-9" aria-hidden="true"></span>
+        </a>
+        <div class="flex items-center gap-2">
+          <a
+            href="https://scientata.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="eyebrow hidden items-center gap-1.5 px-2 text-foreground transition-colors hover:text-highlight sm:inline-flex"
+          >
+            <span lang="pt">Uma aplicação Scientata ↗</span><span lang="en">A Scientata application ↗</span>
+          </a>
+          <button type="button" data-lang-switch="en" lang="pt" class="header-chip cursor-pointer">English</button>
+          <button type="button" data-lang-switch="pt" lang="en" class="header-chip cursor-pointer">Português</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container max-w-3xl py-14 sm:py-20">
+      <!-- Português -->
+      <article lang="pt">
+        <p class="eyebrow flex items-center gap-3">
+          <span class="h-px w-10 bg-highlight" aria-hidden="true"></span>Privacidade
+        </p>
+        <h1 class="mt-6 text-[clamp(2.4rem,6vw,4rem)] font-medium leading-[0.95] tracking-[-0.05em]">
+          Política de <em class="accent-serif">privacidade</em>
+        </h1>
+        <p class="eyebrow mt-5">Simetrics · atualizada em 24 de novembro de 2026</p>
+
+        <div class="mt-10 border border-border border-l-2 border-l-highlight bg-card p-6 text-base leading-relaxed">
+          O Simetrics funciona sem conta: as bases que você carrega, os projetos e os PDFs ficam no seu navegador. A
+          conta Scientata é opcional e serve para salvar os projetos na nuvem e abri-los em outros aparelhos.
+          <strong class="font-semibold">Não vendemos dados, não exibimos anúncios e não usamos rastreadores.</strong>
+        </div>
+
+        <section class="mt-14 grid gap-3 border-t border-border pt-8 sm:grid-cols-[4rem_1fr]">
+          <span class="font-mono text-xs text-highlight">01</span>
+          <div class="space-y-3">
+            <h2 class="text-xl font-semibold tracking-[-0.02em]">Sem conta</h2>
+            <ul class="list-disc space-y-2 pl-5 text-muted-foreground marker:text-highlight">
+              <li>Bases bibliográficas, projetos, revisões e PDFs ficam no armazenamento local do navegador (IndexedDB e localStorage) e não são enviados aos nossos servidores.</li>
+              <li>Preferências como idioma, tema e tamanho da letra também ficam só no navegador.</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="mt-10 grid gap-3 border-t border-border pt-8 sm:grid-cols-[4rem_1fr]">
+          <span class="font-mono text-xs text-highlight">02</span>
+          <div class="space-y-3">
+            <h2 class="text-xl font-semibold tracking-[-0.02em]">Com a conta Scientata</h2>
+            <ul class="list-disc space-y-2 pl-5 text-muted-foreground marker:text-highlight">
+              <li><strong class="font-semibold text-foreground">Dados da conta:</strong> e-mail, nome e, ao entrar com Google ou Microsoft, o nome e a foto que esses provedores compartilham. Nunca recebemos a sua senha do Google ou da Microsoft.</li>
+              <li><strong class="font-semibold text-foreground">Projetos e PDFs:</strong> uma cópia de cada projeto salvo (base, deduplicação, temas, revisão) e dos PDFs anexados à revisão fica na nuvem, acessível só pela sua conta.</li>
+              <li>Ao sair da conta, os projetos dela deixam este navegador e voltam quando você entrar de novo.</li>
+              <li>A conta é compartilhada entre as aplicações Scientata: ao criá-la, também é criado um perfil pessoal no Scientata Lab.</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="mt-10 grid gap-3 border-t border-border pt-8 sm:grid-cols-[4rem_1fr]">
+          <span class="font-mono text-xs text-highlight">03</span>
+          <div class="space-y-3">
+            <h2 class="text-xl font-semibold tracking-[-0.02em]">Inteligência artificial</h2>
+            <p class="leading-relaxed text-muted-foreground">Quando você usa um recurso de IA (assistente Simi, classificação temática, nomes de temas, apoio à revisão), os trechos necessários da base ou do PDF são enviados ao provedor escolhido: o que você configurou com a sua própria chave (como Google Gemini, OpenAI, Anthropic ou OpenRouter) ou, no uso gratuito, DeepSeek e TypeSafe (Jev), por meio do servidor do Simetrics. Isso só acontece quando você aciona o recurso e segue as políticas de cada provedor.</p>
+          </div>
+        </section>
+
+        <section class="mt-10 grid gap-3 border-t border-border pt-8 sm:grid-cols-[4rem_1fr]">
+          <span class="font-mono text-xs text-highlight">04</span>
+          <div class="space-y-3">
+            <h2 class="text-xl font-semibold tracking-[-0.02em]">Onde os dados ficam</h2>
+            <ul class="list-disc space-y-2 pl-5 text-muted-foreground marker:text-highlight">
+              <li><strong class="font-semibold text-foreground">Supabase</strong>, região de São Paulo: conta, projetos e PDFs de quem usa a conta.</li>
+              <li><strong class="font-semibold text-foreground">Netlify</strong>: hospedagem do site e do servidor. Para controlar as cotas gratuitas de IA, guardamos só identificadores do aparelho e do IP transformados em hash, nunca o conteúdo das suas bases.</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="mt-10 grid gap-3 border-t border-border pt-8 sm:grid-cols-[4rem_1fr]">
+          <span class="font-mono text-xs text-highlight">05</span>
+          <div class="space-y-3">
+            <h2 class="text-xl font-semibold tracking-[-0.02em]">Seus direitos</h2>
+            <p class="leading-relaxed text-muted-foreground">Pela Lei Geral de Proteção de Dados (LGPD), você pode pedir acesso, correção ou exclusão dos seus dados e da sua conta. Excluir um projeto no Simetrics também o remove da nuvem. Para excluir a conta ou tirar dúvidas, escreva para <a href="mailto:contato@gustavosimas.com" class="text-highlight underline-offset-4 hover:underline">contato@gustavosimas.com</a>.</p>
+            <p class="leading-relaxed text-muted-foreground">Se esta política mudar, a data no topo desta página será atualizada.</p>
+          </div>
+        </section>
+      </article>
+
+      <!-- English -->
+      <article lang="en">
+        <p class="eyebrow flex items-center gap-3">
+          <span class="h-px w-10 bg-highlight" aria-hidden="true"></span>Privacy
+        </p>
+        <h1 class="mt-6 text-[clamp(2.4rem,6vw,4rem)] font-medium leading-[0.95] tracking-[-0.05em]">
+          Privacy <em class="accent-serif">policy</em>
+        </h1>
+        <p class="eyebrow mt-5">Simetrics · last updated November 24, 2026</p>
+
+        <div class="mt-10 border border-border border-l-2 border-l-highlight bg-card p-6 text-base leading-relaxed">
+          Simetrics works without an account: the datasets you load, your projects and your PDFs stay in your browser.
+          The Scientata account is optional and lets you save projects to the cloud and open them on other devices.
+          <strong class="font-semibold">We do not sell data, show ads or use trackers.</strong>
+        </div>
+
+        <section class="mt-14 grid gap-3 border-t border-border pt-8 sm:grid-cols-[4rem_1fr]">
+          <span class="font-mono text-xs text-highlight">01</span>
+          <div class="space-y-3">
+            <h2 class="text-xl font-semibold tracking-[-0.02em]">Without an account</h2>
+            <ul class="list-disc space-y-2 pl-5 text-muted-foreground marker:text-highlight">
+              <li>Bibliographic files, projects, reviews and PDFs stay in the browser's local storage (IndexedDB and localStorage) and are not sent to our servers.</li>
+              <li>Preferences such as language, theme and font size also stay in the browser.</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="mt-10 grid gap-3 border-t border-border pt-8 sm:grid-cols-[4rem_1fr]">
+          <span class="font-mono text-xs text-highlight">02</span>
+          <div class="space-y-3">
+            <h2 class="text-xl font-semibold tracking-[-0.02em]">With a Scientata account</h2>
+            <ul class="list-disc space-y-2 pl-5 text-muted-foreground marker:text-highlight">
+              <li><strong class="font-semibold text-foreground">Account data:</strong> email, name and, when signing in with Google or Microsoft, the name and picture those providers share. We never receive your Google or Microsoft password.</li>
+              <li><strong class="font-semibold text-foreground">Projects and PDFs:</strong> a copy of each saved project (dataset, deduplication, themes, review) and of the PDFs attached to the review is kept in the cloud, accessible only to your account.</li>
+              <li>When you sign out, that account's projects leave this browser and come back when you sign in again.</li>
+              <li>The account is shared across Scientata applications: creating it also creates a personal profile in Scientata Lab.</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="mt-10 grid gap-3 border-t border-border pt-8 sm:grid-cols-[4rem_1fr]">
+          <span class="font-mono text-xs text-highlight">03</span>
+          <div class="space-y-3">
+            <h2 class="text-xl font-semibold tracking-[-0.02em]">Artificial intelligence</h2>
+            <p class="leading-relaxed text-muted-foreground">When you use an AI feature (Simi assistant, thematic classification, theme naming, review support), the needed excerpts of your dataset or PDF are sent to the chosen provider: the one you configured with your own key (such as Google Gemini, OpenAI, Anthropic or OpenRouter) or, for free use, DeepSeek and TypeSafe (Jev) through the Simetrics server. This only happens when you trigger the feature and follows each provider's policies.</p>
+          </div>
+        </section>
+
+        <section class="mt-10 grid gap-3 border-t border-border pt-8 sm:grid-cols-[4rem_1fr]">
+          <span class="font-mono text-xs text-highlight">04</span>
+          <div class="space-y-3">
+            <h2 class="text-xl font-semibold tracking-[-0.02em]">Where data is stored</h2>
+            <ul class="list-disc space-y-2 pl-5 text-muted-foreground marker:text-highlight">
+              <li><strong class="font-semibold text-foreground">Supabase</strong>, São Paulo region: account, projects and PDFs for account users.</li>
+              <li><strong class="font-semibold text-foreground">Netlify</strong>: hosting for the site and server. To enforce free AI quotas we keep only hashed device and IP identifiers, never the contents of your datasets.</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="mt-10 grid gap-3 border-t border-border pt-8 sm:grid-cols-[4rem_1fr]">
+          <span class="font-mono text-xs text-highlight">05</span>
+          <div class="space-y-3">
+            <h2 class="text-xl font-semibold tracking-[-0.02em]">Your rights</h2>
+            <p class="leading-relaxed text-muted-foreground">Under Brazil's General Data Protection Law (LGPD) you may request access to, correction of, or deletion of your data and account. Deleting a project in Simetrics also removes it from the cloud. To delete your account or ask questions, write to <a href="mailto:contato@gustavosimas.com" class="text-highlight underline-offset-4 hover:underline">contato@gustavosimas.com</a>.</p>
+            <p class="leading-relaxed text-muted-foreground">If this policy changes, the date at the top of this page will be updated.</p>
+          </div>
+        </section>
+      </article>
+    </main>
+
+    <footer class="border-t border-border py-4">
+      <div class="container flex flex-col items-center justify-between gap-2 text-center sm:flex-row sm:text-left">
+        <span class="eyebrow flex flex-wrap items-center justify-center gap-x-3">
+          <a href="/" class="transition-colors hover:text-highlight">← Simetrics</a>
+          <a href="/termos.html" class="transition-colors hover:text-highlight"><span lang="pt">Termos de serviço</span><span lang="en">Terms of service</span></a>
+        </span>
+        <a href="https://gustavosimas.com" target="_blank" rel="noopener noreferrer" class="text-sm text-muted-foreground">
+          <span lang="pt">Desenvolvido por</span><span lang="en">Developed by</span>
+          <span class="accent-serif text-base">Gustavo Simas</span>
+        </a>
+      </div>
+    </footer>
+  </body>
+</html>

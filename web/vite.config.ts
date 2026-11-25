@@ -53,6 +53,12 @@ export default defineConfig(({ mode }) => {
       // sob demanda, por aba. Os gráficos em si são SVG desenhado pelo Simetrics.
       // Vite 8 usa Rolldown: o `manualChunks` em objeto do Rollup virou `codeSplitting.groups`.
       rollupOptions: {
+        // Páginas institucionais (privacidade, termos), com o CSS e as fontes do app.
+        input: {
+          main: fileURLToPath(new URL('./index.html', import.meta.url)),
+          privacidade: fileURLToPath(new URL('./privacidade.html', import.meta.url)),
+          termos: fileURLToPath(new URL('./termos.html', import.meta.url)),
+        },
         output: {
           codeSplitting: {
             groups: [
