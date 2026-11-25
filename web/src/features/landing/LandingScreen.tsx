@@ -219,13 +219,14 @@ export function LandingScreen({ navigate, onOpenTutorial }: LandingScreenProps) 
               {t('landing_cta_tutorial')} ↗
             </button>
 
+            {/* Sobre e perguntas frequentes numa janela só, com o link da política de privacidade. */}
             <Dialog>
               <DialogTrigger asChild>
                 <button type="button" className={linkClass}>
                   {t('landing_about_button')}
                 </button>
               </DialogTrigger>
-              <DialogContent className="max-h-[85dvh] max-w-4xl overflow-y-auto">
+              <DialogContent className="max-h-[90dvh] max-w-4xl overflow-y-auto">
                 <DialogTitle className="pr-10 text-3xl font-medium tracking-[-0.05em]">
                   {t('landing_about_button')}
                 </DialogTitle>
@@ -245,27 +246,13 @@ export function LandingScreen({ navigate, onOpenTutorial }: LandingScreenProps) 
                     </div>
                   ))}
                 </div>
-              </DialogContent>
-            </Dialog>
 
-            <Dialog>
-              <DialogTrigger asChild>
-                <button type="button" className={linkClass}>
-                  {t('landing_faq_title')}
-                </button>
-              </DialogTrigger>
-              <DialogContent className="max-h-[90dvh] max-w-4xl overflow-y-auto">
-                <div className="space-y-2 pr-10">
-                  <p className="eyebrow">— {t('landing_faq_eyebrow')}</p>
-                  <DialogTitle className="text-3xl font-medium tracking-[-0.05em]">
-                    {t('landing_faq_title')}
-                  </DialogTitle>
-                </div>
+                <h3 className="eyebrow pt-2">— {t('landing_faq_title')}</h3>
                 {/* Lista à esquerda, resposta à direita: altura fixa, a janela não cresce ao trocar de pergunta. */}
                 <Tabs
                   orientation="vertical"
                   defaultValue={FAQ_ITEMS[0].questionKey}
-                  className="grid border-t border-border sm:h-[min(22rem,55dvh)] sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]"
+                  className="grid border-y border-border sm:h-[min(20rem,38dvh)] sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]"
                 >
                   <TabsList className="flex h-auto flex-col items-stretch justify-start overflow-y-auto border-b border-border sm:border-b-0 sm:border-r">
                     {FAQ_ITEMS.map(({ questionKey }) => (
@@ -289,6 +276,10 @@ export function LandingScreen({ navigate, onOpenTutorial }: LandingScreenProps) 
                     </TabsContent>
                   ))}
                 </Tabs>
+
+                <a href="/privacidade.html" className={`${linkClass} justify-self-start`}>
+                  {t('landing_privacy_link')} ↗
+                </a>
               </DialogContent>
             </Dialog>
           </div>
@@ -297,7 +288,12 @@ export function LandingScreen({ navigate, onOpenTutorial }: LandingScreenProps) 
 
       <footer className="relative border-t border-border py-4">
         <div className="container flex flex-col items-center justify-between gap-2 text-center sm:flex-row sm:text-left">
-          <span className="eyebrow">Simetrics · {t('app_subtitle')}</span>
+          <span className="eyebrow">
+            Simetrics · {t('app_subtitle')} ·{' '}
+            <a href="/privacidade.html" className="transition-colors hover:text-highlight">
+              {t('landing_privacy_link')}
+            </a>
+          </span>
           <a
             href="https://gustavosimas.com"
             target="_blank"
