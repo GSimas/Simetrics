@@ -1,10 +1,11 @@
 import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
-import { ArrowLeft, ChevronDown, ChevronRight, FolderOpen, HelpCircle, LogIn, LogOut, Menu, Settings } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronRight, FolderOpen, HelpCircle, LogIn, LogOut, Menu, Settings, UserRound } from 'lucide-react';
 
 import type { User } from '@supabase/supabase-js';
 
 import { AuthDialog, CloudStatusLine, NewPasswordDialog } from '@/components/AccountDialogs';
 import { SettingsPanel } from '@/components/HeaderActions';
+import { ProfileDialog } from '@/components/ProfileDialog';
 import { lazyWithPreload } from '@/lib/lazy';
 import { cn } from '@/lib/utils';
 import { signOut, useAuth } from '@/state/auth.store';
@@ -74,6 +75,7 @@ export function HeaderMenu({
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<'main' | 'settings'>('main');
   const [authOpen, setAuthOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   // Montado desde a primeira abertura, para a animação de fechar continuar funcionando.
   const [aiMounted, setAiMounted] = useState(false);
@@ -174,6 +176,9 @@ export function HeaderMenu({
               </div>
 
               <div className="py-1">
+                {user && (
+                  <MenuItem icon={<UserRound className="size-4" />} label={t('profile_title')} onClick={run(() => setProfileOpen(true))} />
+                )}
                 {onOpenProjects && (
                   <MenuItem icon={<FolderOpen className="size-4" />} label={t('nav_projects_btn')} onClick={run(onOpenProjects)} />
                 )}
@@ -225,6 +230,8 @@ export function HeaderMenu({
         }}
       />
       <NewPasswordDialog />
+      {/* Montado só aberto: os campos nascem com os dados atuais da conta. */}
+      {user && profileOpen && <ProfileDialog open onOpenChange={setProfileOpen} />}
       {aiMounted && (
         <Suspense fallback={null}>
           <AiSettingsModal open={aiOpen} onOpenChange={setAiOpen} />

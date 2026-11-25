@@ -1,7 +1,7 @@
 import type { User } from '@supabase/supabase-js';
 import { create } from 'zustand';
 
-import { releaseAccount, setCloudUser, syncAll } from '@/lib/cloud-sync';
+import { deleteAccountData, releaseAccount, setCloudUser, syncAll } from '@/lib/cloud-sync';
 import { supabase } from '@/lib/supabase';
 import { useLocale } from './locale.store';
 import { useProjectStore } from './project.store';
@@ -91,6 +91,43 @@ export async function signOut(): Promise<void> {
   });
   const projects = useProjectStore.getState();
   if (projects.activeProjectId && removed.includes(projects.activeProjectId)) projects.startBlank();
+  await supabase.auth.signOut();
+  await projects.refreshList();
+}
+
+/** Entra com senha (conta com identidade de e-mail) em vez de só OAuth. */
+export function hasPassword(user: User): boolean {
+  return user.identities?.some((identity) => identity.provider === 'email') ?? false;
+}
+
+/** Nome de exibição: nos metadados da conta e no perfil Scientata (compartilhado). */
+export async function updateDisplayName(name: string): Promise<void> {
+  const { data, error } = await supabase.auth.updateUser({ data: { full_name: name } });
+  if (error) throw error;
+  // O perfil do Scientata Lab guarda o mesmo nome; se falhar, a conta já foi atualizada.
+  await supabase.from('profiles').update({ display_name: name }).eq('id', data.user.id);
+}
+
+/** Troca o e-mail de acesso: o Supabase envia um link de confirmação ao novo endereço. */
+export async function updateEmail(email: string): Promise<void> {
+  const { error } = await supabase.auth.updateUser({ email }, { emailRedirectTo: returnUrl() });
+  if (error) throw error;
+}
+
+/** Troca a senha conferindo a atual antes, para uma sessão aberta não bastar. */
+export async function changePassword(email: string, current: string, next: string): Promise<void> {
+  const { error: checkError } = await supabase.auth.signInWithPassword({ email, password: current });
+  if (checkError) throw new Error(useLocale.getState().t('profile_password_wrong'));
+  const { error } = await supabase.auth.updateUser({ password: next });
+  if (error) throw error;
+}
+
+/** Apaga os dados do Simetrics na nuvem e neste navegador, e sai da conta. */
+export async function deleteSimetricsData(): Promise<void> {
+  await deleteAccountData();
+  const projects = useProjectStore.getState();
+  projects.startBlank();
+  // Direto no Supabase: `signOut()` tentaria subir de novo o que acabou de ser apagado.
   await supabase.auth.signOut();
   await projects.refreshList();
 }

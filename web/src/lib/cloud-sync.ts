@@ -162,6 +162,39 @@ export async function releaseAccount(): Promise<string[]> {
   return removed;
 }
 
+/**
+ * "Excluir meus dados do Simetrics": apaga da nuvem todos os projetos e PDFs da conta e
+ * tira deste navegador os projetos dela. A conta Scientata em si continua (é compartilhada
+ * com as outras aplicações Scientata). Os PDFs locais ficam, como em `releaseAccount`.
+ */
+export async function deleteAccountData(): Promise<void> {
+  const uid = userId;
+  if (!uid) return;
+  for (const timer of pendingUploads.values()) clearTimeout(timer);
+  pendingUploads.clear();
+
+  const bucket = supabase.storage.from(CLOUD_BUCKET);
+  for (const folder of ['projects', 'pdfs']) {
+    // ponytail: até 1000 arquivos por pasta, como no `syncAll`; paginar se alguém passar disso.
+    const { data, error } = await bucket.list(`${uid}/${folder}`, { limit: 1000 });
+    if (error) throw error;
+    const paths = (data ?? []).map((file) => `${uid}/${folder}/${file.name}`);
+    if (paths.length > 0) {
+      const { error: removeError } = await bucket.remove(paths);
+      if (removeError) throw removeError;
+    }
+  }
+  const { error } = await supabase.from('simetrics_projects').delete().eq('user_id', uid);
+  if (error) throw error;
+
+  for (const id of readSynced(uid)) await deleteProject(id, { localOnly: true });
+  try {
+    localStorage.removeItem(syncedKey(uid));
+  } catch {
+    // Sem armazenamento: nada a limpar.
+  }
+}
+
 async function uploadPdf(uid: string, pdf: StoredPdf): Promise<void> {
   const bucket = supabase.storage.from(CLOUD_BUCKET);
   const sidecar = JSON.stringify({ name: pdf.name, pageTexts: pdf.pageTexts, storedAt: pdf.storedAt });
