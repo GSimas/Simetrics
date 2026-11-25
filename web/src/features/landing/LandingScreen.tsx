@@ -5,8 +5,7 @@ import { AmbientBackground, HeroOrbits } from '@/components/AmbientBackdrop';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { BrandMark } from '@/components/BrandMark';
-import { AccountButton } from '@/components/AccountButton';
-import { SettingsButton } from '@/components/HeaderActions';
+import { HeaderMenu } from '@/components/HeaderMenu';
 import { EmptyState } from '@/features/EmptyState';
 import { ProjectCard } from '@/features/landing/ProjectCard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -99,8 +98,7 @@ export function LandingScreen({ navigate, onOpenTutorial }: LandingScreenProps) 
               {t('landing_family')}
               <ArrowUpRight className="size-3.5 text-highlight" aria-hidden />
             </a>
-            <AccountButton />
-            <SettingsButton />
+            <HeaderMenu onOpenTutorial={onOpenTutorial} />
           </div>
         </div>
       </header>
