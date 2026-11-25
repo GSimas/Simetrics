@@ -451,6 +451,7 @@ export const TRANSLATIONS = {
     landing_projects_eyebrow: 'Seus projetos · salvos neste navegador',
     landing_about_button: 'Sobre o Simetrics',
     landing_privacy_link: 'Política de privacidade',
+    landing_terms_link: 'Termos de serviço',
     landing_highlight_1_label: 'Seus dados, sob seu controle',
     landing_highlight_1_text:
       'Todo o processamento roda no seu navegador. Sem conta, nada sai do seu computador; com a conta Scientata, opcional, seus projetos também ficam salvos na nuvem.',
@@ -1000,6 +1001,7 @@ export const TRANSLATIONS = {
     landing_projects_eyebrow: 'Your projects · saved in this browser',
     landing_about_button: 'About Simetrics',
     landing_privacy_link: 'Privacy policy',
+    landing_terms_link: 'Terms of service',
     landing_highlight_1_label: 'Your data, your control',
     landing_highlight_1_text:
       'All processing runs in your browser. Without an account nothing leaves your computer; with the optional Scientata account, your projects are also saved to the cloud.',

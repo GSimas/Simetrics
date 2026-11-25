@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="pt-BR" data-lang="pt" data-title-pt="Termos de serviço · Simetrics" data-title-en="Terms of service · Simetrics">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Termos de serviço · Simetrics</title>
+    <meta
+      name="description"
+      content="Termos de serviço do Simetrics: uso do app, conta Scientata opcional, recursos de IA, seus conteúdos e responsabilidades."
+    />
+    <link rel="canonical" href="https://simetrics.app/termos.html" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="any" />
+    <meta name="theme-color" content="#07110f" />
+    <!-- Mesmas preferências do app, antes do primeiro paint (index.html). -->
+    <script>
+      (function () {
+        var root = document.documentElement;
+        try {
+          if (localStorage.getItem('simetrics-theme') !== 'light') root.classList.add('dark');
+          var font = localStorage.getItem('simetrics-font');
+          root.dataset.font = font === 'min' || font === 'max' ? font : 'med';
+          if (localStorage.getItem('simetrics-contrast') === 'high') root.dataset.contrast = 'high';
+        } catch (e) {
+          root.classList.add('dark');
+        }
+      })();
+    </script>
+    <style>
+      html { background: #f0eee6; color: #07110f; }
+      html.dark { background: #07110f; color: #f0eee6; }
+      html[data-lang='pt'] [lang='en'], html[data-lang='en'] [lang='pt'] { display: none; }
+    </style>
+    <script type="module" src="/src/static-page.ts"></script>
+  </head>
+  <body class="min-h-dvh bg-background text-foreground">
+    <header class="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-md">
+      <div class="container flex items-center justify-between gap-4 py-4">
+        <a href="/" aria-label="Simetrics" class="inline-flex text-foreground transition-colors hover:text-highlight">
+          <span class="brand-mark h-9" aria-hidden="true"></span>
+        </a>
+        <div class="flex items-center gap-2">
+          <a
+            href="https://scientata.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="eyebrow hidden items-center gap-1.5 px-2 text-foreground transition-colors hover:text-highlight sm:inline-flex"
+          >
+            <span lang="pt">Uma aplicação Scientata ↗</span><span lang="en">A Scientata application ↗</span>
+          </a>
+          <button type="button" data-lang-switch="en" lang="pt" class="header-chip cursor-pointer">English</button>
+          <button type="button" data-lang-switch="pt" lang="en" class="header-chip cursor-pointer">Português</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="container max-w-3xl py-14 sm:py-20">
+      <!-- Português -->
+      <article lang="pt">
+        <p class="eyebrow flex items-center gap-3">
+          <span class="h-px w-10 bg-highlight" aria-hidden="true"></span>Termos
+        </p>
+        <h1 class="mt-6 text-[clamp(2.4rem,6vw,4rem)] font-medium leading-[0.95] tracking-[-0.05em]">
+          Termos de <em class="accent-serif">serviço</em>
+        </h1>
+        <p class="eyebrow mt-5">Simetrics · atualizados em 24 de novembro de 2026</p>
+
+        <div class="mt-10 border border-border border-l-2 border-l-highlight bg-card p-6 text-base leading-relaxed">
+          O Simetrics é uma aplicação Scientata, desenvolvida por Gustavo Simas, para análise bibliométrica,
+          cientométrica e revisão sistematizada. Ao usar o app, você concorda com estes termos. O tratamento dos seus
+          dados está descrito na <a href="/privacidade.html" class="text-highlight underline-offset-4 hover:underline">política de privacidade</a>.
+        </div>
+
+        <section class="mt-14 grid gap-3 border-t border-border pt-8 sm:grid-cols-[4rem_1fr]">
+          <span class="font-mono text-xs text-highlight">01</span>
+          <div class="space-y-3">
+            <h2 class="text-xl font-semibold tracking-[-0.02em]">O serviço</h2>
+            <p class="leading-relaxed text-muted-foreground">O Simetrics é gratuito e funciona no navegador, com ou sem conta. Os recursos podem mudar, ser ampliados ou descontinuados, e as cotas gratuitas de IA podem ser ajustadas conforme o custo e a demanda.</p>
+          </div>
+        </section>
+
+        <section class="mt-10 grid gap-3 border-t border-border pt-8 sm:grid-cols-[4rem_1fr]">
+          <span class="font-mono text-xs text-highlight">02</span>
+          <div class="space-y-3">
+            <h2 class="text-xl font-semibold tracking-[-0.02em]">Conta Scientata</h2>
+            <ul class="list-disc space-y-2 pl-5 text-muted-foreground marker:text-highlight">
+              <li>A conta é opcional e compartilhada entre as aplicações Scientata.</li>
+              <li>Você é responsável pelas informações que fornece e pela segurança do acesso à sua conta, inclusive da senha e das contas Google ou Microsoft usadas para entrar.</li>
+              <li>Podemos suspender contas usadas para violar estes termos.</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="mt-10 grid gap-3 border-t border-border pt-8 sm:grid-cols-[4rem_1fr]">
+          <span class="font-mono text-xs text-highlight">03</span>
+          <div class="space-y-3">
+            <h2 class="text-xl font-semibold tracking-[-0.02em]">Uso aceitável</h2>
+            <p class="leading-relaxed text-muted-foreground">Ao usar o Simetrics, você se compromete a não:</p>
+            <ul class="list-disc space-y-2 pl-5 text-muted-foreground marker:text-highlight">
+              <li>usar o app para fins ilegais ou para violar direitos de terceiros;</li>
+              <li>contornar as cotas gratuitas de IA, automatizar acessos em massa ou sobrecarregar o serviço;</li>
+              <li>tentar acessar dados de outras pessoas ou explorar falhas de segurança (se encontrar uma, avise pelo e-mail abaixo).</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="mt-10 grid gap-3 border-t border-border pt-8 sm:grid-cols-[4rem_1fr]">
+          <span class="font-mono text-xs text-highlight">04</span>
+          <div class="space-y-3">
+            <h2 class="text-xl font-semibold tracking-[-0.02em]">Seus conteúdos</h2>
+            <ul class="list-disc space-y-2 pl-5 text-muted-foreground marker:text-highlight">
+              <li>As bases, projetos e PDFs continuam sendo seus. Com a conta, você nos autoriza apenas a armazená-los e processá-los para prestar o serviço.</li>
+              <li>Você é responsável por ter o direito de usar os arquivos que carrega, em especial PDFs protegidos por direitos autorais.</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="mt-10 grid gap-3 border-t border-border pt-8 sm:grid-cols-[4rem_1fr]">
+          <span class="font-mono text-xs text-highlight">05</span>
+          <div class="space-y-3">
+            <h2 class="text-xl font-semibold tracking-[-0.02em]">Inteligência artificial</h2>
+            <p class="leading-relaxed text-muted-foreground">Respostas, classificações e sugestões geradas por IA podem conter erros ou imprecisões. Elas apoiam o seu trabalho, mas não substituem a sua análise: confira os resultados antes de usá-los em pesquisas, publicações ou decisões. Os provedores de IA são serviços de terceiros, com termos próprios.</p>
+          </div>
+        </section>
+
+        <section class="mt-10 grid gap-3 border-t border-border pt-8 sm:grid-cols-[4rem_1fr]">
+          <span class="font-mono text-xs text-highlight">06</span>
+          <div class="space-y-3">
+            <h2 class="text-xl font-semibold tracking-[-0.02em]">Garantias e responsabilidade</h2>
+            <p class="leading-relaxed text-muted-foreground">O Simetrics é oferecido "no estado em que se encontra", sem garantia de disponibilidade contínua ou de ausência de erros. Mantenha cópias dos seus projetos (a exportação em .json serve para isso). Na medida permitida pela lei, não nos responsabilizamos por perdas de dados, lucros ou danos indiretos decorrentes do uso do app.</p>
+          </div>
+        </section>
+
+        <section class="mt-10 grid gap-3 border-t border-border pt-8 sm:grid-cols-[4rem_1fr]">
+          <span class="font-mono text-xs text-highlight">07</span>
+          <div class="space-y-3">
+            <h2 class="text-xl font-semibold tracking-[-0.02em]">Propriedade intelectual</h2>
+            <p class="leading-relaxed text-muted-foreground">A marca, o visual e o código do Simetrics pertencem ao seu desenvolvedor. Os gráficos, tabelas e relatórios que você gera a partir dos seus dados podem ser usados livremente nos seus trabalhos.</p>
+          </div>
+        </section>
+
+        <section class="mt-10 grid gap-3 border-t border-border pt-8 sm:grid-cols-[4rem_1fr]">
+          <span class="font-mono text-xs text-highlight">08</span>
+          <div class="space-y-3">
+            <h2 class="text-xl font-semibold tracking-[-0.02em]">Encerramento, mudanças e contato</h2>
+            <p class="leading-relaxed text-muted-foreground">Você pode parar de usar o app e pedir a exclusão da conta a qualquer momento. Estes termos podem ser atualizados; a data no topo indica a versão em vigor, e continuar usando o app depois de uma mudança significa aceitá-la. Eles seguem as leis brasileiras. Dúvidas: <a href="mailto:contato@gustavosimas.com" class="text-highlight underline-offset-4 hover:underline">contato@gustavosimas.com</a>.</p>
+          </div>
+        </section>
+      </article>
+
+      <!-- English -->
+      <article lang="en">
+        <p class="eyebrow flex items-center gap-3">
+          <span class="h-px w-10 bg-highlight" aria-hidden="true"></span>Terms
+        </p>
+        <h1 class="mt-6 text-[clamp(2.4rem,6vw,4rem)] font-medium leading-[0.95] tracking-[-0.05em]">
+          Terms of <em class="accent-serif">service</em>
+        </h1>
+        <p class="eyebrow mt-5">Simetrics · last updated November 24, 2026</p>
+
+        <div class="mt-10 border border-border border-l-2 border-l-highlight bg-card p-6 text-base leading-relaxed">
+          Simetrics is a Scientata application, developed by Gustavo Simas, for bibliometric and scientometric analysis
+          and systematic reviews. By using the app you agree to these terms. How your data is handled is described in
+          the <a href="/privacidade.html" class="text-highlight underline-offset-4 hover:underline">privacy policy</a>.
+        </div>
+
+        <section class="mt-14 grid gap-3 border-t border-border pt-8 sm:grid-cols-[4rem_1fr]">
+          <span class="font-mono text-xs text-highlight">01</span>
+          <div class="space-y-3">
+            <h2 class="text-xl font-semibold tracking-[-0.02em]">The service</h2>
+            <p class="leading-relaxed text-muted-foreground">Simetrics is free and runs in the browser, with or without an account. Features may change, grow or be discontinued, and free AI quotas may be adjusted to cost and demand.</p>
+          </div>
+        </section>
+
+        <section class="mt-10 grid gap-3 border-t border-border pt-8 sm:grid-cols-[4rem_1fr]">
+          <span class="font-mono text-xs text-highlight">02</span>
+          <div class="space-y-3">
+            <h2 class="text-xl font-semibold tracking-[-0.02em]">Scientata account</h2>
+            <ul class="list-disc space-y-2 pl-5 text-muted-foreground marker:text-highlight">
+              <li>The account is optional and shared across Scientata applications.</li>
+              <li>You are responsible for the information you provide and for keeping access to your account secure, including your password and the Google or Microsoft accounts used to sign in.</li>
+              <li>We may suspend accounts used to violate these terms.</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="mt-10 grid gap-3 border-t border-border pt-8 sm:grid-cols-[4rem_1fr]">
+          <span class="font-mono text-xs text-highlight">03</span>
+          <div class="space-y-3">
+            <h2 class="text-xl font-semibold tracking-[-0.02em]">Acceptable use</h2>
+            <p class="leading-relaxed text-muted-foreground">When using Simetrics, you agree not to:</p>
+            <ul class="list-disc space-y-2 pl-5 text-muted-foreground marker:text-highlight">
+              <li>use the app for illegal purposes or to infringe third-party rights;</li>
+              <li>circumvent free AI quotas, automate bulk access or overload the service;</li>
+              <li>try to access other people's data or exploit security flaws (if you find one, please report it to the email below).</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="mt-10 grid gap-3 border-t border-border pt-8 sm:grid-cols-[4rem_1fr]">
+          <span class="font-mono text-xs text-highlight">04</span>
+          <div class="space-y-3">
+            <h2 class="text-xl font-semibold tracking-[-0.02em]">Your content</h2>
+            <ul class="list-disc space-y-2 pl-5 text-muted-foreground marker:text-highlight">
+              <li>Your datasets, projects and PDFs remain yours. With an account, you only authorize us to store and process them to provide the service.</li>
+              <li>You are responsible for having the right to use the files you upload, especially copyrighted PDFs.</li>
+            </ul>
+          </div>
+        </section>
+
+        <section class="mt-10 grid gap-3 border-t border-border pt-8 sm:grid-cols-[4rem_1fr]">
+          <span class="font-mono text-xs text-highlight">05</span>
+          <div class="space-y-3">
+            <h2 class="text-xl font-semibold tracking-[-0.02em]">Artificial intelligence</h2>
+            <p class="leading-relaxed text-muted-foreground">AI-generated answers, classifications and suggestions may contain errors or inaccuracies. They support your work but do not replace your own analysis: check the results before using them in research, publications or decisions. AI providers are third-party services with their own terms.</p>
+          </div>
+        </section>
+
+        <section class="mt-10 grid gap-3 border-t border-border pt-8 sm:grid-cols-[4rem_1fr]">
+          <span class="font-mono text-xs text-highlight">06</span>
+          <div class="space-y-3">
+            <h2 class="text-xl font-semibold tracking-[-0.02em]">Warranties and liability</h2>
+            <p class="leading-relaxed text-muted-foreground">Simetrics is provided "as is", with no guarantee of continuous availability or freedom from errors. Keep copies of your projects (the .json export is there for that). To the extent permitted by law, we are not liable for data loss, lost profits or indirect damages arising from use of the app.</p>
+          </div>
+        </section>
+
+        <section class="mt-10 grid gap-3 border-t border-border pt-8 sm:grid-cols-[4rem_1fr]">
+          <span class="font-mono text-xs text-highlight">07</span>
+          <div class="space-y-3">
+            <h2 class="text-xl font-semibold tracking-[-0.02em]">Intellectual property</h2>
+            <p class="leading-relaxed text-muted-foreground">The Simetrics brand, design and code belong to its developer. The charts, tables and reports you generate from your own data may be used freely in your work.</p>
+          </div>
+        </section>
+
+        <section class="mt-10 grid gap-3 border-t border-border pt-8 sm:grid-cols-[4rem_1fr]">
+          <span class="font-mono text-xs text-highlight">08</span>
+          <div class="space-y-3">
+            <h2 class="text-xl font-semibold tracking-[-0.02em]">Termination, changes and contact</h2>
+            <p class="leading-relaxed text-muted-foreground">You may stop using the app and request account deletion at any time. These terms may be updated; the date at the top shows the version in force, and continuing to use the app after a change means accepting it. They are governed by Brazilian law. Questions: <a href="mailto:contato@gustavosimas.com" class="text-highlight underline-offset-4 hover:underline">contato@gustavosimas.com</a>.</p>
+          </div>
+        </section>
+      </article>
+    </main>
+
+    <footer class="border-t border-border py-4">
+      <div class="container flex flex-col items-center justify-between gap-2 text-center sm:flex-row sm:text-left">
+        <span class="eyebrow flex flex-wrap items-center justify-center gap-x-3">
+          <a href="/" class="transition-colors hover:text-highlight">← Simetrics</a>
+          <a href="/privacidade.html" class="transition-colors hover:text-highlight"><span lang="pt">Privacidade</span><span lang="en">Privacy</span></a>
+        </span>
+        <a href="https://gustavosimas.com" target="_blank" rel="noopener noreferrer" class="text-sm text-muted-foreground">
+          <span lang="pt">Desenvolvido por</span><span lang="en">Developed by</span>
+          <span class="accent-serif text-base">Gustavo Simas</span>
+        </a>
+      </div>
+    </footer>
+  </body>
+</html>

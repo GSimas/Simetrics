@@ -219,7 +219,7 @@ export function LandingScreen({ navigate, onOpenTutorial }: LandingScreenProps) 
               {t('landing_cta_tutorial')} ↗
             </button>
 
-            {/* Sobre e perguntas frequentes numa janela só, com o link da política de privacidade. */}
+            {/* Sobre e perguntas frequentes numa janela só, com os links de privacidade e termos. */}
             <Dialog>
               <DialogTrigger asChild>
                 <button type="button" className={linkClass}>
@@ -277,9 +277,14 @@ export function LandingScreen({ navigate, onOpenTutorial }: LandingScreenProps) 
                   ))}
                 </Tabs>
 
-                <a href="/privacidade.html" className={`${linkClass} justify-self-start`}>
-                  {t('landing_privacy_link')} ↗
-                </a>
+                <div className="flex flex-wrap gap-x-6 gap-y-3">
+                  <a href="/privacidade.html" className={linkClass}>
+                    {t('landing_privacy_link')} ↗
+                  </a>
+                  <a href="/termos.html" className={linkClass}>
+                    {t('landing_terms_link')} ↗
+                  </a>
+                </div>
               </DialogContent>
             </Dialog>
           </div>
@@ -292,6 +297,10 @@ export function LandingScreen({ navigate, onOpenTutorial }: LandingScreenProps) 
             Simetrics · {t('app_subtitle')} ·{' '}
             <a href="/privacidade.html" className="transition-colors hover:text-highlight">
               {t('landing_privacy_link')}
+            </a>{' '}
+            ·{' '}
+            <a href="/termos.html" className="transition-colors hover:text-highlight">
+              {t('landing_terms_link')}
             </a>
           </span>
           <a

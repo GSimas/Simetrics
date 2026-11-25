@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt-BR" data-lang="pt">
+<html lang="pt-BR" data-lang="pt" data-title-pt="Privacidade · Simetrics" data-title-en="Privacy · Simetrics">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -31,7 +31,7 @@
       html.dark { background: #07110f; color: #f0eee6; }
       html[data-lang='pt'] [lang='en'], html[data-lang='en'] [lang='pt'] { display: none; }
     </style>
-    <script type="module" src="/src/privacy-page.ts"></script>
+    <script type="module" src="/src/static-page.ts"></script>
   </head>
   <body class="min-h-dvh bg-background text-foreground">
     <header class="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-md">
@@ -196,7 +196,10 @@
 
     <footer class="border-t border-border py-4">
       <div class="container flex flex-col items-center justify-between gap-2 text-center sm:flex-row sm:text-left">
-        <a href="/" class="eyebrow transition-colors hover:text-highlight">← Simetrics</a>
+        <span class="eyebrow flex flex-wrap items-center justify-center gap-x-3">
+          <a href="/" class="transition-colors hover:text-highlight">← Simetrics</a>
+          <a href="/termos.html" class="transition-colors hover:text-highlight"><span lang="pt">Termos de serviço</span><span lang="en">Terms of service</span></a>
+        </span>
         <a href="https://gustavosimas.com" target="_blank" rel="noopener noreferrer" class="text-sm text-muted-foreground">
           <span lang="pt">Desenvolvido por</span><span lang="en">Developed by</span>
           <span class="accent-serif text-base">Gustavo Simas</span>

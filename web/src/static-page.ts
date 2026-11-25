@@ -1,6 +1,7 @@
 /**
- * Página de privacidade (privacidade.html): só a tipografia e os tokens do app, sem React.
- * Mostra o idioma da interface (o salvo no app ou o do sistema) e troca pelos botões.
+ * Páginas institucionais (privacidade.html, termos.html): só a tipografia e os tokens do
+ * app, sem React. Mostram o idioma da interface (o salvo no app ou o do sistema) e trocam
+ * pelos botões. O título de cada idioma vem de `data-title-pt`/`data-title-en` no <html>.
  */
 import './fonts.css';
 import './index.css';
@@ -25,7 +26,8 @@ function show(lang: Lang): void {
   const root = document.documentElement;
   root.dataset.lang = lang;
   root.lang = lang === 'en' ? 'en' : 'pt-BR';
-  document.title = lang === 'en' ? 'Privacy · Simetrics' : 'Privacidade · Simetrics';
+  const title = lang === 'en' ? root.dataset.titleEn : root.dataset.titlePt;
+  if (title) document.title = title;
 }
 
 show(initialLang());
