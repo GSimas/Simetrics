@@ -7,6 +7,7 @@ import { AuthDialog, CloudStatusLine, NewPasswordDialog } from '@/components/Acc
 import { SettingsPanel } from '@/components/HeaderActions';
 import { ProfileDialog } from '@/components/ProfileDialog';
 import { lazyWithPreload } from '@/lib/lazy';
+import { usePresence } from '@/lib/use-presence';
 import { cn } from '@/lib/utils';
 import { signOut, useAuth } from '@/state/auth.store';
 import { useLocale } from '@/state/locale.store';
@@ -83,9 +84,12 @@ export function HeaderMenu({
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
+  const { mounted, closing } = usePresence(open);
+  // Volta ao menu principal só depois da saída: trocar antes faria o painel mudar enquanto some.
+  if (!mounted && view !== 'main') setView('main');
+
   const close = (): void => {
     setOpen(false);
-    setView('main');
   };
 
   // Fecha com clique fora ou Esc (e devolve o foco ao botão).
@@ -138,14 +142,19 @@ export function HeaderMenu({
         <ChevronDown className={cn('size-3.5 transition-transform duration-200', open && 'rotate-180')} aria-hidden />
       </button>
 
-      {open && (
+      {mounted && (
         <div
           role="menu"
           aria-label={view === 'settings' ? t('settings_title') : t('menu_btn')}
-          className="absolute right-0 top-full z-50 mt-2 max-h-[calc(100dvh-6rem)] w-[min(22rem,calc(100vw-2rem))] overflow-y-auto border border-border bg-card text-left shadow-xl duration-200 animate-in fade-in-0 slide-in-from-top-1"
+          className={cn(
+            'absolute right-0 top-full z-50 mt-2 max-h-[calc(100dvh-6rem)] w-[min(22rem,calc(100vw-2rem))] overflow-y-auto border border-border bg-card text-left shadow-xl duration-200',
+            closing
+              ? 'pointer-events-none animate-out fade-out-0 slide-out-to-top-1 fill-mode-forwards'
+              : 'animate-in fade-in-0 slide-in-from-top-1',
+          )}
         >
           {view === 'main' ? (
-            <>
+            <div key="main" className="animate-in fade-in-0 slide-in-from-left-3 duration-200">
               <div className="space-y-2 border-b border-border p-4">
                 {user ? (
                   <>
@@ -198,9 +207,9 @@ export function HeaderMenu({
                   <MenuItem icon={<LogOut className="size-4" />} label={t('auth_sign_out')} onClick={run(() => void signOut())} />
                 </div>
               )}
-            </>
+            </div>
           ) : (
-            <div className="p-4">
+            <div key="settings" className="p-4 animate-in fade-in-0 slide-in-from-right-3 duration-200">
               <button
                 type="button"
                 onClick={() => setView('main')}

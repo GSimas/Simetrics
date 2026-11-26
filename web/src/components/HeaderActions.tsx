@@ -1,12 +1,12 @@
 import type { ReactNode } from 'react';
-import { KeyRound, Moon, Sun } from 'lucide-react';
+import { Contrast, GalleryHorizontalEnd, KeyRound, Monitor, Moon, MoveHorizontal, Sun, Waves, type LucideIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import type { Locale } from '@/lib/i18n/translations';
 import { cn } from '@/lib/utils';
 import { useAiConfig } from '@/state/ai-config.store';
 import { useLocale } from '@/state/locale.store';
-import { systemReducesMotion, usePreferences, type FontScale, type Theme } from '@/state/preferences.store';
+import { systemReducesMotion, usePreferences, type FontScale, type ThemeMode } from '@/state/preferences.store';
 
 /** Grupo de opções mutuamente exclusivas, no traço dos controles do cabeçalho. */
 function Segmented<T extends string>({
@@ -48,11 +48,13 @@ function Segmented<T extends string>({
 
 /** Interruptor liga/desliga na largura do campo, com o rótulo à esquerda. */
 function Switch({
+  Icon,
   label,
   checked,
   onChange,
   disabled = false,
 }: {
+  Icon: LucideIcon;
   label: string;
   checked: boolean;
   onChange: (checked: boolean) => void;
@@ -67,7 +69,10 @@ function Switch({
       onClick={() => onChange(!checked)}
       className="flex w-full cursor-pointer items-center justify-between border border-border px-3 py-2 text-sm transition-colors hover:border-highlight disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-border"
     >
-      <span>{label}</span>
+      <span className="flex items-center gap-2">
+        <Icon className="size-4 text-muted-foreground" aria-hidden />
+        {label}
+      </span>
       <span
         className={cn(
           'relative h-5 w-9 rounded-full border transition-colors',
@@ -118,7 +123,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
  */
 export function SettingsPanel({ onConfigureAi, onPreloadAi }: { onConfigureAi: () => void; onPreloadAi: () => void }) {
   const { t, locale, setLocale } = useLocale();
-  const theme = usePreferences((state) => state.theme);
+  const themeMode = usePreferences((state) => state.themeMode);
   const fontScale = usePreferences((state) => state.fontScale);
   const highContrast = usePreferences((state) => state.highContrast);
   const tickerScroll = usePreferences((state) => state.tickerScroll);
@@ -132,13 +137,14 @@ export function SettingsPanel({ onConfigureAi, onPreloadAi }: { onConfigureAi: (
   return (
     <div className="space-y-5">
       <Field label={t('settings_theme')}>
-        <Segmented<Theme>
+        <Segmented<ThemeMode>
           label={t('settings_theme')}
-          value={theme}
+          value={themeMode}
           onChange={setTheme}
           options={[
             { value: 'dark', label: t('settings_theme_dark'), icon: <Moon className="size-4" aria-hidden /> },
             { value: 'light', label: t('settings_theme_light'), icon: <Sun className="size-4" aria-hidden /> },
+            { value: 'system', label: t('settings_theme_system'), icon: <Monitor className="size-4" aria-hidden /> },
           ]}
         />
       </Field>
@@ -169,11 +175,12 @@ export function SettingsPanel({ onConfigureAi, onPreloadAi }: { onConfigureAi: (
       </Field>
 
       <Field label={t('settings_contrast')}>
-        <Switch label={t('settings_contrast')} checked={highContrast} onChange={setHighContrast} />
+        <Switch Icon={Contrast} label={t('settings_contrast')} checked={highContrast} onChange={setHighContrast} />
       </Field>
 
       <Field label={t('settings_motion')}>
         <Switch
+          Icon={Waves}
           label={t('settings_motion_reduce')}
           checked={reduceMotion || systemMotion}
           onChange={setReduceMotion}
@@ -183,8 +190,9 @@ export function SettingsPanel({ onConfigureAi, onPreloadAi }: { onConfigureAi: (
 
       <Field label={t('settings_ticker')}>
         <div className="space-y-2">
-          <Switch label={t('settings_ticker_show')} checked={tickerVisible} onChange={setTickerVisible} />
+          <Switch Icon={GalleryHorizontalEnd} label={t('settings_ticker_show')} checked={tickerVisible} onChange={setTickerVisible} />
           <Switch
+            Icon={MoveHorizontal}
             label={t('settings_ticker_scroll')}
             checked={tickerScroll}
             onChange={setTickerScroll}

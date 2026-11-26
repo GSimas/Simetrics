@@ -72,7 +72,7 @@ export function ChatWidget() {
           type="button"
           onClick={() => setIsOpen((prev) => !prev)}
           className={cn(
-            'group relative flex items-center rounded-full py-2.5 sm:py-3 text-white shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 focus:outline-hidden',
+            'group relative flex cursor-pointer items-center rounded-full py-2.5 sm:py-3 text-white shadow-2xl transition-all duration-300 hover:scale-105 active:scale-95 focus:outline-hidden',
             isOpen
               ? 'gap-2.5 px-4 bg-slate-800 dark:bg-slate-700'
               : 'gap-0 px-3.5 hover:gap-2.5 bg-primary text-primary-foreground shadow-[0_0_28px_-8px_var(--highlight)]',
@@ -144,7 +144,7 @@ export function ChatWidget() {
               <button
                 type="button"
                 onClick={() => setAiModalOpen(true)}
-                className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                className="cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 title={t('ai_settings_btn')}
                 aria-label={t('ai_settings_btn')}
               >
@@ -155,7 +155,7 @@ export function ChatWidget() {
                 <button
                   type="button"
                   onClick={() => useChat.getState().clear()}
-                  className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+                  className="cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
                   title={isEn ? 'Clear history' : 'Limpar conversa'}
                   aria-label={isEn ? 'Clear history' : 'Limpar conversa'}
                 >
@@ -166,7 +166,7 @@ export function ChatWidget() {
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                className="cursor-pointer rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 title={isEn ? 'Minimize' : 'Minimizar'}
                 aria-label={isEn ? 'Close' : 'Fechar'}
               >

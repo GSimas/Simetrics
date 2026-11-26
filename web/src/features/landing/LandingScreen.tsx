@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { ArrowRight, ArrowUpRight, FolderOpen, Upload } from 'lucide-react';
+import { ArrowUpRight, FlaskConical, FolderOpen, Plus, Upload } from 'lucide-react';
 
 import { AmbientBackground, HeroOrbits } from '@/components/AmbientBackdrop';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { TranslationKey } from '@/lib/i18n/translations';
 import type { AppView } from '@/lib/use-hash-route';
 import { useLocale } from '@/state/locale.store';
+import { useDataset } from '@/state/dataset.store';
 import { useProjectStore } from '@/state/project.store';
 
 const FAQ_ITEMS = [
@@ -50,6 +51,7 @@ export function LandingScreen({ navigate, onOpenTutorial }: LandingScreenProps) 
   const importFromFile = useProjectStore((state) => state.importFromFile);
   const clearError = useProjectStore((state) => state.clearError);
   const startBlank = useProjectStore((state) => state.startBlank);
+  const loadDemo = useDataset((state) => state.loadDemo);
 
   useEffect(() => {
     void refreshList();
@@ -57,8 +59,6 @@ export function LandingScreen({ navigate, onOpenTutorial }: LandingScreenProps) 
     // duplicate, delete, import e o checkpoint automático já chamam refreshList).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const mostRecent = projects[0];
 
   const handleOpen = async (id: string): Promise<void> => {
     await openProject(id);
@@ -68,6 +68,12 @@ export function LandingScreen({ navigate, onOpenTutorial }: LandingScreenProps) 
   const handleNewBlank = (): void => {
     startBlank();
     navigate('workspace');
+  };
+
+  const handleExample = (): void => {
+    startBlank();
+    navigate('workspace');
+    void loadDemo();
   };
 
   const handleImportChange = (fileList: FileList | null): void => {
@@ -85,10 +91,10 @@ export function LandingScreen({ navigate, onOpenTutorial }: LandingScreenProps) 
       <AmbientBackground />
       <header className="relative z-40 border-b border-border bg-background/80 backdrop-blur-md">
         <div className="container flex items-center justify-between gap-4 py-4">
-          <span role="img" aria-label="Simetrics" className="inline-flex text-foreground">
-            <BrandMark className="h-9" />
-          </span>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-4">
+            <span role="img" aria-label="Simetrics" className="inline-flex text-foreground">
+              <BrandMark className="h-9" />
+            </span>
             <a
               href="https://scientata.com/"
               target="_blank"
@@ -98,6 +104,8 @@ export function LandingScreen({ navigate, onOpenTutorial }: LandingScreenProps) 
               {t('landing_family')}
               <ArrowUpRight className="size-3.5 text-highlight" aria-hidden />
             </a>
+          </div>
+          <div className="flex items-center gap-2">
             <HeaderMenu onOpenTutorial={onOpenTutorial} />
           </div>
         </div>
@@ -123,26 +131,9 @@ export function LandingScreen({ navigate, onOpenTutorial }: LandingScreenProps) 
           </h1>
 
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-            {mostRecent ? (
-              <>
-                <Button size="lg" className="cursor-pointer" onClick={() => void handleOpen(mostRecent.id)}>
-                  {t('landing_cta_continue').replace('{name}', mostRecent.name)}
-                  <ArrowRight aria-hidden />
-                </Button>
-                <Button variant="outline" size="lg" className="cursor-pointer" onClick={handleNewBlank}>
-                  {t('landing_cta_new_blank')}
-                </Button>
-              </>
-            ) : (
-              <Button size="lg" className="cursor-pointer" onClick={handleNewBlank}>
-                {t('landing_cta_start')}
-                <ArrowRight aria-hidden />
-              </Button>
-            )}
-
             <Dialog>
               <DialogTrigger asChild>
-                <Button variant="outline" size="lg" className="cursor-pointer">
+                <Button size="lg" className="cursor-pointer">
                   <FolderOpen aria-hidden />
                   {t('landing_projects_title')}
                 </Button>
@@ -155,23 +146,34 @@ export function LandingScreen({ navigate, onOpenTutorial }: LandingScreenProps) 
                       {t('landing_projects_title')}
                     </DialogTitle>
                   </div>
-                  <input
-                    ref={importInputRef}
-                    type="file"
-                    accept="application/json"
-                    onChange={(event) => handleImportChange(event.target.files)}
-                    className="hidden"
-                    id="simetrics-import-project"
-                  />
-                  <Button asChild variant="outline" size="sm" className="header-chip cursor-pointer">
-                    <label htmlFor="simetrics-import-project">
-                      <Upload className="size-4" aria-hidden />
-                      {t('landing_projects_import')}
-                    </label>
-                  </Button>
                 </DialogHeader>
 
                 <div className="min-h-0 space-y-4 overflow-y-auto">
+                  <div className="flex flex-wrap gap-2">
+                    <Button className="cursor-pointer" onClick={handleNewBlank}>
+                      <Plus aria-hidden />
+                      {t('landing_projects_new')}
+                    </Button>
+                    <input
+                      ref={importInputRef}
+                      type="file"
+                      accept="application/json"
+                      onChange={(event) => handleImportChange(event.target.files)}
+                      className="hidden"
+                      id="simetrics-import-project"
+                    />
+                    <Button asChild variant="outline" className="cursor-pointer">
+                      <label htmlFor="simetrics-import-project">
+                        <Upload aria-hidden />
+                        {t('landing_projects_import')}
+                      </label>
+                    </Button>
+                    <Button variant="outline" className="cursor-pointer" onClick={handleExample}>
+                      <FlaskConical aria-hidden />
+                      {t('landing_projects_example')}
+                    </Button>
+                  </div>
+
                   {error && (
                     <div className="flex items-center justify-between gap-3 border border-destructive/40 bg-destructive/5 p-2 text-sm text-destructive animate-in fade-in-0">
                       <span>{error}</span>
@@ -292,7 +294,7 @@ export function LandingScreen({ navigate, onOpenTutorial }: LandingScreenProps) 
       <footer className="relative border-t border-border py-4">
         <div className="container flex flex-col items-center justify-between gap-2 text-center sm:flex-row sm:text-left">
           <span className="eyebrow">
-            Simetrics · {t('app_subtitle')} ·{' '}
+            Simetrics ·{' '}
             <a href="/privacidade.html" className="transition-colors hover:text-highlight">
               {t('landing_privacy_link')}
             </a>{' '}

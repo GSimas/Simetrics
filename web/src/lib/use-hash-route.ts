@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 
+import { viewTransition } from '@/lib/view-transition';
+
 /**
  * Roteamento mínimo por `location.hash` — landing ⇄ workspace(+projeto). Não é um
  * router de propósito geral: só existem essas duas telas, sem rotas aninhadas, então um
@@ -43,7 +45,8 @@ export function useHashRoute(): [AppRoute, (view: AppView, projectId?: string) =
   const [route, setRoute] = useState<AppRoute>(readRoute);
 
   useEffect(() => {
-    const handleHashChange = () => setRoute(readRoute());
+    // Vale para o `navigate` e para voltar/avançar do navegador.
+    const handleHashChange = () => viewTransition(() => setRoute(readRoute()), 'route');
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);

@@ -61,7 +61,9 @@
       (function () {
         var root = document.documentElement;
         try {
-          if (localStorage.getItem('simetrics-theme') !== 'light') root.classList.add('dark');
+          var theme = localStorage.getItem('simetrics-theme');
+          var light = theme === 'system' ? matchMedia('(prefers-color-scheme: light)').matches : theme === 'light';
+          if (!light) root.classList.add('dark');
           var font = localStorage.getItem('simetrics-font');
           root.dataset.font = font === 'min' || font === 'max' ? font : 'med';
           if (localStorage.getItem('simetrics-contrast') === 'high') root.dataset.contrast = 'high';

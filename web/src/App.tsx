@@ -15,6 +15,7 @@ import { type TranslationKey } from '@/lib/i18n/translations';
 import { lazyWithPreload, whenIdle } from '@/lib/lazy';
 import { useHashRoute } from '@/lib/use-hash-route';
 import { useDataset } from '@/state/dataset.store';
+import { PANEL_ENTER } from '@/features/review/motion';
 import { useLocale } from '@/state/locale.store';
 import { useNavigation, type WorkspaceTab } from '@/state/navigation.store';
 import { usePreferences } from '@/state/preferences.store';
@@ -146,7 +147,6 @@ export default function App() {
                 onClick={() => navigate('landing')}
                 className="group flex items-center gap-4 text-left cursor-pointer focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                 aria-label={t('landing_projects_title')}
-                title={t('landing_projects_title')}
               >
                 <BrandMark className="h-10 sm:h-11 text-foreground" />
                 <h1 className="sr-only">{t('app_title')}</h1>
@@ -158,7 +158,7 @@ export default function App() {
               </button>
 
               {projectName && (
-                <div className="hidden min-w-0 flex-1 flex-col gap-1 border-l border-border pl-4 md:flex" title={projectName}>
+                <div className="hidden min-w-0 flex-1 flex-col gap-1 border-l border-border pl-4 md:flex">
                   <span className="eyebrow">{t('header_project_label')}</span>
                   <span className="truncate text-base font-medium leading-tight tracking-[-0.02em]">{projectName}</span>
                 </div>
@@ -189,9 +189,11 @@ export default function App() {
             <h2 className="sr-only">{t(activeLabelKey)}</h2>
             {/* Uma tela que quebre (ou cujo chunk não baixe) não leva as outras junto. */}
             <ErrorBoundary key={activeTab} variant="page" label={t(activeLabelKey)}>
-              <Suspense fallback={<TabFallback />}>
-                <ActivePanel />
-              </Suspense>
+              <div className={PANEL_ENTER}>
+                <Suspense fallback={<TabFallback />}>
+                  <ActivePanel />
+                </Suspense>
+              </div>
             </ErrorBoundary>
           </main>
         </div>
@@ -210,37 +212,6 @@ export default function App() {
 
         {/* Botão Flutuante de Café Luminoso (Pague-me um café - Canto Inferior Esquerdo) */}
         <BuyMeCoffeeButton />
-
-        {/* Rodapé com crédito de desenvolvimento centralizado */}
-        <footer className="app-footer mt-20 border-t border-border bg-background/70 py-8 backdrop-blur-md">
-          {/* Reserva a área dos botões flutuantes (Simi e café, canto inferior direito): embaixo
-              no layout empilhado, à direita no layout em linha — o crédito nunca fica coberto. */}
-          <div className="container flex flex-col items-center justify-between gap-4 pb-24 text-center text-xs text-muted-foreground md:flex-row md:pb-0 md:pr-24">
-            <div className="flex items-center justify-center md:justify-start gap-3">
-              <span className="brand-mark h-6 text-foreground" aria-hidden />
-              <a
-                href="https://scientata.com/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="eyebrow transition-colors hover:text-highlight"
-              >
-                {t('landing_family')} ↗
-              </a>
-            </div>
-
-            <p className="text-center">
-              {t('developed_by')}{' '}
-              <a
-                href="https://gustavosimas.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="accent-serif text-base underline-offset-4 hover:underline"
-              >
-                Gustavo Simas
-              </a>
-            </p>
-          </div>
-        </footer>
 
         {/* Modal do tutorial */}
         {tutorialMounted && (

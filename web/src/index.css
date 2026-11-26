@@ -329,15 +329,6 @@
   pointer-events: none;
 }
 
-/*
- * Enquanto a aba carrega, o fallback reserva 60vh e o conteúdo real quase nunca tem essa
- * altura: o rodapé mudava de lugar à vista (CLS). Invisível, ele se move sem contar como
- * deslocamento, e reaparece já na posição final.
- */
-body:has([data-tab-fallback]) .app-footer {
-  visibility: hidden;
-}
-
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -515,6 +506,27 @@ body:has([data-tab-fallback]) .app-footer {
 ::view-transition-new(root) {
   animation-duration: 0.3s;
   animation-timing-function: ease-out;
+}
+
+/* Troca de tela (landing ⇄ workspace, abrir projeto): a velha some subindo de leve, a
+   nova entra de baixo — o mesmo gesto do PANEL_ENTER das abas. */
+@keyframes vt-screen-out {
+  to {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+@keyframes vt-screen-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+html:active-view-transition-type(route)::view-transition-old(root) {
+  animation: vt-screen-out 0.22s cubic-bezier(0.4, 0, 1, 1) both;
+}
+html:active-view-transition-type(route)::view-transition-new(root) {
+  animation: vt-screen-in 0.38s cubic-bezier(0.16, 1, 0.3, 1) 0.06s both;
 }
 
 /* Quem pede menos movimento — no sistema ou nas Configurações (`data-motion`) — não

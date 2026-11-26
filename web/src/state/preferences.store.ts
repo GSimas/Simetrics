@@ -1,5 +1,6 @@
-import { flushSync } from 'react-dom';
 import { create } from 'zustand';
+
+import { viewTransition } from '@/lib/view-transition';
 
 /**
  * Preferências de exibição: tema, tamanho da letra, alto contraste, rolagem da faixa
@@ -10,9 +11,13 @@ import { create } from 'zustand';
  * paint, para a página não abrir num tema e trocar para outro.
  */
 export type Theme = 'dark' | 'light';
+/** O que o usuário escolheu; `system` segue o tema do sistema operacional. */
+export type ThemeMode = Theme | 'system';
 export type FontScale = 'min' | 'med' | 'max';
 
 interface PreferencesState {
+  themeMode: ThemeMode;
+  /** Tema em vigor (o do sistema, quando `themeMode` é `system`). */
   theme: Theme;
   fontScale: FontScale;
   highContrast: boolean;
@@ -22,7 +27,7 @@ interface PreferencesState {
   tickerScroll: boolean;
   /** Menos movimento: animações, transições e o fundo animado param (como pede o sistema). */
   reduceMotion: boolean;
-  setTheme: (theme: Theme) => void;
+  setTheme: (mode: ThemeMode) => void;
   setFontScale: (scale: FontScale) => void;
   setHighContrast: (enabled: boolean) => void;
   setTickerScroll: (enabled: boolean) => void;
@@ -55,11 +60,21 @@ function write(key: string, value: string): void {
   }
 }
 
-function initial(): Pick<PreferencesState, 'theme' | 'fontScale' | 'highContrast' | 'tickerScroll' | 'tickerVisible' | 'reduceMotion'> {
+const systemLight = window.matchMedia('(prefers-color-scheme: light)');
+
+function resolveTheme(mode: ThemeMode): Theme {
+  if (mode === 'system') return systemLight.matches ? 'light' : 'dark';
+  return mode;
+}
+
+function initial(): Pick<PreferencesState, 'themeMode' | 'theme' | 'fontScale' | 'highContrast' | 'tickerScroll' | 'tickerVisible' | 'reduceMotion'> {
   const font = read(KEYS.font);
+  const storedTheme = read(KEYS.theme);
+  // Escuro por padrão, como o Scientata; claro e sistema são escolha explícita.
+  const themeMode: ThemeMode = storedTheme === 'light' || storedTheme === 'system' ? storedTheme : 'dark';
   return {
-    // Escuro por padrão, como o Scientata; o claro ("papel") é escolha explícita.
-    theme: read(KEYS.theme) === 'light' ? 'light' : 'dark',
+    themeMode,
+    theme: resolveTheme(themeMode),
     fontScale: font === 'min' || font === 'max' ? font : 'med',
     highContrast: read(KEYS.contrast) === 'high',
     tickerScroll: read(KEYS.ticker) !== 'static',
@@ -97,19 +112,19 @@ export function prefersReducedMotion(): boolean {
 export const usePreferences = create<PreferencesState>()((set, get) => ({
   ...initial(),
 
-  setTheme(theme) {
-    if (theme === get().theme) return;
-    write(KEYS.theme, theme);
-    const update = (): void => {
-      // `flushSync` garante que o "depois" capturado pela View Transition já tem a
-      // paleta nova — inclusive nos componentes que leem o tema do store.
-      flushSync(() => set({ theme }));
+  setTheme(themeMode) {
+    if (themeMode === get().themeMode) return;
+    write(KEYS.theme, themeMode);
+    const theme = resolveTheme(themeMode);
+    if (theme === get().theme) {
+      set({ themeMode });
+      return;
+    }
+    // Cruzamento suave entre as paletas.
+    viewTransition(() => {
+      set({ themeMode, theme });
       apply(get());
-    };
-    // Cruzamento suave entre as paletas; sem suporte (ou com movimento reduzido), troca
-    // direto.
-    if (document.startViewTransition && !prefersReducedMotion()) document.startViewTransition(update);
-    else update();
+    });
   },
 
   setFontScale(fontScale) {
@@ -142,3 +157,12 @@ export const usePreferences = create<PreferencesState>()((set, get) => ({
 }));
 
 apply(usePreferences.getState());
+
+// No modo sistema, acompanha a troca de tema do sistema operacional com o app aberto.
+systemLight.addEventListener('change', () => {
+  const { themeMode, theme } = usePreferences.getState();
+  const next = resolveTheme(themeMode);
+  if (next === theme) return;
+  usePreferences.setState({ theme: next });
+  apply(usePreferences.getState());
+});
